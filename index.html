@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ระบบจำลองการต่อวงจรไฟฟ้าควบคุม (Electrical Control Wiring Simulator)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+        </svg>
+      </div>
+      <div>
+        <h1>Electrical Control Wiring Simulator</h1>
+        <p class="subtitle">ระบบจำลองการเชื่อมต่อสายไฟฟ้าอ้างอิงวงจรสัญลักษณ์ พร้อมตรวจสอบความถูกต้องอัตโนมัติ</p>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <div class="lab-selector-group">
+        <label for="labSelect">เลือกโจทย์ใบงาน:</label>
+        <select id="labSelect" class="lab-select">
+          <option value="lab1_1">ใบงานที่ 1.1: วงจรสวิตช์อนุกรม (Series NO - AND Logic)</option>
+          <option value="lab1_2">ใบงานที่ 1.2: วงจรสวิตช์ขนาน (Parallel NO - OR Logic)</option>
+          <option value="lab1_ex">ใบงานที่ 1 (แบบฝึกหัด): วงจร NOR Logic (0,0 = 1)</option>
+          <option value="lab2_1">ใบงานที่ 2.1: การต่อวงจรรีเลย์เบื้องต้น (ควบคุมหลอดไฟ 1 หลอด)</option>
+          <option value="lab2_2">ใบงานที่ 2.2: การต่อวงจรรีเลย์สลับหน้าสัมผัส NO/NC (หลอดไฟ L1, L2)</option>
+          <option value="lab2_latch">โจทย์เสริม: วงจรรีเลย์ค้างสถานะ (Self-Holding / Latching Circuit)</option>
+        </select>
+      </div>
+
+      <div class="wire-color-picker" role="radiogroup" aria-label="เลือกสีสายไฟ">
+        <span class="picker-label">สีสายไฟ:</span>
+        <button type="button" class="color-swatch active" data-color="#ef4444" style="--swatch: #ef4444" title="สายไฟสีแดง (+12V / ไฟหลัก)"></button>
+        <button type="button" class="color-swatch" data-color="#3b82f6" style="--swatch: #3b82f6" title="สายไฟสีน้ำเงิน (สัญญาณควบคุม)"></button>
+        <button type="button" class="color-swatch" data-color="#eab308" style="--swatch: #eab308" title="สายไฟสีเหลือง (หน้าสัมผัสรีเลย์)"></button>
+        <button type="button" class="color-swatch" data-color="#22c55e" style="--swatch: #22c55e" title="สายไฟสีเขียว"></button>
+        <button type="button" class="color-swatch" data-color="#1e293b" style="--swatch: #1e293b" title="สายไฟสีดำ (0V / กราวด์)"></button>
+      </div>
+
+      <div class="action-buttons">
+        <button type="button" id="btnUndo" class="btn btn-secondary" title="ย้อนกลับสายล่าสุด">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+          ย้อนกลับ
+        </button>
+        <button type="button" id="btnClear" class="btn btn-danger-outline" title="ล้างสายไฟทั้งหมด">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          ล้างสายไฟ
+        </button>
+        <button type="button" id="btnHint" class="btn btn-warning" title="ดูคำใบ้การต่อสาย">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+          คำใบ้ / เฉลย
+        </button>
+        <button type="button" id="btnVerify" class="btn btn-primary">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+          ตรวจสอบความถูกต้องอัตโนมัติ
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="workspace-grid">
+    <!-- Left Column: Schematic & Truth Table / Lab Info -->
+    <section class="left-panel">
+      <div class="panel-card schematic-card">
+        <div class="card-header">
+          <div>
+            <span class="badge badge-schematic">SCHEMATIC DIAGRAM</span>
+            <h2 id="labTitle">วงจรสัญลักษณ์อ้างอิง</h2>
+          </div>
+          <span class="Interactive-tag">กดสวิตช์ในวงจรได้</span>
+        </div>
+        <p id="labObjective" class="lab-objective"></p>
+        <div class="schematic-container" id="schematicContainer">
+          <!-- Dynamic interactive SVG schematic rendered by JS -->
+        </div>
+        <div class="schematic-legend">
+          <span class="legend-item"><i class="dot dot-hot"></i> มีไฟ (+12V)</span>
+          <span class="legend-item"><i class="dot dot-gnd"></i> ครบวงจร (0V)</span>
+          <span class="legend-item"><i class="dot dot-inactive"></i> ไม่มีกระแสไหล</span>
+        </div>
+      </div>
+
+      <div class="panel-card verification-card">
+        <div class="card-header">
+          <div>
+            <span class="badge badge-check">AUTO-VERIFICATION</span>
+            <h2>ตารางความจริง & ผลการตรวจสอบ</h2>
+          </div>
+          <div id="scoreBadge" class="score-badge">รอการตรวจสอบ</div>
+        </div>
+
+        <div id="verificationMessage" class="verification-banner neutral">
+          <div class="banner-icon">ℹ️</div>
+          <div class="banner-text">
+            <strong>คำแนะนำ:</strong> ลากสายไฟเชื่อมขั้วต่างๆ บนชุดฝึกด้านขวาตามวงจรสัญลักษณ์ แล้วกดปุ่ม <b>"ตรวจสอบความถูกต้องอัตโนมัติ"</b> หรือทดลองเปิดแหล่งจ่ายไฟ 12V เพื่อกดสวิตช์ทดสอบจริง
+          </div>
+        </div>
+
+        <div class="truth-table-wrapper">
+          <table class="truth-table" id="truthTable">
+            <thead>
+              <!-- Populated by JS -->
+            </thead>
+            <tbody>
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pinout-reference" id="relayPinoutRef">
+          <div class="pinout-header">
+            <span>📌 โครงสร้างขา Socket Relay MY2N-J (อ้างอิงใบงานที่ 2)</span>
+          </div>
+          <div class="pinout-grid">
+            <div class="pin-chip"><b>ขา 13 (-), 14 (+):</b> Coil Relay</div>
+            <div class="pin-chip"><b>ชุดที่ 1:</b> ขา 9 (COM1) → ขา 1 (NC1) / ขา 5 (NO1)</div>
+            <div class="pin-chip"><b>ชุดที่ 2:</b> ขา 12 (COM2) → ขา 4 (NC2) / ขา 8 (NO2)</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: Physical Workbench Simulation -->
+    <section class="right-panel">
+      <div class="panel-card workbench-card">
+        <div class="workbench-toolbar">
+          <div class="toolbar-left">
+            <span class="badge badge-board">ชุดทดลองการเชื่อมต่อวงจรไฟฟ้าควบคุมด้วย RELAY</span>
+            <span class="board-status" id="wireCountText">สายไฟที่ต่อ: 0 เส้น</span>
+          </div>
+
+          <div class="toolbar-right">
+            <div class="power-switch-wrap">
+              <span class="power-label">แหล่งจ่ายไฟ 12VDC:</span>
+              <button type="button" id="btnPowerToggle" class="power-toggle on" aria-pressed="true">
+                <span class="power-indicator"></span>
+                <span class="power-state-text">ON (จ่ายไฟ)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="board-viewport" id="boardViewport">
+          <svg id="workbenchSvg" viewBox="0 0 920 620" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <filter id="glow-yellow" x="-40%" y="-40%" width="180%" height="180%">
+                <feGaussianBlur stdDeviation="8" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+              <filter id="glow-green" x="-40%" y="-40%" width="180%" height="180%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+              <filter id="shadow-card" x="-5%" y="-5%" width="110%" height="115%">
+                <feDropShadow dx="0" dy="3" stdDeviation="4" flood-opacity="0.16" />
+              </filter>
+              <radialGradient id="screwGrad" cx="35%" cy="35%" r="65%">
+                <stop offset="0%" stop-color="#f8fafc" />
+                <stop offset="65%" stop-color="#cbd5e1" />
+                <stop offset="100%" stop-color="#64748b" />
+              </radialGradient>
+              <radialGradient id="lampOffGrad" cx="40%" cy="40%" r="60%">
+                <stop offset="0%" stop-color="#fef9c3" />
+                <stop offset="100%" stop-color="#ca8a04" />
+              </radialGradient>
+              <radialGradient id="lampOnGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#ffffff" />
+                <stop offset="45%" stop-color="#fde047" />
+                <stop offset="100%" stop-color="#eab308" />
+              </radialGradient>
+            </defs>
+
+            <!-- Board Background Frame -->
+            <rect x="10" y="10" width="900" height="600" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2" />
+
+            <!-- Power Supply Module (Left Box) -->
+            <g id="powerModule" transform="translate(25, 25)">
+              <rect x="0" y="0" width="145" height="260" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="2" filter="url(#shadow-card)" />
+              <rect x="0" y="0" width="145" height="36" rx="8" fill="#1e293b" />
+              <text x="72.5" y="23" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">POWER SUPPLY</text>
+
+              <!-- +12V Jack -->
+              <text x="42" y="92" text-anchor="middle" fill="#dc2626" font-size="28" font-weight="700">+</text>
+              <g class="terminal-node" data-terminal="PWR_POS" data-label="แหล่งจ่ายไฟ +12V" transform="translate(90, 82)">
+                <circle class="term-hit" r="24" fill="transparent" />
+                <circle class="term-outer" r="18" fill="#ef4444" stroke="#991b1b" stroke-width="2.5" />
+                <circle class="term-inner" r="9" fill="#ffffff" stroke="#7f1d1d" stroke-width="2" />
+              </g>
+
+              <!-- 0V (-) Jack -->
+              <text x="42" y="158" text-anchor="middle" fill="#0f172a" font-size="32" font-weight="700">-</text>
+              <g class="terminal-node" data-terminal="PWR_NEG" data-label="แหล่งจ่ายไฟ 0V (-)" transform="translate(90, 148)">
+                <circle class="term-hit" r="24" fill="transparent" />
+                <circle class="term-outer" r="18" fill="#1e293b" stroke="#0f172a" stroke-width="2.5" />
+                <circle class="term-inner" r="9" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+              </g>
+
+              <text x="72.5" y="210" text-anchor="middle" fill="#1e293b" font-size="16" font-weight="700">POWER</text>
+              <text x="72.5" y="232" text-anchor="middle" fill="#dc2626" font-size="18" font-weight="700">12VDC</text>
+              <text id="shortCircuitAlert" x="72.5" y="252" text-anchor="middle" fill="#dc2626" font-size="11" font-weight="700" opacity="0">⚠️ ลัดวงจร (SHORT)!</text>
+            </g>
+
+            <!-- Main Experiment Board Box -->
+            <g id="mainBoard" transform="translate(185, 25)">
+              <rect x="0" y="0" width="710" height="570" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="2" filter="url(#shadow-card)" />
+
+              <!-- TERMINAL BLOCK (6 Columns x 2 Rows internally linked per column) -->
+              <g id="terminalBlockGroup" transform="translate(45, 35)">
+                <text x="0" y="-10" fill="#334155" font-size="14" font-weight="700">TERMINAL BLOCK (ขั้วต่อสายร่วมในแนวตั้งเดียวกันเชื่อมต่อถึงกัน)</text>
+                <rect x="0" y="0" width="276" height="96" rx="4" fill="#fef08a" stroke="#1e293b" stroke-width="2.5" />
+                <!-- Vertical dividers and screws generated by JS -->
+                <g id="terminalBlockPins"></g>
+                <text x="290" y="54" fill="#0f172a" font-size="18" font-weight="700">TERMINAL</text>
+              </g>
+
+              <!-- LAMP LOAD L1 -->
+              <g id="lamp1Group" transform="translate(495, 55)">
+                <text id="lamp1Title" x="55" y="-15" text-anchor="middle" fill="#0f172a" font-size="18" font-weight="700">L1 (LOAD)</text>
+                <!-- Left tab -->
+                <rect x="0" y="18" width="26" height="16" fill="#d97706" stroke="#1e293b" stroke-width="2" />
+                <!-- Right tab -->
+                <rect x="84" y="18" width="26" height="16" fill="#d97706" stroke="#1e293b" stroke-width="2" />
+                <!-- Lamp Circle -->
+                <circle id="lamp1Halo" cx="55" cy="26" r="36" fill="#fde047" opacity="0" filter="url(#glow-yellow)" />
+                <circle id="lamp1Body" cx="55" cy="26" r="29" fill="url(#lampOffGrad)" stroke="#1e293b" stroke-width="2.5" />
+                <line x1="35" y1="6" x2="75" y2="46" stroke="#1e293b" stroke-width="2.5" />
+                <line x1="75" y1="6" x2="35" y2="46" stroke="#1e293b" stroke-width="2.5" />
+                <!-- Lamp 1 Terminals -->
+                <g class="terminal-node" data-terminal="L1_A" data-label="หลอดไฟ L1 (ขั้วซ้าย)" transform="translate(13, 26)">
+                  <circle class="term-hit" r="20" fill="transparent" />
+                  <circle class="term-screw" r="11" fill="url(#screwGrad)" stroke="#334155" stroke-width="2" />
+                  <path d="M-6,0 H6 M0,-6 V6" stroke="#334155" stroke-width="2" />
+                </g>
+                <g class="terminal-node" data-terminal="L1_B" data-label="หลอดไฟ L1 (ขั้วขวา)" transform="translate(97, 26)">
+                  <circle class="term-hit" r="20" fill="transparent" />
+                  <circle class="term-screw" r="11" fill="url(#screwGrad)" stroke="#334155" stroke-width="2" />
+                  <path d="M-6,0 H6 M0,-6 V6" stroke="#334155" stroke-width="2" />
+                </g>
+              </g>
+
+              <!-- LAMP LOAD L2 (Shown in Lab 2.2 or available as L2) -->
+              <g id="lamp2Group" transform="translate(495, 145)">
+                <text x="55" y="-12" text-anchor="middle" fill="#0f172a" font-size="17" font-weight="700">L2 (LOAD 2)</text>
+                <rect x="0" y="18" width="26" height="16" fill="#d97706" stroke="#1e293b" stroke-width="2" />
+                <rect x="84" y="18" width="26" height="16" fill="#d97706" stroke="#1e293b" stroke-width="2" />
+                <circle id="lamp2Halo" cx="55" cy="26" r="36" fill="#fde047" opacity="0" filter="url(#glow-yellow)" />
+                <circle id="lamp2Body" cx="55" cy="26" r="29" fill="url(#lampOffGrad)" stroke="#1e293b" stroke-width="2.5" />
+                <line x1="35" y1="6" x2="75" y2="46" stroke="#1e293b" stroke-width="2.5" />
+                <line x1="75" y1="6" x2="35" y2="46" stroke="#1e293b" stroke-width="2.5" />
+                <g class="terminal-node" data-terminal="L2_A" data-label="หลอดไฟ L2 (ขั้วซ้าย)" transform="translate(13, 26)">
+                  <circle class="term-hit" r="20" fill="transparent" />
+                  <circle class="term-screw" r="11" fill="url(#screwGrad)" stroke="#334155" stroke-width="2" />
+                  <path d="M-6,0 H6 M0,-6 V6" stroke="#334155" stroke-width="2" />
+                </g>
+                <g class="terminal-node" data-terminal="L2_B" data-label="หลอดไฟ L2 (ขั้วขวา)" transform="translate(97, 26)">
+                  <circle class="term-hit" r="20" fill="transparent" />
+                  <circle class="term-screw" r="11" fill="url(#screwGrad)" stroke="#334155" stroke-width="2" />
+                  <path d="M-6,0 H6 M0,-6 V6" stroke="#334155" stroke-width="2" />
+                </g>
+              </g>
+
+              <!-- PUSH BUTTON SWITCH S1 -->
+              <g id="switch1Group" transform="translate(35, 210)">
+                <text x="125" y="-12" text-anchor="middle" fill="#0f172a" font-size="20" font-weight="700">สวิตช์ปุ่มกด S1</text>
+                <!-- Interactive Button Plunger -->
+                <g id="s1PlungerGroup" class="switch-actuator" role="button" tabindex="0" aria-label="กดสวิตช์ S1">
+                  <rect id="s1Cap" x="0" y="18" width="28" height="114" rx="6" fill="#10b981" stroke="#065f46" stroke-width="2.5" />
+                  <text x="14" y="75" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="700" writing-mode="tb">PRESS</text>
+                </g>
+                <!-- Metal collar & body -->
+                <rect x="26" y="0" width="22" height="150" fill="#cbd5e1" stroke="#1e293b" stroke-width="2" />
+                <rect x="48" y="12" width="38" height="126" fill="#64748b" stroke="#1e293b" stroke-width="2" />
+                <rect x="86" y="12" width="145" height="126" fill="#f8fafc" stroke="#1e293b" stroke-width="2" />
+
+                <!-- Internal contact indicator bridge -->
+                <line id="s1NcBridge" x1="120" y1="52" x2="120" y2="98" stroke="#16a34a" stroke-width="3" stroke-dasharray="4 2" />
+                <line id="s1NoBridge" x1="192" y1="52" x2="192" y2="98" stroke="#94a3b8" stroke-width="2" stroke-dasharray="3 3" opacity="0.4" />
+
+                <!-- NC Terminals -->
+                <rect x="100" y="18" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" />
+                <rect x="100" y="92" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" />
+                <text x="136" y="79" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="700" transform="rotate(-90 136 75)">NC</text>
+
+                <!-- NO Terminals -->
+                <rect x="172" y="18" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" />
+                <rect x="172" y="92" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" />
+                <text x="208" y="79" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="700" transform="rotate(-90 208 75)">NO</text>
+
+                <!-- Terminal Screws for S1 -->
+                <g class="terminal-node" data-terminal="S1_NC_1" data-label="S1 ขั้ว NC (บน)" transform="translate(120, 38)">
+                  <circle class="term-hit" r="20" fill="transparent" />
+                  <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
+                  <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
+                </g>
+                <g class="terminal-node" data-terminal="S1_NC_2" data-label="S1 ขั้ว NC (ล่าง)" transform="translate(120, 112)">
+                  <circle class="term-hit" r="20" fill="transparent" />
+                  <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
+                  <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
+                </g>
+                <g class="terminal-node" data-terminal="S1_NO_1" data-label="S1 ขั้ว NO (บน)" transform="translate(192, 38)">
+                  <circle class="term-hit" r="20" fill="transparent" />
+                  <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
+                  <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
+                </g>
+                <g class="terminal-node" data-terminal="S1_NO_2" data-label="S1 ขั้ว NO (ล่าง)" transform="translate(192, 112)">
+                  <circle class="term-hit" r="20" fill="transparent" />
+                  <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
+                  <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
+                </g>
+
+                <!-- S1 Mode controls -->
+                <g transform="translate(26, 156)">
+                  <rect id="s1StatePill" x="0" y="0" width="96" height="24" rx="12" fill="#e2e8f0" />
+                  <text id="s1StateText" x="48" y="16" text-anchor="middle" fill="#334155" font-size="11" font-weight="600">สถานะ: ปกติ (0)</text>
+                  <g id="s1LockBtn" class="lock-toggle-svg" transform="translate(104, 0)" style="cursor:pointer">
+                    <rect x="0" y="0" width="100" height="24" rx="12" fill="#f1f5f9" stroke="#cbd5e1" />
+                    <text id="s1LockText" x="50" y="16" text-anchor="middle" fill="#475569" font-size="11" font-weight="600">🔓 กดค้าง/สลับ</text>
+                  </g>
+                </g>
+              </g>
+
+              <!-- PUSH BUTTON SWITCH S2 -->
+              <g id="switch2Group" transform="translate(35, 405)">
+                <text x="125" y="-12" text-anchor="middle" fill="#0f172a" font-size="20" font-weight="700">สวิตช์ปุ่มกด S2</text>
+                <g id="s2PlungerGroup" class="switch-actuator" role="button" tabindex="0" aria-label="กดสวิตช์ S2">
+                  <rect id="s2Cap" x="0" y="18" width="28" height="114" rx="6" fill="#10b981" stroke="#065f46" stroke-width="2.5" />
+                  <text x="14" y="75" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="700" writing-mode="tb">PRESS</text>
+                </g>
+                <rect x="26" y="0" width="22" height="150" fill="#cbd5e1" stroke="#1e293b" stroke-width="2" />
+                <rect x="48" y="12" width="38" height="126" fill="#64748b" stroke="#1e293b" stroke-width="2" />
+                <rect x="86" y="12" width="145" height="126" fill="#f8fafc" stroke="#1e293b" stroke-width="2" />
+
+                <line id="s2NcBridge" x1="120" y1="52" x2="120" y2="98" stroke="#16a34a" stroke-width="3" stroke-dasharray="4 2" />
+                <line id="s2NoBridge" x1="192" y1="52" x2="192" y2="98" stroke="#94a3b8" stroke-width="2" stroke-dasharray="3 3" opacity="0.4" />
+
+                <rect x="100" y="18" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" />
+                <rect x="100" y="92" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" />
+                <text x="136" y="79" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="700" transform="rotate(-90 136 75)">NC</text>
+
+                <rect x="172" y="18" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" />
+                <rect x="172" y="92" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" />
+                <text x="208" y="79" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="700" transform="rotate(-90 208 75)">NO</text>
+
+                <g class="terminal-node" data-terminal="S2_NC_1" data-label="S2 ขั้ว NC (บน)" transform="translate(120, 38)">
+                  <circle class="term-hit" r="20" fill="transparent" />
+                  <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
+                  <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
+                </g>
+                <g class="terminal-node" data-terminal="S2_NC_2" data-label="S2 ขั้ว NC (ล่าง)" transform="translate(120, 112)">
+                  <circle class="term-hit" r="20" fill="transparent" />
+                  <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
+                  <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
+                </g>
+                <g class="terminal-node" data-terminal="S2_NO_1" data-label="S2 ขั้ว NO (บน)" transform="translate(192, 38)">
+                  <circle class="term-hit" r="20" fill="transparent" />
+                  <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
+                  <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
+                </g>
+                <g class="terminal-node" data-terminal="S2_NO_2" data-label="S2 ขั้ว NO (ล่าง)" transform="translate(192, 112)">
+                  <circle class="term-hit" r="20" fill="transparent" />
+                  <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
+                  <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
+                </g>
+
+                <g transform="translate(26, 156)">
+                  <rect id="s2StatePill" x="0" y="0" width="96" height="24" rx="12" fill="#e2e8f0" />
+                  <text id="s2StateText" x="48" y="16" text-anchor="middle" fill="#334155" font-size="11" font-weight="600">สถานะ: ปกติ (0)</text>
+                  <g id="s2LockBtn" class="lock-toggle-svg" transform="translate(104, 0)" style="cursor:pointer">
+                    <rect x="0" y="0" width="100" height="24" rx="12" fill="#f1f5f9" stroke="#cbd5e1" />
+                    <text id="s2LockText" x="50" y="16" text-anchor="middle" fill="#475569" font-size="11" font-weight="600">🔓 กดค้าง/สลับ</text>
+                  </g>
+                </g>
+              </g>
+
+              <!-- RELAY MODULE K1 & K2 (MY2N-J) -->
+              <g id="relaysGroup" transform="translate(360, 235)">
+                <!-- DIN Rail -->
+                <rect x="-18" y="85" width="295" height="110" rx="3" fill="#cbd5e1" stroke="#94a3b8" stroke-width="1.5" />
+                <!-- Generated by JS for K1 and K2 -->
+                <g id="relayK1Container" transform="translate(0, 0)"></g>
+                <g id="relayK2Container" transform="translate(145, 0)"></g>
+              </g>
+
+              <!-- Footer watermark matching original worksheet -->
+              <text x="18" y="556" fill="#64748b" font-size="13" font-weight="600">ชุดทดลองการเชื่อมต่อวงจรไฟฟ้าควบคุมด้วย RELAY</text>
+              <text x="690" y="556" text-anchor="end" fill="#64748b" font-size="12" font-family="JetBrains Mono, monospace">Interactive Simulator</text>
+            </g>
+
+            <!-- Wires Layer -->
+            <g id="wiresLayer"></g>
+            <!-- Active Drag Wire Preview -->
+            <path id="dragWirePreview" d="" fill="none" stroke="#ef4444" stroke-width="5" stroke-linecap="round" stroke-dasharray="8 6" pointer-events="none" opacity="0" />
+          </svg>
+
+          <!-- Floating Terminal Tooltip -->
+          <div id="terminalTooltip" class="terminal-tooltip" hidden></div>
+
+          <!-- Floating Routing Helper Bar (Especially useful on Mobile / Touch screens) -->
+          <div id="routingHelperBar" class="routing-helper-bar" hidden>
+            <span id="routingStatusText" class="routing-status-text">กำลังเดินสายจาก: -</span>
+            <div class="routing-helper-actions">
+              <button type="button" id="btnUndoWaypoint" class="btn-mini btn-mini-warn" title="ลบจุดพักสายล่าสุด">↩ ลบจุดพัก</button>
+              <button type="button" id="btnCancelWire" class="btn-mini btn-mini-danger" title="ยกเลิกการเดินสายนี้">✕ ยกเลิกสาย</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="workbench-footer">
+          <div class="footer-tip">
+            <span>💡 <b>รองรับมือถือ/แท็บเล็ต & คอมพิวเตอร์:</b> แตะขั้วเริ่มต้น → แตะพื้นที่ว่างเพื่อพักสายอ้อมอุปกรณ์ → แตะขั้วปลายทาง (หรือแตะค้างแล้วลากนิ้วไปปล่อยที่ขั้วปลายทางก็ได้) | <b>สวิตช์ S1, S2:</b> แตะที่ปุ่มสีเขียวเพื่อเปิด/ปิดค้างสถานะ</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
