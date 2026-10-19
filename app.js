@@ -3280,14 +3280,16 @@ const TEACHER_PASSWORD = 'tatc';
 const CUSTOM_LABS_STORAGE_KEY = 'tatc_custom_labs_v1';
 const DELETED_LABS_STORAGE_KEY = 'tatc_deleted_custom_labs_v1';
 
-// Multi-Tier Cloud Sync Configuration
+// Multi-Tier Cloud Sync Configuration (Dual-Blob + Dual-Pointer)
 const CLOUD_POINTER_GET_URL = 'https://keyvalue.immanuel.co/api/KeyVal/GetValue/rxkvtq0k/tatc_cloud_id';
 const CLOUD_POINTER_SET_URL = 'https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/rxkvtq0k/tatc_cloud_id';
-const CLOUD_OBJECTS_BASE_URL = 'https://api.restful-api.dev/objects';
-const DEFAULT_CLOUD_OBJECT_ID = 'ff808181a09d98f701a153af69fa1795';
+const CLOUD_RESTFUL_PTR_URL = 'https://api.restful-api.dev/objects/ff808181a09d98f701a153af69fa1795';
+const BYTEBIN_POST_URL = 'https://bytebin.lucko.me/post';
+const BYTEBIN_GET_BASE = 'https://bytebin.lucko.me';
+const DPASTE_POST_URL = 'https://dpaste.com/api/v2/';
+const DPASTE_GET_BASE = 'https://dpaste.com';
 const STATIC_CUSTOM_LABS_URL = './custom_labs.json';
 
-let currentCloudObjectId = DEFAULT_CLOUD_OBJECT_ID;
 let isCloudSyncing = false;
 
 function getDeletedCustomLabIds() {
@@ -3370,6 +3372,183 @@ function saveStoredCustomLabs(customLabs) {
   }
 }
 
+async function fetchLatestCloudPointer() {
+  let combinedPtr = '';
+
+  // 1. Fetch KeyValue store pointer
+  try {
+    const kvRes = await fetch(`${CLOUD_POINTER_GET_URL}?t=${Date.now()}`, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined
+    });
+    if (kvRes.ok) {
+      let text = await kvRes.text();
+      text = (text || '').replace(/["'\s]/g, '').trim();
+      if (text && text.includes('_')) {
+        combinedPtr = text;
+      }
+    }
+  } catch (err) {
+    console.warn('KV pointer fetch warning:', err);
+  }
+
+  // 2. Fetch Restful API pointer if KeyValue failed or didn't return a combined pointer
+  if (!combinedPtr) {
+    try {
+      const rfRes = await fetch(`${CLOUD_RESTFUL_PTR_URL}?t=${Date.now()}`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined
+      });
+      if (rfRes.ok) {
+        const obj = await rfRes.json();
+        if (obj && obj.data) {
+          if (obj.data.ptr && typeof obj.data.ptr === 'string' && obj.data.ptr.includes('_')) {
+            combinedPtr = obj.data.ptr.trim();
+          } else if (obj.data.dpasteId || obj.data.bytebinKey) {
+            combinedPtr = `${obj.data.dpasteId || 'none'}_${obj.data.bytebinKey || 'none'}`;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Restful pointer fetch warning:', err);
+    }
+  }
+
+  if (combinedPtr && combinedPtr.includes('_')) {
+    const parts = combinedPtr.split('_');
+    return {
+      dpasteId: parts[0] && parts[0] !== 'none' ? parts[0] : '',
+      bytebinKey: parts[1] && parts[1] !== 'none' ? parts[1] : ''
+    };
+  }
+
+  return { dpasteId: '', bytebinKey: '' };
+}
+
+async function fetchCloudBlobByPointer(ptr) {
+  if (!ptr) return null;
+  const { dpasteId, bytebinKey } = ptr;
+
+  // 1. Try Bytebin first
+  if (bytebinKey && bytebinKey !== 'none') {
+    try {
+      const res = await fetch(`${BYTEBIN_GET_BASE}/${bytebinKey}`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data) {
+          return data.customLabs ? data : (data.data || null);
+        }
+      }
+    } catch (err) {
+      console.warn('Bytebin fetch blob warning:', err);
+    }
+  }
+
+  // 2. Try dpaste second
+  if (dpasteId && dpasteId !== 'none') {
+    try {
+      const res = await fetch(`${DPASTE_GET_BASE}/${dpasteId}.txt`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
+      });
+      if (res.ok) {
+        const text = await res.text();
+        const data = JSON.parse(text);
+        if (data) {
+          return data.customLabs ? data : (data.data || null);
+        }
+      }
+    } catch (err) {
+      console.warn('dpaste fetch blob warning:', err);
+    }
+  }
+
+  return null;
+}
+
+async function uploadCloudBlobAndPointer(payloadObj) {
+  const jsonStr = JSON.stringify(payloadObj);
+
+  let bytebinKey = 'none';
+  try {
+    const bbRes = await fetch(BYTEBIN_POST_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: jsonStr,
+      signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined
+    });
+    if (bbRes.ok) {
+      const bbJson = await bbRes.json();
+      if (bbJson && bbJson.key) bytebinKey = bbJson.key;
+    }
+  } catch (e) {
+    console.warn('Bytebin upload warning:', e);
+  }
+
+  let dpasteId = 'none';
+  try {
+    const formBody = new URLSearchParams();
+    formBody.append('content', jsonStr);
+    formBody.append('syntax', 'json');
+    formBody.append('expiry_days', '365');
+    const dpRes = await fetch(DPASTE_POST_URL, {
+      method: 'POST',
+      body: formBody,
+      signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined
+    });
+    if (dpRes.ok) {
+      const dpText = (await dpRes.text()).trim();
+      const parts = dpText.replace(/\/+$/, '').split('/');
+      const extracted = parts[parts.length - 1].trim();
+      if (extracted && extracted.length >= 4 && extracted.length <= 20) {
+        dpasteId = extracted;
+      }
+    }
+  } catch (e) {
+    console.warn('dpaste upload warning:', e);
+  }
+
+  if (bytebinKey === 'none' && dpasteId === 'none') {
+    return { success: false };
+  }
+
+  const combinedPtr = `${dpasteId}_${bytebinKey}`;
+
+  let ptrSaved = false;
+
+  // Save to Pointer Store 1 (KeyValue)
+  try {
+    const kvRes = await fetch(`${CLOUD_POINTER_SET_URL}/${combinedPtr}`, {
+      method: 'POST',
+      signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
+    });
+    if (kvRes.ok) ptrSaved = true;
+  } catch (e) {
+    console.warn('KV pointer update warning:', e);
+  }
+
+  // Save to Pointer Store 2 (Restful API)
+  try {
+    const rfRes = await fetch(CLOUD_RESTFUL_PTR_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'tatc_ptr',
+        data: { ptr: combinedPtr, dpasteId, bytebinKey }
+      }),
+      signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
+    });
+    if (rfRes.ok) ptrSaved = true;
+  } catch (e) {
+    console.warn('Restful pointer update warning:', e);
+  }
+
+  return { success: ptrSaved, combinedPtr };
+}
+
 async function fetchCustomLabsFromServer(silent = true, allowPushBack = true) {
   if (isCloudSyncing) return { success: false, inProgress: true };
   isCloudSyncing = true;
@@ -3378,41 +3557,18 @@ async function fetchCustomLabsFromServer(silent = true, allowPushBack = true) {
   let fetchedData = null;
   let remoteServerReachable = false;
 
-  // 1. Discover latest active object ID from cloud pointer
+  // 1. Fetch pointer & blob from cloud
   try {
-    const pointerRes = await fetch(CLOUD_POINTER_GET_URL, {
-      cache: 'no-store',
-      signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined
-    });
-    if (pointerRes.ok) {
-      let pointerVal = await pointerRes.text();
-      pointerVal = (pointerVal || '').replace(/["'\s]/g, '').trim();
-      if (pointerVal && pointerVal.length >= 8) {
-        currentCloudObjectId = pointerVal;
-      }
+    const ptr = await fetchLatestCloudPointer();
+    fetchedData = await fetchCloudBlobByPointer(ptr);
+    if (fetchedData) {
+      remoteServerReachable = true;
     }
   } catch (err) {
-    console.warn('Pointer lookup fallback to default:', err);
+    console.warn('Cloud sync lookup error:', err);
   }
 
-  // 2. Fetch object from REST API
-  try {
-    const objRes = await fetch(`${CLOUD_OBJECTS_BASE_URL}/${currentCloudObjectId}?t=${Date.now()}`, {
-      cache: 'no-store',
-      signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined
-    });
-    if (objRes.ok) {
-      const objData = await objRes.json();
-      if (objData && objData.data) {
-        fetchedData = objData.data;
-        remoteServerReachable = true;
-      }
-    }
-  } catch (err) {
-    console.warn('REST API fetch error:', err);
-  }
-
-  // 3. Fallback to static custom_labs.json if remote failed
+  // 2. Fallback to static custom_labs.json if remote failed
   if (!fetchedData) {
     try {
       const staticRes = await fetch(`${STATIC_CUSTOM_LABS_URL}?t=${Date.now()}`, {
@@ -3427,7 +3583,7 @@ async function fetchCustomLabsFromServer(silent = true, allowPushBack = true) {
     }
   }
 
-  // 4. Merge incoming data with local storage & memory
+  // 3. Merge incoming data with local storage & memory
   if (fetchedData && typeof fetchedData === 'object') {
     const incomingLabs = fetchedData.customLabs || {};
     const incomingDeleted = Array.isArray(fetchedData.deletedIds) ? fetchedData.deletedIds : [];
@@ -3538,39 +3694,20 @@ async function fetchCustomLabsFromServer(silent = true, allowPushBack = true) {
 }
 
 async function pushCustomLabsToServer() {
-  // 1. Try to fetch the latest pointer and latest remote object with short timeout (4000ms) to merge changes from other devices
-  try {
-    const pointerRes = await fetch(CLOUD_POINTER_GET_URL, {
-      cache: 'no-store',
-      signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined
-    });
-    if (pointerRes.ok) {
-      let pointerVal = await pointerRes.text();
-      pointerVal = (pointerVal || '').replace(/["'\s]/g, '').trim();
-      if (pointerVal && pointerVal.length >= 8) {
-        currentCloudObjectId = pointerVal;
-      }
-    }
-  } catch (err) {
-    console.warn('Pointer pre-push check warning:', err);
-  }
+  setCloudSyncBadge('syncing', '⏳ กำลังอัปโหลดไปยังเซิร์ฟเวอร์...');
 
+  // 1. Try to fetch latest pointer and remote blob to merge changes before pushing
   let remoteLabs = {};
   let remoteDeleted = [];
   try {
-    const remoteRes = await fetch(`${CLOUD_OBJECTS_BASE_URL}/${currentCloudObjectId}?t=${Date.now()}`, {
-      cache: 'no-store',
-      signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined
-    });
-    if (remoteRes.ok) {
-      const remoteData = await remoteRes.json();
-      if (remoteData && remoteData.data) {
-        remoteLabs = remoteData.data.customLabs || {};
-        remoteDeleted = Array.isArray(remoteData.data.deletedIds) ? remoteData.data.deletedIds : [];
-      }
+    const ptr = await fetchLatestCloudPointer();
+    const remoteData = await fetchCloudBlobByPointer(ptr);
+    if (remoteData && typeof remoteData === 'object') {
+      remoteLabs = remoteData.customLabs || {};
+      remoteDeleted = Array.isArray(remoteData.deletedIds) ? remoteData.deletedIds : [];
     }
   } catch (err) {
-    console.warn('Remote object pre-push fetch warning:', err);
+    console.warn('Pre-push remote fetch warning:', err);
   }
 
   // Merge remote customLabs and deletedIds with local
@@ -3616,52 +3753,17 @@ async function pushCustomLabsToServer() {
   refreshCustomLabsInSelect();
   renderBuilderCustomLabsList();
 
-  const payload = {
-    name: 'tatc_custom_labs',
-    data: {
+  try {
+    const upRes = await uploadCloudBlobAndPointer({
       customLabs: localLabs,
       deletedIds: mergedDeleted,
       updatedAt: Date.now()
-    }
-  };
-
-  setCloudSyncBadge('syncing', '⏳ กำลังอัปโหลดไปยังเซิร์ฟเวอร์...');
-
-  try {
-    // 1. Try PUT to update existing object
-    let putRes = await fetch(`${CLOUD_OBJECTS_BASE_URL}/${currentCloudObjectId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined
     });
 
-    if (putRes.ok) {
+    if (upRes && upRes.success) {
       const count = Object.keys(localLabs).length;
       setCloudSyncBadge('synced', `☁️ ซิงค์ออนไลน์แล้ว (${count} โจทย์)`);
       return { success: true };
-    }
-
-    // 2. Fallback to POST if !putRes.ok (ANY non-2xx status, not just 404!)
-    const postRes = await fetch(CLOUD_OBJECTS_BASE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined
-    });
-    if (postRes.ok) {
-      const newObj = await postRes.json();
-      if (newObj && newObj.id) {
-        currentCloudObjectId = newObj.id;
-        try {
-          await fetch(`${CLOUD_POINTER_SET_URL}/${currentCloudObjectId}`, { method: 'POST' });
-        } catch (e) {
-          console.warn('Pointer update warning:', e);
-        }
-        const count = Object.keys(localLabs).length;
-        setCloudSyncBadge('synced', `☁️ ซิงค์ออนไลน์แล้ว (${count} โจทย์)`);
-        return { success: true };
-      }
     }
 
     setCloudSyncBadge('error', '⚠️ อัปโหลดเซิร์ฟเวอร์ไม่สำเร็จ');
