@@ -92,20 +92,20 @@ const LABS = {
 
   lab1_2: {
     id: 'lab1_2',
-    title: 'ใบงานที่ 1 (ตอนที่ 2): วงจรสวิตช์ขนาน (Parallel NO - OR Logic)',
-    objective: 'เชื่อมต่อวงจรจากวงจรสัญลักษณ์: ต่อสวิตช์ S1 (NO) ขนานกับ S2 (NO) เพื่อควบคุมหลอดไฟ LOAD (L1) ที่แรงดัน 12VDC (กด S1 หรือ S2 อย่างใดอย่างหนึ่งหลอดไฟก็สว่าง)',
+    title: 'ใบงานที่ 1 (ตอนที่ 2): วงจรสวิตช์ขนาน NC (Parallel NC - NAND Logic)',
+    objective: 'เชื่อมต่อวงจรจากวงจรสัญลักษณ์: ต่อสวิตช์ S1 (NC) ขนานกับ S2 (NC) เพื่อควบคุมหลอดไฟ LOAD (L1) ที่แรงดัน 12VDC (สภาวะปกติหลอดไฟจะติดสว่าง และจะดับก็ต่อเมื่อกดทั้ง S1 และ S2 พร้อมกัน)',
     inputs: ['S1', 'S2'],
     outputs: ['L1'],
     showL2: false,
     showS2: true,
     showRelays: false,
     truthTable: [
-      { S1: 0, S2: 0, expected: { L1: 0 } },
+      { S1: 0, S2: 0, expected: { L1: 1 } },
       { S1: 0, S2: 1, expected: { L1: 1 } },
       { S1: 1, S2: 0, expected: { L1: 1 } },
-      { S1: 1, S2: 1, expected: { L1: 1 } }
+      { S1: 1, S2: 1, expected: { L1: 0 } }
     ],
-    logicComparison: 'OR Gate (ลอจิกเกต OR)',
+    logicComparison: 'NAND Gate (ลอจิกเกต NAND - ต่อหน้าสัมผัส NC ขนานกัน)',
     hintWires: [
       {
         from: 'PWR_POS',
@@ -115,27 +115,27 @@ const LABS = {
       },
       {
         from: 'TB_1_B',
-        to: 'S1_NO_1',
+        to: 'S1_NC_1',
         color: '#ef4444',
-        waypoints: [{ x: 253, y: 195 }, { x: 412, y: 195 }]
+        waypoints: [{ x: 253, y: 195 }, { x: 340, y: 195 }]
       },
       {
-        from: 'S1_NO_1',
-        to: 'S2_NO_1',
+        from: 'S1_NC_1',
+        to: 'S2_NC_1',
         color: '#ef4444',
-        waypoints: [{ x: 455, y: 273 }, { x: 455, y: 468 }]
+        waypoints: [{ x: 300, y: 263 }, { x: 300, y: 458 }]
       },
       {
-        from: 'S1_NO_2',
-        to: 'S2_NO_2',
+        from: 'S1_NC_2',
+        to: 'S2_NC_2',
         color: '#3b82f6',
-        waypoints: [{ x: 485, y: 347 }, { x: 485, y: 542 }]
+        waypoints: [{ x: 375, y: 337 }, { x: 375, y: 532 }]
       },
       {
-        from: 'S2_NO_2',
+        from: 'S2_NC_2',
         to: 'L1_A',
         color: '#3b82f6',
-        waypoints: [{ x: 525, y: 542 }, { x: 525, y: 106 }]
+        waypoints: [{ x: 340, y: 580 }, { x: 520, y: 580 }, { x: 520, y: 106 }]
       },
       {
         from: 'L1_B',
@@ -1044,8 +1044,8 @@ function renderSchematic() {
       </svg>
     `;
   } else if (state.currentLabId === 'lab1_2') {
-    // Parallel S1 (NO) and S2 (NO) -> L1
-    const branchHot = s1 || s2;
+    // Parallel S1 (NC) and S2 (NC) -> L1 (Matches worksheet diagram)
+    const branchHot = !s1 || !s2;
     svgContent = `
       <svg viewBox="0 0 360 255">
         <text x="25" y="24" font-size="14" font-weight="700" fill="#dc2626">+12V</text>
@@ -1053,24 +1053,24 @@ function renderSchematic() {
         <path d="M51 38 H280 V76 M150 38 V76" fill="none" stroke="${hotStroke}" stroke-width="3"/>
         <circle cx="150" cy="38" r="5" fill="#0f172a"/>
 
-        ${drawIECSwitchNO({
+        ${drawIECSwitchNC({
           id: 'S1',
           label: 'S1',
           x: 150,
           yTop: 76,
           pressed: s1,
           topEnergized: true,
-          bottomEnergized: s1
+          bottomEnergized: !s1
         })}
 
-        ${drawIECSwitchNO({
+        ${drawIECSwitchNC({
           id: 'S2',
           label: 'S2',
           x: 280,
           yTop: 76,
           pressed: s2,
           topEnergized: true,
-          bottomEnergized: s2
+          bottomEnergized: !s2
         })}
 
         <path d="M150 110 V145 M280 110 V145 H150 V168" fill="none" stroke="${branchHot ? hotStroke : idleStroke}" stroke-width="3"/>
