@@ -747,6 +747,110 @@ body {
   border: 1px solid rgba(239, 68, 68, 0.5);
 }
 
+.toolbar-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.switch-mode-wrap,
+.power-switch-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #475569;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  transition: all 0.15s ease;
+}
+
+.mode-toggle.locked {
+  background: rgba(56, 189, 248, 0.18);
+  color: #7dd3fc;
+  border-color: #0284c7;
+}
+
+.mode-toggle.momentary {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+  border-color: #d97706;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Floating Zoom Controls inside Board Viewport */
+.zoom-controls {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid #475569;
+  padding: 0.3rem 0.5rem;
+  border-radius: 999px;
+  z-index: 55;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.zoom-btn {
+  background: #1e293b;
+  color: #f8fafc;
+  border: 1px solid #334155;
+  border-radius: 999px;
+  padding: 0.28rem 0.6rem;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.zoom-btn:hover {
+  background: #334155;
+}
+
+.zoom-btn.active {
+  background: #0284c7;
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.zoom-level-text {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  min-width: 42px;
+  text-align: center;
+}
+
+#workbenchSvg.pan-mode {
+  cursor: grab;
+}
+
+#workbenchSvg.pan-mode.panning {
+  cursor: grabbing;
+}
+
 .workbench-footer {
   font-size: 0.78rem;
   color: #94a3b8;
@@ -785,7 +889,7 @@ body {
   }
 
   #workbenchSvg {
-    min-height: 300px;
+    min-height: 340px;
     max-height: none;
   }
 

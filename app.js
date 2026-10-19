@@ -10,16 +10,24 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // Application State
+const MAX_UNDO_STEPS = 5;
+const BASE_VIEWBOX = { w: 920, h: 620 };
+
 const state = {
   currentLabId: 'lab1_1',
   powerOn: true,
   wireColor: '#ef4444',
   wires: [], // { id, from, to, color, waypoints: [{x, y}, ...] }
+  undoStack: [], // Stores up to MAX_UNDO_STEPS (5) snapshots of wires
+  redoStack: [],
   showingHints: false,
   selectedTerminal: null,
   activeWaypoints: [], // [{x, y}] while routing a wire
   draggingFrom: null,
   pointerDownPos: null,
+  zoom: 1,
+  viewBox: { x: 0, y: 0, w: 920, h: 620 },
+  panMode: false,
   switches: {
     // Default locked: true so clicking S1 or S2 holds its state (ON/OFF) by default for easy multi-switch testing
     S1: { pressed: false, locked: true },
@@ -762,13 +770,11 @@ function updateSimulationUI() {
   ['S1', 'S2'].forEach((sw, idx) => {
     const num = idx + 1;
     const pressed = state.switches[sw].pressed;
-    const locked = state.switches[sw].locked;
     const cap = document.getElementById(`s${num}Cap`);
     const ncBridge = document.getElementById(`s${num}NcBridge`);
     const noBridge = document.getElementById(`s${num}NoBridge`);
     const stateText = document.getElementById(`s${num}StateText`);
     const statePill = document.getElementById(`s${num}StatePill`);
-    const lockText = document.getElementById(`s${num}LockText`);
 
     cap.setAttribute('x', pressed ? '10' : '0');
     cap.setAttribute('fill', pressed ? '#059669' : '#10b981');
@@ -779,22 +785,34 @@ function updateSimulationUI() {
       noBridge.setAttribute('stroke', '#16a34a');
       noBridge.setAttribute('stroke-width', '3.5');
       noBridge.setAttribute('opacity', '1');
-      stateText.textContent = 'สถานะ: กดON (1)';
-      statePill.setAttribute('fill', '#dcfce7');
-      stateText.setAttribute('fill', '#15803d');
+      if (stateText) stateText.textContent = 'กดค้าง ON (1)';
+      if (statePill) statePill.setAttribute('fill', '#dcfce7');
+      if (stateText) stateText.setAttribute('fill', '#15803d');
     } else {
       ncBridge.setAttribute('stroke', '#16a34a');
       ncBridge.setAttribute('opacity', '1');
       noBridge.setAttribute('stroke', '#94a3b8');
       noBridge.setAttribute('stroke-width', '2');
       noBridge.setAttribute('opacity', '0.4');
-      stateText.textContent = 'สถานะ: ปกติ (0)';
-      statePill.setAttribute('fill', '#e2e8f0');
-      stateText.setAttribute('fill', '#334155');
+      if (stateText) stateText.textContent = 'ปกติ OFF (0)';
+      if (statePill) statePill.setAttribute('fill', '#e2e8f0');
+      if (stateText) stateText.setAttribute('fill', '#334155');
     }
-
-    lockText.textContent = locked ? '🔒 โหมดกดค้าง (คลิกสลับ)' : '🔓 โหมดกดติดปล่อยดับ';
   });
+
+  // Update toolbar switch mode button
+  const modeBtn = document.getElementById('btnSwitchModeToggle');
+  if (modeBtn) {
+    const isLocked = state.switches.S1.locked;
+    modeBtn.classList.toggle('locked', isLocked);
+    modeBtn.classList.toggle('momentary', !isLocked);
+    modeBtn.textContent = isLocked
+      ? '🔒 กดค้างสถานะ (คลิกสลับ)'
+      : '🔓 กดติดปล่อยดับ (Momentary)';
+  }
+
+  // Update Undo / Redo button states
+  updateUndoRedoUI();
 
   // Highlight energized terminals
   document.querySelectorAll('.terminal-node').forEach((node) => {
@@ -1471,7 +1489,133 @@ function runAutomatedVerification() {
   }
 }
 
-// Add or Remove Wire (supports waypoints array)
+// ============================================================================
+// 5-Step Undo / Redo History Management
+// ============================================================================
+function cloneWires(wires) {
+  return wires.map((w) => ({
+    ...w,
+    waypoints: (w.waypoints || []).map((pt) => ({ x: pt.x, y: pt.y }))
+  }));
+}
+
+function recordHistorySnapshot() {
+  state.undoStack.push(cloneWires(state.wires));
+  if (state.undoStack.length > MAX_UNDO_STEPS) {
+    state.undoStack.shift();
+  }
+  state.redoStack = [];
+  updateUndoRedoUI();
+}
+
+function performUndo() {
+  if (state.selectedTerminal && state.activeWaypoints.length > 0) {
+    state.activeWaypoints.pop();
+    updateSimulationUI();
+    return;
+  }
+  if (state.selectedTerminal) {
+    cancelActiveWireRouting();
+    return;
+  }
+  if (state.undoStack.length === 0) return;
+
+  state.redoStack.push(cloneWires(state.wires));
+  if (state.redoStack.length > MAX_UNDO_STEPS) {
+    state.redoStack.shift();
+  }
+  state.wires = state.undoStack.pop();
+  updateSimulationUI();
+}
+
+function performRedo() {
+  if (state.redoStack.length === 0) return;
+  state.undoStack.push(cloneWires(state.wires));
+  if (state.undoStack.length > MAX_UNDO_STEPS) {
+    state.undoStack.shift();
+  }
+  state.wires = state.redoStack.pop();
+  updateSimulationUI();
+}
+
+function updateUndoRedoUI() {
+  const btnUndo = document.getElementById('btnUndo');
+  const undoBtnText = document.getElementById('undoBtnText');
+  const btnRedo = document.getElementById('btnRedo');
+
+  const canUndoWaypoint = Boolean(state.selectedTerminal);
+  const undoCount = state.undoStack.length;
+
+  if (btnUndo) {
+    btnUndo.disabled = !canUndoWaypoint && undoCount === 0;
+  }
+  if (undoBtnText) {
+    undoBtnText.textContent = canUndoWaypoint
+      ? 'ลบจุดพักสาย'
+      : `ย้อนกลับ (${undoCount}/${MAX_UNDO_STEPS})`;
+  }
+  if (btnRedo) {
+    btnRedo.disabled = state.redoStack.length === 0;
+  }
+}
+
+// ============================================================================
+// Zoom & Pan Engine for SVG Workbench (Pinch-to-Zoom, Wheel, Buttons, Pan Mode)
+// ============================================================================
+function applyViewBox() {
+  const svg = document.getElementById('workbenchSvg');
+  if (!svg) return;
+
+  // Clamp viewBox within reasonable bounds so board never gets lost
+  const maxX = BASE_VIEWBOX.w - state.viewBox.w;
+  const maxY = BASE_VIEWBOX.h - state.viewBox.h;
+  state.viewBox.x = Math.max(-60, Math.min(maxX + 60, state.viewBox.x));
+  state.viewBox.y = Math.max(-60, Math.min(maxY + 60, state.viewBox.y));
+
+  svg.setAttribute(
+    'viewBox',
+    `${state.viewBox.x.toFixed(1)} ${state.viewBox.y.toFixed(1)} ${state.viewBox.w.toFixed(1)} ${state.viewBox.h.toFixed(1)}`
+  );
+
+  const zoomText = document.getElementById('zoomLevelText');
+  if (zoomText) {
+    zoomText.textContent = `${Math.round(state.zoom * 100)}%`;
+  }
+}
+
+function setZoomLevel(newZoom, focalSvgPt = null) {
+  const clamped = Math.max(1, Math.min(3.0, newZoom));
+  const cx = focalSvgPt ? focalSvgPt.x : state.viewBox.x + state.viewBox.w / 2;
+  const cy = focalSvgPt ? focalSvgPt.y : state.viewBox.y + state.viewBox.h / 2;
+
+  const newW = BASE_VIEWBOX.w / clamped;
+  const newH = BASE_VIEWBOX.h / clamped;
+
+  const ratioX = (cx - state.viewBox.x) / state.viewBox.w;
+  const ratioY = (cy - state.viewBox.y) / state.viewBox.h;
+
+  state.zoom = clamped;
+  state.viewBox.w = newW;
+  state.viewBox.h = newH;
+
+  if (clamped === 1) {
+    state.viewBox.x = 0;
+    state.viewBox.y = 0;
+  } else {
+    state.viewBox.x = cx - ratioX * newW;
+    state.viewBox.y = cy - ratioY * newH;
+  }
+
+  applyViewBox();
+}
+
+function resetZoom() {
+  state.zoom = 1;
+  state.viewBox = { x: 0, y: 0, w: BASE_VIEWBOX.w, h: BASE_VIEWBOX.h };
+  applyViewBox();
+}
+
+// Add or Remove Wire (supports waypoints array & records 5-step undo history)
 function addWire(fromTerm, toTerm, waypoints = []) {
   if (!fromTerm || !toTerm || fromTerm === toTerm) return;
 
@@ -1479,6 +1623,8 @@ function addWire(fromTerm, toTerm, waypoints = []) {
     (w) => (w.from === fromTerm && w.to === toTerm) || (w.from === toTerm && w.to === fromTerm)
   );
   if (exists) return;
+
+  recordHistorySnapshot();
 
   state.wires.push({
     id: `wire_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -1492,6 +1638,10 @@ function addWire(fromTerm, toTerm, waypoints = []) {
 }
 
 function removeWire(wireId) {
+  const exists = state.wires.some((w) => w.id === wireId);
+  if (!exists) return;
+
+  recordHistorySnapshot();
   state.wires = state.wires.filter((w) => w.id !== wireId);
   updateSimulationUI();
 }
@@ -1537,7 +1687,7 @@ function loadLab(labId) {
   banner.innerHTML = `
     <div class="banner-icon">ℹ️</div>
     <div class="banner-text">
-      <strong>คำแนะนำ:</strong> คลิกขั้วเริ่มต้น → คลิกจุดพักสาย (Waypoint) บนบอร์ดเพื่ออ้อมอุปกรณ์ → คลิกขั้วปลายทาง แล้วกดปุ่ม <b>"ตรวจสอบความถูกต้องอัตโนมัติ"</b>
+      <strong>คำแนะนำ:</strong> แตะขั้วเริ่มต้น → แตะจุดพักสาย (Waypoint) บนบอร์ดเพื่ออ้อมอุปกรณ์ → แตะขั้วปลายทาง (สามารถซูมดูใกล้ๆ ด้วยปุ่ม ➕/➖ หรือใช้ 2 นิ้วถ่างซูมบนมือถือได้)
     </div>
   `;
   const scoreBadge = document.getElementById('scoreBadge');
@@ -1548,22 +1698,60 @@ function loadLab(labId) {
   updateSimulationUI();
 }
 
-// Setup Pointer Events for Wire Dragging, Multi-Waypoint Routing & Switch Controls
+// Setup Pointer Events for Wire Dragging, Multi-Waypoint Routing, Pinch Zoom & Switch Controls
 function initInteractions() {
   const svg = document.getElementById('workbenchSvg');
   const preview = document.getElementById('dragWirePreview');
   const tooltip = document.getElementById('terminalTooltip');
 
-  // Terminal pointerdown: either start a new wire or complete an active wire with waypoints
+  // Track active pointers for multi-touch pinch-to-zoom & two-finger pan on mobile
+  const activePointers = new Map();
+  let lastPinchDist = null;
+  let lastPinchMidClient = null;
+  let isSinglePanning = false;
+  let panStartClient = null;
+  let panStartViewBox = null;
+
   svg.addEventListener('pointerdown', (e) => {
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    // If 2 fingers are touching on mobile, switch to pinch-zoom / two-finger pan
+    if (activePointers.size === 2) {
+      state.draggingFrom = null;
+      isSinglePanning = false;
+      const pts = Array.from(activePointers.values());
+      lastPinchDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      lastPinchMidClient = {
+        x: (pts[0].x + pts[1].x) / 2,
+        y: (pts[0].y + pts[1].y) / 2
+      };
+      return;
+    }
+
     if (e.button === 2) {
       e.preventDefault();
       cancelActiveWireRouting();
       return;
     }
+
+    // Middle mouse button or Pan Mode enabled on empty space -> pan the zoomed board
+    const termNode = e.target.closest('.terminal-node');
+    const isInteractiveTarget =
+      termNode ||
+      e.target.closest('.wire-group') ||
+      e.target.closest('.switch-actuator');
+
+    if (e.button === 1 || (state.panMode && !termNode && !e.target.closest('.switch-actuator'))) {
+      e.preventDefault();
+      isSinglePanning = true;
+      svg.classList.add('panning');
+      panStartClient = { x: e.clientX, y: e.clientY };
+      panStartViewBox = { ...state.viewBox };
+      return;
+    }
+
     if (e.button !== 0) return;
 
-    const termNode = e.target.closest('.terminal-node');
     if (termNode) {
       e.preventDefault();
       e.stopPropagation();
@@ -1602,12 +1790,7 @@ function initInteractions() {
 
     // If user is currently routing a wire (state.selectedTerminal is set) and clicks on empty board space:
     // Add an intermediate waypoint to route around terminals/components!
-    if (
-      state.selectedTerminal &&
-      !e.target.closest('.wire-group') &&
-      !e.target.closest('.switch-actuator') &&
-      !e.target.closest('.lock-toggle-svg')
-    ) {
+    if (state.selectedTerminal && !isInteractiveTarget) {
       e.preventDefault();
       const wp = clientToSvgPoint(e.clientX, e.clientY);
       state.activeWaypoints.push({ x: wp.x, y: wp.y });
@@ -1616,10 +1799,63 @@ function initInteractions() {
       preview.setAttribute('d', computeWirePath(startPt, wp, state.activeWaypoints));
       preview.setAttribute('opacity', '0.9');
       updateSimulationUI();
+      return;
+    }
+
+    // If zoomed in (>1) and user drags empty board area (while not routing a wire), allow smooth panning!
+    if (!state.selectedTerminal && state.zoom > 1 && !isInteractiveTarget) {
+      isSinglePanning = true;
+      svg.classList.add('panning');
+      panStartClient = { x: e.clientX, y: e.clientY };
+      panStartViewBox = { ...state.viewBox };
     }
   });
 
   svg.addEventListener('pointermove', (e) => {
+    if (activePointers.has(e.pointerId)) {
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+
+    // Handle 2-finger pinch zoom & pan on mobile
+    if (activePointers.size === 2) {
+      const pts = Array.from(activePointers.values());
+      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      const midClient = {
+        x: (pts[0].x + pts[1].x) / 2,
+        y: (pts[0].y + pts[1].y) / 2
+      };
+
+      if (lastPinchDist && lastPinchDist > 10) {
+        const scaleFactor = dist / lastPinchDist;
+        const focalPt = clientToSvgPoint(midClient.x, midClient.y);
+        setZoomLevel(state.zoom * scaleFactor, focalPt);
+      }
+
+      if (lastPinchMidClient) {
+        const rect = svg.getBoundingClientRect();
+        const dxSvg = ((midClient.x - lastPinchMidClient.x) / rect.width) * state.viewBox.w;
+        const dySvg = ((midClient.y - lastPinchMidClient.y) / rect.height) * state.viewBox.h;
+        state.viewBox.x -= dxSvg;
+        state.viewBox.y -= dySvg;
+        applyViewBox();
+      }
+
+      lastPinchDist = dist;
+      lastPinchMidClient = midClient;
+      return;
+    }
+
+    // Handle single-finger / mouse panning when in Pan Mode or dragging empty zoomed canvas
+    if (isSinglePanning && panStartClient && panStartViewBox) {
+      const rect = svg.getBoundingClientRect();
+      const dxSvg = ((e.clientX - panStartClient.x) / rect.width) * state.viewBox.w;
+      const dySvg = ((e.clientY - panStartClient.y) / rect.height) * state.viewBox.h;
+      state.viewBox.x = panStartViewBox.x - dxSvg;
+      state.viewBox.y = panStartViewBox.y - dySvg;
+      applyViewBox();
+      return;
+    }
+
     const termNode = e.target.closest('.terminal-node');
     if (termNode) {
       const label = termNode.getAttribute('data-label') || termNode.getAttribute('data-terminal');
@@ -1641,7 +1877,22 @@ function initInteractions() {
     preview.setAttribute('opacity', '0.9');
   });
 
+  const handlePointerEnd = (e) => {
+    activePointers.delete(e.pointerId);
+    if (activePointers.size < 2) {
+      lastPinchDist = null;
+      lastPinchMidClient = null;
+    }
+    if (isSinglePanning) {
+      isSinglePanning = false;
+      svg.classList.remove('panning');
+      panStartClient = null;
+      panStartViewBox = null;
+    }
+  };
+
   window.addEventListener('pointerup', (e) => {
+    handlePointerEnd(e);
     tooltip.hidden = true;
     if (!state.draggingFrom) return;
     const targetEl = document.elementFromPoint(e.clientX, e.clientY);
@@ -1659,6 +1910,43 @@ function initInteractions() {
     state.draggingFrom = null;
     updateSimulationUI();
   });
+
+  window.addEventListener('pointercancel', handlePointerEnd);
+
+  // Mouse Wheel Zoom on Workbench SVG
+  svg.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
+      const focalPt = clientToSvgPoint(e.clientX, e.clientY);
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      setZoomLevel(state.zoom * factor, focalPt);
+    },
+    { passive: false }
+  );
+
+  // Zoom Control Buttons
+  const btnZoomIn = document.getElementById('btnZoomIn');
+  const btnZoomOut = document.getElementById('btnZoomOut');
+  const btnZoomReset = document.getElementById('btnZoomReset');
+  const btnPanMode = document.getElementById('btnPanMode');
+
+  if (btnZoomIn) {
+    btnZoomIn.addEventListener('click', () => setZoomLevel(state.zoom + 0.35));
+  }
+  if (btnZoomOut) {
+    btnZoomOut.addEventListener('click', () => setZoomLevel(state.zoom - 0.35));
+  }
+  if (btnZoomReset) {
+    btnZoomReset.addEventListener('click', () => resetZoom());
+  }
+  if (btnPanMode) {
+    btnPanMode.addEventListener('click', () => {
+      state.panMode = !state.panMode;
+      btnPanMode.classList.toggle('active', state.panMode);
+      svg.classList.toggle('pan-mode', state.panMode);
+    });
+  }
 
   // Mobile / Floating Routing Helper Bar Buttons
   const btnUndoWaypoint = document.getElementById('btnUndoWaypoint');
@@ -1692,7 +1980,7 @@ function initInteractions() {
     }
   });
 
-  // Escape key cancels active wire routing, Backspace removes last waypoint
+  // Keyboard shortcuts: Escape, Backspace, Ctrl+Z (Undo), Ctrl+Y (Redo)
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && state.selectedTerminal) {
       cancelActiveWireRouting();
@@ -1700,14 +1988,19 @@ function initInteractions() {
       e.preventDefault();
       state.activeWaypoints.pop();
       updateSimulationUI();
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      performUndo();
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+      e.preventDefault();
+      performRedo();
     }
   });
 
-  // Pushbutton S1 & S2 interactions (Default: Toggle Hold so S1 & S2 can be turned ON together easily)
+  // Pushbutton S1 & S2 interactions
   ['S1', 'S2'].forEach((sw, idx) => {
     const num = idx + 1;
     const plunger = document.getElementById(`s${num}PlungerGroup`);
-    const lockBtn = document.getElementById(`s${num}LockBtn`);
 
     plunger.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
@@ -1725,20 +2018,28 @@ function initInteractions() {
         updateSimulationUI();
       }
     });
+  });
 
-    lockBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      state.switches[sw].locked = !state.switches[sw].locked;
-      if (!state.switches[sw].locked) {
-        state.switches[sw].pressed = false;
+  // Toolbar Switch Mode Toggle (Moved out of SVG board so it never blocks wire clicks!)
+  const btnSwitchModeToggle = document.getElementById('btnSwitchModeToggle');
+  if (btnSwitchModeToggle) {
+    btnSwitchModeToggle.addEventListener('click', () => {
+      const nextLock = !state.switches.S1.locked;
+      state.switches.S1.locked = nextLock;
+      state.switches.S2.locked = nextLock;
+      if (!nextLock) {
+        state.switches.S1.pressed = false;
+        state.switches.S2.pressed = false;
       }
       updateSimulationUI();
     });
-  });
+  }
 
   // Header Controls
   document.getElementById('labSelect').addEventListener('change', (e) => {
     state.wires = [];
+    state.undoStack = [];
+    state.redoStack = [];
     loadLab(e.target.value);
   });
 
@@ -1751,17 +2052,20 @@ function initInteractions() {
   });
 
   document.getElementById('btnUndo').addEventListener('click', () => {
-    if (state.selectedTerminal && state.activeWaypoints.length > 0) {
-      state.activeWaypoints.pop();
-    } else if (state.selectedTerminal) {
-      cancelActiveWireRouting();
-    } else {
-      state.wires.pop();
-    }
-    updateSimulationUI();
+    performUndo();
   });
 
+  const btnRedo = document.getElementById('btnRedo');
+  if (btnRedo) {
+    btnRedo.addEventListener('click', () => {
+      performRedo();
+    });
+  }
+
   document.getElementById('btnClear').addEventListener('click', () => {
+    if (state.wires.length > 0) {
+      recordHistorySnapshot();
+    }
     state.wires = [];
     state.showingHints = false;
     cancelActiveWireRouting();
@@ -1774,7 +2078,7 @@ function initInteractions() {
       state.showingHints = true;
       updateSimulationUI();
     } else {
-      // Second click on hint auto-wires the solution with clean orthogonal waypoints
+      recordHistorySnapshot();
       state.wires = lab.hintWires.map((hw, i) => ({
         id: `sol_${i}_${Date.now()}`,
         from: hw.from,

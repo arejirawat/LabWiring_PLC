@@ -46,9 +46,13 @@
       </div>
 
       <div class="action-buttons">
-        <button type="button" id="btnUndo" class="btn btn-secondary" title="ย้อนกลับสายล่าสุด">
+        <button type="button" id="btnUndo" class="btn btn-secondary" title="ย้อนกลับได้สูงสุด 5 ครั้ง (Ctrl+Z)" disabled>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
-          ย้อนกลับ
+          <span id="undoBtnText">ย้อนกลับ (0/5)</span>
+        </button>
+        <button type="button" id="btnRedo" class="btn btn-secondary" title="ทำซ้ำ (Ctrl+Y)" disabled>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+          <span id="redoBtnText">ทำซ้ำ</span>
         </button>
         <button type="button" id="btnClear" class="btn btn-danger-outline" title="ล้างสายไฟทั้งหมด">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -138,6 +142,12 @@
           </div>
 
           <div class="toolbar-right">
+            <div class="switch-mode-wrap">
+              <span class="power-label">โหมดปุ่มกด S1, S2:</span>
+              <button type="button" id="btnSwitchModeToggle" class="mode-toggle locked" title="สลับระหว่างโหมดกดค้าง (ON/OFF) และโหมดกดติดปล่อยดับ">
+                🔒 กดค้างสถานะ (คลิกสลับ)
+              </button>
+            </div>
             <div class="power-switch-wrap">
               <span class="power-label">แหล่งจ่ายไฟ 12VDC:</span>
               <button type="button" id="btnPowerToggle" class="power-toggle on" aria-pressed="true">
@@ -267,32 +277,35 @@
                 </g>
               </g>
 
-              <!-- PUSH BUTTON SWITCH S1 -->
-              <g id="switch1Group" transform="translate(35, 210)">
-                <text x="125" y="-12" text-anchor="middle" fill="#0f172a" font-size="20" font-weight="700">สวิตช์ปุ่มกด S1</text>
+              <!-- PUSH BUTTON SWITCH S1 (No obstructing buttons below terminals!) -->
+              <g id="switch1Group" transform="translate(35, 200)">
+                <text x="90" y="-10" fill="#0f172a" font-size="18" font-weight="700" pointer-events="none">S1</text>
+                <rect id="s1StatePill" x="122" y="-26" width="98" height="22" rx="11" fill="#e2e8f0" pointer-events="none" />
+                <text id="s1StateText" x="171" y="-11" text-anchor="middle" fill="#334155" font-size="11" font-weight="700" pointer-events="none">ปกติ (0)</text>
+
                 <!-- Interactive Button Plunger -->
                 <g id="s1PlungerGroup" class="switch-actuator" role="button" tabindex="0" aria-label="กดสวิตช์ S1">
                   <rect id="s1Cap" x="0" y="18" width="28" height="114" rx="6" fill="#10b981" stroke="#065f46" stroke-width="2.5" />
-                  <text x="14" y="75" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="700" writing-mode="tb">PRESS</text>
+                  <text x="14" y="75" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="700" writing-mode="tb" pointer-events="none">PRESS</text>
                 </g>
                 <!-- Metal collar & body -->
-                <rect x="26" y="0" width="22" height="150" fill="#cbd5e1" stroke="#1e293b" stroke-width="2" />
-                <rect x="48" y="12" width="38" height="126" fill="#64748b" stroke="#1e293b" stroke-width="2" />
-                <rect x="86" y="12" width="145" height="126" fill="#f8fafc" stroke="#1e293b" stroke-width="2" />
+                <rect x="26" y="0" width="22" height="150" fill="#cbd5e1" stroke="#1e293b" stroke-width="2" pointer-events="none" />
+                <rect x="48" y="12" width="38" height="126" fill="#64748b" stroke="#1e293b" stroke-width="2" pointer-events="none" />
+                <rect x="86" y="12" width="145" height="126" fill="#f8fafc" stroke="#1e293b" stroke-width="2" pointer-events="none" />
 
                 <!-- Internal contact indicator bridge -->
-                <line id="s1NcBridge" x1="120" y1="52" x2="120" y2="98" stroke="#16a34a" stroke-width="3" stroke-dasharray="4 2" />
-                <line id="s1NoBridge" x1="192" y1="52" x2="192" y2="98" stroke="#94a3b8" stroke-width="2" stroke-dasharray="3 3" opacity="0.4" />
+                <line id="s1NcBridge" x1="120" y1="52" x2="120" y2="98" stroke="#16a34a" stroke-width="3" stroke-dasharray="4 2" pointer-events="none" />
+                <line id="s1NoBridge" x1="192" y1="52" x2="192" y2="98" stroke="#94a3b8" stroke-width="2" stroke-dasharray="3 3" opacity="0.4" pointer-events="none" />
 
                 <!-- NC Terminals -->
-                <rect x="100" y="18" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" />
-                <rect x="100" y="92" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" />
-                <text x="136" y="79" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="700" transform="rotate(-90 136 75)">NC</text>
+                <rect x="100" y="18" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" pointer-events="none" />
+                <rect x="100" y="92" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" pointer-events="none" />
+                <text x="136" y="79" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="700" transform="rotate(-90 136 75)" pointer-events="none">NC</text>
 
                 <!-- NO Terminals -->
-                <rect x="172" y="18" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" />
-                <rect x="172" y="92" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" />
-                <text x="208" y="79" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="700" transform="rotate(-90 208 75)">NO</text>
+                <rect x="172" y="18" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" pointer-events="none" />
+                <rect x="172" y="92" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" pointer-events="none" />
+                <text x="208" y="79" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="700" transform="rotate(-90 208 75)" pointer-events="none">NO</text>
 
                 <!-- Terminal Screws for S1 -->
                 <g class="terminal-node" data-terminal="S1_NC_1" data-label="S1 ขั้ว NC (บน)" transform="translate(120, 38)">
@@ -315,39 +328,32 @@
                   <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
                   <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
                 </g>
-
-                <!-- S1 Mode controls -->
-                <g transform="translate(26, 156)">
-                  <rect id="s1StatePill" x="0" y="0" width="96" height="24" rx="12" fill="#e2e8f0" />
-                  <text id="s1StateText" x="48" y="16" text-anchor="middle" fill="#334155" font-size="11" font-weight="600">สถานะ: ปกติ (0)</text>
-                  <g id="s1LockBtn" class="lock-toggle-svg" transform="translate(104, 0)" style="cursor:pointer">
-                    <rect x="0" y="0" width="100" height="24" rx="12" fill="#f1f5f9" stroke="#cbd5e1" />
-                    <text id="s1LockText" x="50" y="16" text-anchor="middle" fill="#475569" font-size="11" font-weight="600">🔓 กดค้าง/สลับ</text>
-                  </g>
-                </g>
               </g>
 
-              <!-- PUSH BUTTON SWITCH S2 -->
-              <g id="switch2Group" transform="translate(35, 405)">
-                <text x="125" y="-12" text-anchor="middle" fill="#0f172a" font-size="20" font-weight="700">สวิตช์ปุ่มกด S2</text>
+              <!-- PUSH BUTTON SWITCH S2 (No obstructing buttons below terminals!) -->
+              <g id="switch2Group" transform="translate(35, 395)">
+                <text x="90" y="-10" fill="#0f172a" font-size="18" font-weight="700" pointer-events="none">S2</text>
+                <rect id="s2StatePill" x="122" y="-26" width="98" height="22" rx="11" fill="#e2e8f0" pointer-events="none" />
+                <text id="s2StateText" x="171" y="-11" text-anchor="middle" fill="#334155" font-size="11" font-weight="700" pointer-events="none">ปกติ (0)</text>
+
                 <g id="s2PlungerGroup" class="switch-actuator" role="button" tabindex="0" aria-label="กดสวิตช์ S2">
                   <rect id="s2Cap" x="0" y="18" width="28" height="114" rx="6" fill="#10b981" stroke="#065f46" stroke-width="2.5" />
-                  <text x="14" y="75" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="700" writing-mode="tb">PRESS</text>
+                  <text x="14" y="75" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="700" writing-mode="tb" pointer-events="none">PRESS</text>
                 </g>
-                <rect x="26" y="0" width="22" height="150" fill="#cbd5e1" stroke="#1e293b" stroke-width="2" />
-                <rect x="48" y="12" width="38" height="126" fill="#64748b" stroke="#1e293b" stroke-width="2" />
-                <rect x="86" y="12" width="145" height="126" fill="#f8fafc" stroke="#1e293b" stroke-width="2" />
+                <rect x="26" y="0" width="22" height="150" fill="#cbd5e1" stroke="#1e293b" stroke-width="2" pointer-events="none" />
+                <rect x="48" y="12" width="38" height="126" fill="#64748b" stroke="#1e293b" stroke-width="2" pointer-events="none" />
+                <rect x="86" y="12" width="145" height="126" fill="#f8fafc" stroke="#1e293b" stroke-width="2" pointer-events="none" />
 
-                <line id="s2NcBridge" x1="120" y1="52" x2="120" y2="98" stroke="#16a34a" stroke-width="3" stroke-dasharray="4 2" />
-                <line id="s2NoBridge" x1="192" y1="52" x2="192" y2="98" stroke="#94a3b8" stroke-width="2" stroke-dasharray="3 3" opacity="0.4" />
+                <line id="s2NcBridge" x1="120" y1="52" x2="120" y2="98" stroke="#16a34a" stroke-width="3" stroke-dasharray="4 2" pointer-events="none" />
+                <line id="s2NoBridge" x1="192" y1="52" x2="192" y2="98" stroke="#94a3b8" stroke-width="2" stroke-dasharray="3 3" opacity="0.4" pointer-events="none" />
 
-                <rect x="100" y="18" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" />
-                <rect x="100" y="92" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" />
-                <text x="136" y="79" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="700" transform="rotate(-90 136 75)">NC</text>
+                <rect x="100" y="18" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" pointer-events="none" />
+                <rect x="100" y="92" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" pointer-events="none" />
+                <text x="136" y="79" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="700" transform="rotate(-90 136 75)" pointer-events="none">NC</text>
 
-                <rect x="172" y="18" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" />
-                <rect x="172" y="92" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" />
-                <text x="208" y="79" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="700" transform="rotate(-90 208 75)">NO</text>
+                <rect x="172" y="18" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" pointer-events="none" />
+                <rect x="172" y="92" width="40" height="40" fill="#fef08a" stroke="#475569" stroke-width="1.5" pointer-events="none" />
+                <text x="208" y="79" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="700" transform="rotate(-90 208 75)" pointer-events="none">NO</text>
 
                 <g class="terminal-node" data-terminal="S2_NC_1" data-label="S2 ขั้ว NC (บน)" transform="translate(120, 38)">
                   <circle class="term-hit" r="20" fill="transparent" />
@@ -369,29 +375,20 @@
                   <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
                   <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
                 </g>
-
-                <g transform="translate(26, 156)">
-                  <rect id="s2StatePill" x="0" y="0" width="96" height="24" rx="12" fill="#e2e8f0" />
-                  <text id="s2StateText" x="48" y="16" text-anchor="middle" fill="#334155" font-size="11" font-weight="600">สถานะ: ปกติ (0)</text>
-                  <g id="s2LockBtn" class="lock-toggle-svg" transform="translate(104, 0)" style="cursor:pointer">
-                    <rect x="0" y="0" width="100" height="24" rx="12" fill="#f1f5f9" stroke="#cbd5e1" />
-                    <text id="s2LockText" x="50" y="16" text-anchor="middle" fill="#475569" font-size="11" font-weight="600">🔓 กดค้าง/สลับ</text>
-                  </g>
-                </g>
               </g>
 
               <!-- RELAY MODULE K1 & K2 (MY2N-J) -->
               <g id="relaysGroup" transform="translate(360, 235)">
                 <!-- DIN Rail -->
-                <rect x="-18" y="85" width="295" height="110" rx="3" fill="#cbd5e1" stroke="#94a3b8" stroke-width="1.5" />
+                <rect x="-18" y="85" width="295" height="110" rx="3" fill="#cbd5e1" stroke="#94a3b8" stroke-width="1.5" pointer-events="none" />
                 <!-- Generated by JS for K1 and K2 -->
                 <g id="relayK1Container" transform="translate(0, 0)"></g>
                 <g id="relayK2Container" transform="translate(145, 0)"></g>
               </g>
 
               <!-- Footer watermark matching original worksheet -->
-              <text x="18" y="556" fill="#64748b" font-size="13" font-weight="600">ชุดทดลองการเชื่อมต่อวงจรไฟฟ้าควบคุมด้วย RELAY</text>
-              <text x="690" y="556" text-anchor="end" fill="#64748b" font-size="12" font-family="JetBrains Mono, monospace">Interactive Simulator</text>
+              <text x="18" y="556" fill="#64748b" font-size="13" font-weight="600" pointer-events="none">ชุดทดลองการเชื่อมต่อวงจรไฟฟ้าควบคุมด้วย RELAY</text>
+              <text x="690" y="556" text-anchor="end" fill="#64748b" font-size="12" font-family="JetBrains Mono, monospace" pointer-events="none">Interactive Simulator</text>
             </g>
 
             <!-- Wires Layer -->
@@ -411,11 +408,20 @@
               <button type="button" id="btnCancelWire" class="btn-mini btn-mini-danger" title="ยกเลิกการเดินสายนี้">✕ ยกเลิกสาย</button>
             </div>
           </div>
+
+          <!-- Floating Zoom & Pan Controls for Mobile & Desktop -->
+          <div class="zoom-controls" aria-label="ควบคุมการซูมและเลื่อนมุมมอง">
+            <button type="button" id="btnPanMode" class="zoom-btn" title="สลับโหมดเลื่อนกระดาน (หรือใช้ 2 นิ้วถ่างซูม/เลื่อนบนมือถือ)">✋ เลื่อน</button>
+            <button type="button" id="btnZoomOut" class="zoom-btn" title="ซูมออก">➖</button>
+            <span id="zoomLevelText" class="zoom-level-text">100%</span>
+            <button type="button" id="btnZoomIn" class="zoom-btn" title="ซูมเข้าดูใกล้ๆ">➕</button>
+            <button type="button" id="btnZoomReset" class="zoom-btn" title="รีเซ็ตมุมมอง 100%">รีเซ็ต</button>
+          </div>
         </div>
 
         <div class="workbench-footer">
           <div class="footer-tip">
-            <span>💡 <b>รองรับมือถือ/แท็บเล็ต & คอมพิวเตอร์:</b> แตะขั้วเริ่มต้น → แตะพื้นที่ว่างเพื่อพักสายอ้อมอุปกรณ์ → แตะขั้วปลายทาง (หรือแตะค้างแล้วลากนิ้วไปปล่อยที่ขั้วปลายทางก็ได้) | <b>สวิตช์ S1, S2:</b> แตะที่ปุ่มสีเขียวเพื่อเปิด/ปิดค้างสถานะ</span>
+            <span>💡 <b>การซูมดูใกล้ๆ (มือถือ/คอม):</b> ใช้ <b>2 นิ้วถ่างซูม/เลื่อนกระดาน</b> หรือกดปุ่ม <b>➕/➖/✋ เลื่อน</b> มุมขวาล่าง (บนคอมใช้ลูกกลิ้งเมาส์ซูมได้) | <b>ต่อสาย:</b> แตะขั้วเริ่ม → แตะจุดพักสาย → แตะขั้วปลายทาง</span>
           </div>
         </div>
       </div>
