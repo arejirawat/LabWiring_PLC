@@ -3291,6 +3291,33 @@ const DPASTE_GET_BASE = 'https://dpaste.com';
 const STATIC_CUSTOM_LABS_URL = './custom_labs.json';
 
 let isCloudSyncing = false;
+let lastCloudError = '';
+
+function timeoutSignal(ms) {
+  return AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined;
+}
+
+function formatError(err) {
+  if (!err) return 'unknown error';
+  if (typeof err === 'string') return err;
+  if (err.name === 'TimeoutError' || err.name === 'AbortError') return 'timeout';
+  return err.message || String(err);
+}
+
+async function withRetry(fn, retries = 1, delayMs = 300) {
+  let lastErr;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (i < retries && delayMs > 0) {
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    }
+  }
+  throw lastErr;
+}
 
 function getDeletedCustomLabIds() {
   try {
@@ -3327,12 +3354,19 @@ function removeDeletedCustomLabId(labId) {
   saveDeletedCustomLabIds(next);
 }
 
-function setCloudSyncBadge(stateType, text) {
+function setCloudSyncBadge(stateType, text, title) {
   const badges = document.querySelectorAll('.cloud-sync-badge');
   badges.forEach((badge) => {
     badge.classList.remove('synced', 'syncing', 'error');
     if (stateType) badge.classList.add(stateType);
     if (text) badge.textContent = text;
+    if (title !== undefined) {
+      badge.title = title;
+    } else if (stateType === 'synced') {
+      badge.title = text || 'ซิงค์สำเร็จ';
+    } else if (stateType === 'syncing') {
+      badge.title = text || 'กำลังซิงค์ข้อมูล...';
+    }
   });
 }
 
@@ -3373,45 +3407,57 @@ function saveStoredCustomLabs(customLabs) {
 }
 
 async function fetchLatestCloudPointer() {
-  let combinedPtr = '';
-
-  // 1. Fetch KeyValue store pointer
-  try {
-    const kvRes = await fetch(`${CLOUD_POINTER_GET_URL}?t=${Date.now()}`, {
-      cache: 'no-store',
-      signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined
-    });
-    if (kvRes.ok) {
+  // Query KeyValue and Restful pointer IN PARALLEL
+  const [kvResult, rfResult] = await Promise.allSettled([
+    (async () => {
+      const kvRes = await fetch(`${CLOUD_POINTER_GET_URL}?t=${Date.now()}`, {
+        cache: 'no-store',
+        signal: timeoutSignal(15000)
+      });
+      if (!kvRes.ok) throw new Error(`HTTP ${kvRes.status}`);
       let text = await kvRes.text();
       text = (text || '').replace(/["'\s]/g, '').trim();
       if (text && text.includes('_')) {
-        combinedPtr = text;
+        return text;
       }
-    }
-  } catch (err) {
-    console.warn('KV pointer fetch warning:', err);
-  }
-
-  // 2. Fetch Restful API pointer if KeyValue failed or didn't return a combined pointer
-  if (!combinedPtr) {
-    try {
+      throw new Error('invalid format');
+    })(),
+    (async () => {
       const rfRes = await fetch(`${CLOUD_RESTFUL_PTR_URL}?t=${Date.now()}`, {
         cache: 'no-store',
-        signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined
+        signal: timeoutSignal(15000)
       });
-      if (rfRes.ok) {
-        const obj = await rfRes.json();
-        if (obj && obj.data) {
-          if (obj.data.ptr && typeof obj.data.ptr === 'string' && obj.data.ptr.includes('_')) {
-            combinedPtr = obj.data.ptr.trim();
-          } else if (obj.data.dpasteId || obj.data.bytebinKey) {
-            combinedPtr = `${obj.data.dpasteId || 'none'}_${obj.data.bytebinKey || 'none'}`;
-          }
+      if (!rfRes.ok) throw new Error(`HTTP ${rfRes.status}`);
+      const obj = await rfRes.json();
+      if (obj && obj.data) {
+        if (obj.data.ptr && typeof obj.data.ptr === 'string' && obj.data.ptr.includes('_')) {
+          return obj.data.ptr.trim();
+        } else if (obj.data.dpasteId || obj.data.bytebinKey) {
+          return `${obj.data.dpasteId || 'none'}_${obj.data.bytebinKey || 'none'}`;
         }
       }
-    } catch (err) {
-      console.warn('Restful pointer fetch warning:', err);
-    }
+      throw new Error('invalid format');
+    })()
+  ]);
+
+  let kvPtr = kvResult.status === 'fulfilled' ? kvResult.value : null;
+  let rfPtr = rfResult.status === 'fulfilled' ? rfResult.value : null;
+
+  const ptrErrors = [];
+  if (kvResult.status === 'rejected') {
+    console.warn('KV pointer fetch warning:', kvResult.reason);
+    ptrErrors.push(`kv: ${formatError(kvResult.reason)}`);
+  }
+  if (rfResult.status === 'rejected') {
+    console.warn('Restful pointer fetch warning:', rfResult.reason);
+    ptrErrors.push(`restful: ${formatError(rfResult.reason)}`);
+  }
+
+  // Prefer KeyValue's combined pointer if valid, else Restful's
+  const combinedPtr = kvPtr || rfPtr || '';
+
+  if (!combinedPtr && ptrErrors.length > 0) {
+    lastCloudError = ptrErrors.join('; ');
   }
 
   if (combinedPtr && combinedPtr.includes('_')) {
@@ -3428,22 +3474,30 @@ async function fetchLatestCloudPointer() {
 async function fetchCloudBlobByPointer(ptr) {
   if (!ptr) return null;
   const { dpasteId, bytebinKey } = ptr;
+  if ((!bytebinKey || bytebinKey === 'none') && (!dpasteId || dpasteId === 'none')) {
+    return null;
+  }
+
+  const blobErrors = [];
 
   // 1. Try Bytebin first
   if (bytebinKey && bytebinKey !== 'none') {
     try {
       const res = await fetch(`${BYTEBIN_GET_BASE}/${bytebinKey}`, {
         cache: 'no-store',
-        signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
+        signal: timeoutSignal(20000)
       });
       if (res.ok) {
         const data = await res.json();
         if (data) {
           return data.customLabs ? data : (data.data || null);
         }
+      } else {
+        blobErrors.push(`bytebin: HTTP ${res.status}`);
       }
     } catch (err) {
       console.warn('Bytebin fetch blob warning:', err);
+      blobErrors.push(`bytebin: ${formatError(err)}`);
     }
   }
 
@@ -3452,7 +3506,7 @@ async function fetchCloudBlobByPointer(ptr) {
     try {
       const res = await fetch(`${DPASTE_GET_BASE}/${dpasteId}.txt`, {
         cache: 'no-store',
-        signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
+        signal: timeoutSignal(20000)
       });
       if (res.ok) {
         const text = await res.text();
@@ -3460,10 +3514,17 @@ async function fetchCloudBlobByPointer(ptr) {
         if (data) {
           return data.customLabs ? data : (data.data || null);
         }
+      } else {
+        blobErrors.push(`dpaste: HTTP ${res.status}`);
       }
     } catch (err) {
       console.warn('dpaste fetch blob warning:', err);
+      blobErrors.push(`dpaste: ${formatError(err)}`);
     }
+  }
+
+  if (blobErrors.length > 0) {
+    lastCloudError = (lastCloudError ? `${lastCloudError}; ` : '') + blobErrors.join('; ');
   }
 
   return null;
@@ -3473,84 +3534,150 @@ async function uploadCloudBlobAndPointer(payloadObj) {
   const jsonStr = JSON.stringify(payloadObj);
 
   let bytebinKey = 'none';
-  try {
-    const bbRes = await fetch(BYTEBIN_POST_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-      body: jsonStr,
-      signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined
-    });
-    if (bbRes.ok) {
-      const bbJson = await bbRes.json();
-      if (bbJson && bbJson.key) bytebinKey = bbJson.key;
-    }
-  } catch (e) {
-    console.warn('Bytebin upload warning:', e);
+  let dpasteId = 'none';
+  const uploadErrors = [];
+
+  // Upload to bytebin and dpaste IN PARALLEL (helpers never throw)
+  const [bbRes, dpRes] = await Promise.all([
+    (async () => {
+      try {
+        const key = await withRetry(async () => {
+          const res = await fetch(BYTEBIN_POST_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+            body: jsonStr,
+            signal: timeoutSignal(25000)
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          if (data && data.key) return data.key;
+          throw new Error('missing key');
+        }, 1);
+        return { ok: true, key };
+      } catch (e) {
+        console.warn('Bytebin upload warning:', e);
+        return { ok: false, error: formatError(e) };
+      }
+    })(),
+    (async () => {
+      try {
+        const id = await withRetry(async () => {
+          const formBody = new URLSearchParams();
+          formBody.append('content', jsonStr);
+          formBody.append('syntax', 'json');
+          formBody.append('expiry_days', '365');
+          const res = await fetch(DPASTE_POST_URL, {
+            method: 'POST',
+            body: formBody,
+            signal: timeoutSignal(25000)
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const dpText = (await res.text()).trim();
+          const parts = dpText.replace(/\/+$/, '').split('/');
+          const extracted = parts[parts.length - 1].trim();
+          if (extracted && extracted.length >= 4 && extracted.length <= 20) {
+            return extracted;
+          }
+          throw new Error('invalid id format');
+        }, 1);
+        return { ok: true, id };
+      } catch (e) {
+        console.warn('dpaste upload warning:', e);
+        return { ok: false, error: formatError(e) };
+      }
+    })()
+  ]);
+
+  if (bbRes.ok) {
+    bytebinKey = bbRes.key;
+  } else {
+    uploadErrors.push(`bytebin: ${bbRes.error}`);
   }
 
-  let dpasteId = 'none';
-  try {
-    const formBody = new URLSearchParams();
-    formBody.append('content', jsonStr);
-    formBody.append('syntax', 'json');
-    formBody.append('expiry_days', '365');
-    const dpRes = await fetch(DPASTE_POST_URL, {
-      method: 'POST',
-      body: formBody,
-      signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined
-    });
-    if (dpRes.ok) {
-      const dpText = (await dpRes.text()).trim();
-      const parts = dpText.replace(/\/+$/, '').split('/');
-      const extracted = parts[parts.length - 1].trim();
-      if (extracted && extracted.length >= 4 && extracted.length <= 20) {
-        dpasteId = extracted;
-      }
-    }
-  } catch (e) {
-    console.warn('dpaste upload warning:', e);
+  if (dpRes.ok) {
+    dpasteId = dpRes.id;
+  } else {
+    uploadErrors.push(`dpaste: ${dpRes.error}`);
   }
 
   if (bytebinKey === 'none' && dpasteId === 'none') {
+    lastCloudError = uploadErrors.length > 0 ? uploadErrors.join('; ') : 'upload failed';
     return { success: false };
   }
 
   const combinedPtr = `${dpasteId}_${bytebinKey}`;
+  const pointerErrors = [];
 
-  let ptrSaved = false;
+  // Save pointers to KeyValue and Restful IN PARALLEL (helpers never throw)
+  const [kvRes, rfRes] = await Promise.all([
+    (async () => {
+      try {
+        await withRetry(async () => {
+          const res = await fetch(`${CLOUD_POINTER_SET_URL}/${combinedPtr}`, {
+            method: 'POST',
+            signal: timeoutSignal(15000)
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        }, 1);
+        return { ok: true };
+      } catch (e) {
+        console.warn('KV pointer update warning:', e);
+        return { ok: false, error: formatError(e) };
+      }
+    })(),
+    (async () => {
+      try {
+        await withRetry(async () => {
+          const res = await fetch(CLOUD_RESTFUL_PTR_URL, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: 'tatc_ptr',
+              data: { ptr: combinedPtr, dpasteId, bytebinKey }
+            }),
+            signal: timeoutSignal(15000)
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        }, 1);
+        return { ok: true };
+      } catch (e) {
+        console.warn('Restful pointer update warning:', e);
+        return { ok: false, error: formatError(e) };
+      }
+    })()
+  ]);
 
-  // Save to Pointer Store 1 (KeyValue)
-  try {
-    const kvRes = await fetch(`${CLOUD_POINTER_SET_URL}/${combinedPtr}`, {
-      method: 'POST',
-      signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
-    });
-    if (kvRes.ok) ptrSaved = true;
-  } catch (e) {
-    console.warn('KV pointer update warning:', e);
+  const kvSaved = kvRes.ok;
+  const rfSaved = rfRes.ok;
+
+  if (!kvRes.ok) pointerErrors.push(`kv: ${kvRes.error}`);
+  if (!rfRes.ok) pointerErrors.push(`restful: ${rfRes.error}`);
+
+  const ptrSaved = kvSaved || rfSaved;
+
+  if (!ptrSaved) {
+    const allErrors = [...uploadErrors, ...pointerErrors];
+    lastCloudError = allErrors.length > 0 ? allErrors.join('; ') : 'pointer save failed';
+    return { success: false, combinedPtr };
   }
 
-  // Save to Pointer Store 2 (Restful API)
-  try {
-    const rfRes = await fetch(CLOUD_RESTFUL_PTR_URL, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'tatc_ptr',
-        data: { ptr: combinedPtr, dpasteId, bytebinKey }
-      }),
-      signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
-    });
-    if (rfRes.ok) ptrSaved = true;
-  } catch (e) {
-    console.warn('Restful pointer update warning:', e);
-  }
-
-  return { success: ptrSaved, combinedPtr };
+  lastCloudError = '';
+  return { success: true, combinedPtr };
 }
 
 async function fetchCustomLabsFromServer(silent = true, allowPushBack = true) {
   if (isCloudSyncing) return { success: false, inProgress: true };
+
+  const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  if (isOffline) {
+    lastCloudError = 'ออฟไลน์ (ไม่ได้เชื่อมต่อเครือข่ายอินเทอร์เน็ต)';
+    setCloudSyncBadge('error', '⚠️ ออฟไลน์', lastCloudError);
+    if (!silent) {
+      alert(`อุปกรณ์ของคุณออฟไลน์อยู่ในขณะนี้ ระบบจะใช้ข้อมูลที่บันทึกไว้ในเครื่องของคุณ\n\nรายละเอียด: ${lastCloudError}`);
+    }
+    return { success: false, offline: true };
+  }
+
   isCloudSyncing = true;
   setCloudSyncBadge('syncing', '⏳ กำลังซิงค์ข้อมูลกับเซิร์ฟเวอร์...');
 
@@ -3566,6 +3693,7 @@ async function fetchCustomLabsFromServer(silent = true, allowPushBack = true) {
     }
   } catch (err) {
     console.warn('Cloud sync lookup error:', err);
+    if (!lastCloudError) lastCloudError = formatError(err);
   }
 
   // 2. Fallback to static custom_labs.json if remote failed
@@ -3573,7 +3701,7 @@ async function fetchCustomLabsFromServer(silent = true, allowPushBack = true) {
     try {
       const staticRes = await fetch(`${STATIC_CUSTOM_LABS_URL}?t=${Date.now()}`, {
         cache: 'no-store',
-        signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined
+        signal: timeoutSignal(10000)
       });
       if (staticRes.ok) {
         fetchedData = await staticRes.json();
@@ -3685,15 +3813,31 @@ async function fetchCustomLabsFromServer(silent = true, allowPushBack = true) {
       }
     }
 
-    setCloudSyncBadge('error', '⚠️ ซิงค์ไม่สำเร็จ (ใช้ข้อมูลในเครื่อง)');
+    const checkOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    if (checkOffline) {
+      lastCloudError = 'ออฟไลน์ (ไม่ได้เชื่อมต่อเครือข่ายอินเทอร์เน็ต)';
+    }
+    const badgeText = checkOffline ? '⚠️ ออฟไลน์' : '⚠️ ซิงค์ไม่สำเร็จ';
+    const errDetail = lastCloudError || (checkOffline ? 'ออฟไลน์' : 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์');
+    setCloudSyncBadge('error', badgeText, errDetail);
     if (!silent) {
-      alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ออนไลน์ได้ในขณะนี้ ระบบจะใช้ข้อมูลที่บันทึกไว้ในเครื่องของคุณ');
+      const baseMsg = checkOffline
+        ? 'อุปกรณ์ของคุณออฟไลน์อยู่ในขณะนี้ ระบบจะใช้ข้อมูลที่บันทึกไว้ในเครื่องของคุณ'
+        : 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ออนไลน์ได้ในขณะนี้ ระบบจะใช้ข้อมูลที่บันทึกไว้ในเครื่องของคุณ';
+      alert(`${baseMsg}\n\nรายละเอียด: ${errDetail}`);
     }
     return { success: false };
   }
 }
 
 async function pushCustomLabsToServer() {
+  const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  if (isOffline) {
+    lastCloudError = 'ออฟไลน์ (ไม่ได้เชื่อมต่อเครือข่ายอินเทอร์เน็ต)';
+    setCloudSyncBadge('error', '⚠️ ออฟไลน์', lastCloudError);
+    return { success: false, error: new Error('Offline') };
+  }
+
   setCloudSyncBadge('syncing', '⏳ กำลังอัปโหลดไปยังเซิร์ฟเวอร์...');
 
   // 1. Try to fetch latest pointer and remote blob to merge changes before pushing
@@ -3766,11 +3910,23 @@ async function pushCustomLabsToServer() {
       return { success: true };
     }
 
-    setCloudSyncBadge('error', '⚠️ อัปโหลดเซิร์ฟเวอร์ไม่สำเร็จ');
+    const checkOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    if (checkOffline) {
+      lastCloudError = 'ออฟไลน์ (ไม่ได้เชื่อมต่อเครือข่ายอินเทอร์เน็ต)';
+    }
+    const badgeText = checkOffline ? '⚠️ ออฟไลน์' : '⚠️ ซิงค์ไม่สำเร็จ';
+    const errDetail = lastCloudError || (checkOffline ? 'ออฟไลน์' : 'อัปโหลดเซิร์ฟเวอร์ไม่สำเร็จ');
+    setCloudSyncBadge('error', badgeText, errDetail);
     return { success: false };
   } catch (err) {
     console.warn('pushCustomLabsToServer error:', err);
-    setCloudSyncBadge('error', '⚠️ ออฟไลน์ (บันทึกในเครื่องแล้ว)');
+    if (!lastCloudError) lastCloudError = formatError(err);
+    const checkOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    if (checkOffline) {
+      lastCloudError = 'ออฟไลน์ (ไม่ได้เชื่อมต่อเครือข่ายอินเทอร์เน็ต)';
+    }
+    const badgeText = checkOffline ? '⚠️ ออฟไลน์' : '⚠️ ซิงค์ไม่สำเร็จ';
+    setCloudSyncBadge('error', badgeText, lastCloudError);
     return { success: false, error: err };
   }
 }
