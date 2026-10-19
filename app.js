@@ -1062,9 +1062,370 @@ function drawIECSwitchNC({ id, label, x, yTop, pressed, topEnergized, bottomEner
   `;
 }
 
+/**
+ * วาดหน้าสัมผัสรีเลย์ NO (Normally Open Contact 9-5 - IEC 60617)
+ */
+function drawIECRelayContactNO({ x, yTop, label, closed, topEnergized, bottomEnergized }) {
+  const yBot = yTop + 34;
+  const bladeTopX = closed ? x : x - 13;
+  const bladeTopY = closed ? yTop : yTop + 4;
+  const strokeColor = (bottomEnergized || topEnergized) ? '#ef4444' : '#475569';
+  return `
+    <g class="schem-contact" style="cursor:default">
+      <text x="${x - 48}" y="${yTop + 20}" font-size="11" font-weight="700" fill="#0f172a">${label}</text>
+      <circle cx="${x}" cy="${yTop}" r="3" fill="#fff" stroke="${topEnergized ? '#ef4444' : '#334155'}" stroke-width="2"/>
+      <circle cx="${x}" cy="${yBot}" r="3" fill="#fff" stroke="${bottomEnergized ? '#ef4444' : '#334155'}" stroke-width="2"/>
+      <line x1="${x}" y1="${yBot - 2}" x2="${bladeTopX}" y2="${bladeTopY}" stroke="${strokeColor}" stroke-width="2.8" stroke-linecap="round"/>
+    </g>
+  `;
+}
+
+/**
+ * วาดหน้าสัมผัสรีเลย์ NC (Normally Closed Break Contact 9-1 - IEC 60617)
+ */
+function drawIECRelayContactNC({ x, yTop, label, closed, topEnergized, bottomEnergized }) {
+  const yBot = yTop + 34;
+  const bladeTopX = closed ? x + 7 : x + 18;
+  const bladeTopY = closed ? yTop : yTop + 4;
+  const strokeColor = (bottomEnergized || topEnergized) ? '#ef4444' : '#475569';
+  return `
+    <g class="schem-contact" style="cursor:default">
+      <text x="${x - 48}" y="${yTop + 20}" font-size="11" font-weight="700" fill="#0f172a">${label}</text>
+      <circle cx="${x}" cy="${yTop}" r="3" fill="#fff" stroke="${topEnergized ? '#ef4444' : '#334155'}" stroke-width="2"/>
+      <line x1="${x}" y1="${yTop}" x2="${x + 11}" y2="${yTop}" stroke="${topEnergized ? '#ef4444' : '#334155'}" stroke-width="2.2"/>
+      <circle cx="${x}" cy="${yBot}" r="3" fill="#fff" stroke="${bottomEnergized ? '#ef4444' : '#334155'}" stroke-width="2"/>
+      <line x1="${x}" y1="${yBot - 2}" x2="${bladeTopX}" y2="${bladeTopY}" stroke="${strokeColor}" stroke-width="2.8" stroke-linecap="round"/>
+    </g>
+  `;
+}
+
+function renderSchematicSlotComponent({
+  comp,
+  x,
+  yTop,
+  s1,
+  s2,
+  relayOn,
+  topEnergized,
+  botEnergized,
+  interactive,
+  builderMode,
+  branch,
+  slotType
+}) {
+  let innerHtml = '';
+  const yBot = yTop + 34;
+
+  if (comp === 'S1_NO') {
+    innerHtml = drawIECSwitchNO({
+      id: 'S1',
+      label: 'S1(NO)',
+      x,
+      yTop,
+      pressed: s1,
+      topEnergized,
+      bottomEnergized: botEnergized
+    });
+  } else if (comp === 'S1_NC') {
+    innerHtml = drawIECSwitchNC({
+      id: 'S1',
+      label: 'S1(NC)',
+      x,
+      yTop,
+      pressed: s1,
+      topEnergized,
+      bottomEnergized: botEnergized
+    });
+  } else if (comp === 'S2_NO') {
+    innerHtml = drawIECSwitchNO({
+      id: 'S2',
+      label: 'S2(NO)',
+      x,
+      yTop,
+      pressed: s2,
+      topEnergized,
+      bottomEnergized: botEnergized
+    });
+  } else if (comp === 'S2_NC') {
+    innerHtml = drawIECSwitchNC({
+      id: 'S2',
+      label: 'S2(NC)',
+      x,
+      yTop,
+      pressed: s2,
+      topEnergized,
+      bottomEnergized: botEnergized
+    });
+  } else if (comp === 'K1_NO') {
+    innerHtml = drawIECRelayContactNO({
+      x,
+      yTop,
+      label: 'K1(9-5)',
+      closed: relayOn,
+      topEnergized,
+      bottomEnergized: botEnergized
+    });
+  } else if (comp === 'K1_NC') {
+    innerHtml = drawIECRelayContactNC({
+      x,
+      yTop,
+      label: 'K1(9-1)',
+      closed: !relayOn,
+      topEnergized,
+      bottomEnergized: botEnergized
+    });
+  } else if (comp === 'WIRE_V') {
+    const strokeColor = topEnergized ? '#ef4444' : '#475569';
+    innerHtml = `<line x1="${x}" y1="${yTop}" x2="${x}" y2="${yBot}" stroke="${strokeColor}" stroke-width="2.8" stroke-linecap="round"/>`;
+  } else {
+    if (!builderMode) {
+      innerHtml = `
+        <circle cx="${x}" cy="${yTop}" r="2.8" fill="#fff" stroke="#475569" stroke-width="1.8"/>
+        <circle cx="${x}" cy="${yBot}" r="2.8" fill="#fff" stroke="#475569" stroke-width="1.8"/>
+      `;
+    }
+  }
+
+  if (builderMode) {
+    const hasComp = Boolean(comp);
+    return `
+      <g class="svg-slot-group" data-branch="${branch}" data-slot="${slotType}">
+        <rect class="slot-box" x="${x - 30}" y="${yTop - 6}" width="60" height="46" rx="6"
+              fill="${hasComp ? 'rgba(30, 41, 59, 0.5)' : 'rgba(15, 23, 42, 0.4)'}"
+              stroke="${hasComp ? '#38bdf8' : '#475569'}"
+              stroke-dasharray="${hasComp ? 'none' : '3 3'}" stroke-width="1.5"/>
+        ${innerHtml}
+        ${!hasComp ? `<text x="${x}" y="${yTop + 20}" font-size="10" font-weight="600" text-anchor="middle" fill="#64748b">+ วาง</text>` : ''}
+      </g>
+    `;
+  }
+
+  return innerHtml;
+}
+
+function renderSchematicLoadComponent({
+  load,
+  x,
+  yCenter,
+  energized,
+  l1,
+  l2,
+  relayOn,
+  builderMode,
+  branch
+}) {
+  let innerHtml = '';
+  const isL1Active = load === 'L1' && (builderMode ? energized : l1);
+  const isL2Active = load === 'L2' && (builderMode ? energized : l2);
+  const isCoilActive = load === 'K1_COIL' && (builderMode ? energized : relayOn);
+
+  if (load === 'L1') {
+    innerHtml = `
+      <circle cx="${x}" cy="${yCenter}" r="13" fill="${isL1Active ? '#fde047' : '#ffffff'}" stroke="#0f172a" stroke-width="2.2"/>
+      <path d="M ${x - 9} ${yCenter - 9} L ${x + 9} ${yCenter + 9} M ${x + 9} ${yCenter - 9} L ${x - 9} ${yCenter + 9}" stroke="#0f172a" stroke-width="1.8"/>
+      <text x="${x + 18}" y="${yCenter + 4}" font-size="11" font-weight="700" fill="#0f172a">L1</text>
+    `;
+  } else if (load === 'L2') {
+    innerHtml = `
+      <circle cx="${x}" cy="${yCenter}" r="13" fill="${isL2Active ? '#fde047' : '#ffffff'}" stroke="#0f172a" stroke-width="2.2"/>
+      <path d="M ${x - 9} ${yCenter - 9} L ${x + 9} ${yCenter + 9} M ${x + 9} ${yCenter - 9} L ${x - 9} ${yCenter + 9}" stroke="#0f172a" stroke-width="1.8"/>
+      <text x="${x + 18}" y="${yCenter + 4}" font-size="11" font-weight="700" fill="#0f172a">L2</text>
+    `;
+  } else if (load === 'K1_COIL') {
+    innerHtml = `
+      <rect x="${x - 20}" y="${yCenter - 11}" width="40" height="22" rx="2" fill="${isCoilActive ? '#dcfce7' : '#ffffff'}" stroke="#0f172a" stroke-width="2"/>
+      <text x="${x}" y="${yCenter + 4}" font-size="11" font-weight="700" text-anchor="middle" fill="#0f172a">K1</text>
+      <text x="${x + 24}" y="${yCenter + 4}" font-size="9" font-weight="600" fill="#475569">14-13</text>
+    `;
+  }
+
+  if (builderMode) {
+    const hasLoad = Boolean(load);
+    return `
+      <g class="svg-slot-group" data-branch="${branch}" data-slot="loadSlot">
+        <rect class="slot-box" x="${x - 30}" y="${yCenter - 15}" width="60" height="32" rx="6"
+              fill="${hasLoad ? 'rgba(30, 41, 59, 0.5)' : 'rgba(15, 23, 42, 0.4)'}"
+              stroke="${hasLoad ? '#38bdf8' : '#475569'}"
+              stroke-dasharray="${hasLoad ? 'none' : '3 3'}" stroke-width="1.5"/>
+        ${innerHtml}
+        ${!hasLoad ? `<text x="${x}" y="${yCenter + 4}" font-size="10" font-weight="600" text-anchor="middle" fill="#64748b">+ โหลด</text>` : ''}
+      </g>
+    `;
+  }
+
+  return innerHtml;
+}
+
+function generateCustomSchematicSvg(schematic, options = {}) {
+  const {
+    s1 = false,
+    s2 = false,
+    l1 = false,
+    l2 = false,
+    relayOn = false,
+    interactive = false,
+    builderMode = false
+  } = options;
+
+  const hotStroke = '#ef4444';
+  const idleStroke = '#475569';
+  const gndStroke = '#64748b';
+
+  const bXs = [85, 195, 305];
+  const branches = schematic.branches || [
+    { topSlot: null, midSlot: null, loadSlot: null },
+    { topSlot: null, midSlot: null, loadSlot: null },
+    { topSlot: null, midSlot: null, loadSlot: null }
+  ];
+
+  const isClosed = (comp) => {
+    if (!comp) return false;
+    if (comp === 'WIRE_V') return true;
+    if (comp === 'S1_NO') return Boolean(s1);
+    if (comp === 'S1_NC') return !s1;
+    if (comp === 'S2_NO') return Boolean(s2);
+    if (comp === 'S2_NC') return !s2;
+    if (comp === 'K1_NO') return Boolean(relayOn);
+    if (comp === 'K1_NC') return !relayOn;
+    return false;
+  };
+
+  let topOut = [false, false, false];
+  for (let b = 0; b < 3; b++) {
+    topOut[b] = isClosed(branches[b] ? branches[b].topSlot : null);
+  }
+  if (schematic.bridge12) {
+    const m = topOut[0] || topOut[1];
+    topOut[0] = m;
+    topOut[1] = m;
+  }
+  if (schematic.bridge23) {
+    const m = topOut[1] || topOut[2];
+    topOut[1] = m;
+    topOut[2] = m;
+  }
+  if (schematic.bridge12) {
+    const m = topOut[0] || topOut[1];
+    topOut[0] = m;
+    topOut[1] = m;
+  }
+
+  let midOut = [false, false, false];
+  for (let b = 0; b < 3; b++) {
+    midOut[b] = topOut[b] && isClosed(branches[b] ? branches[b].midSlot : null);
+  }
+
+  let svg = `
+    <svg viewBox="0 0 380 260" class="custom-schem-svg">
+      <!-- Top Rail: +12V -->
+      <text x="18" y="22" font-size="13" font-weight="700" fill="#dc2626">+12V</text>
+      <circle cx="36" cy="34" r="5" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
+      <path d="M 41 34 H 305" fill="none" stroke="${hotStroke}" stroke-width="2.8"/>
+  `;
+
+  for (let b = 0; b < 3; b++) {
+    const bx = bXs[b];
+    const bObj = branches[b] || {};
+    const topComp = bObj.topSlot;
+    const midComp = bObj.midSlot;
+    const loadComp = bObj.loadSlot;
+
+    svg += `<circle cx="${bx}" cy="34" r="4" fill="#0f172a"/>`;
+    svg += `<path d="M ${bx} 34 V 50" fill="none" stroke="${hotStroke}" stroke-width="2.6"/>`;
+
+    svg += renderSchematicSlotComponent({
+      comp: topComp,
+      x: bx,
+      yTop: 50,
+      s1,
+      s2,
+      relayOn,
+      topEnergized: true,
+      botEnergized: topOut[b],
+      interactive,
+      builderMode,
+      branch: b,
+      slotType: 'topSlot'
+    });
+
+    svg += `<path d="M ${bx} 84 V 100" fill="none" stroke="${topOut[b] ? hotStroke : idleStroke}" stroke-width="2.6"/>`;
+    svg += `<circle cx="${bx}" cy="100" r="${(b === 0 && schematic.bridge12) || (b === 1 && (schematic.bridge12 || schematic.bridge23)) || (b === 2 && schematic.bridge23) ? '4' : '2.5'}" fill="#0f172a"/>`;
+
+    svg += `<path d="M ${bx} 100 V 114" fill="none" stroke="${topOut[b] ? hotStroke : idleStroke}" stroke-width="2.6"/>`;
+
+    svg += renderSchematicSlotComponent({
+      comp: midComp,
+      x: bx,
+      yTop: 114,
+      s1,
+      s2,
+      relayOn,
+      topEnergized: topOut[b],
+      botEnergized: midOut[b],
+      interactive,
+      builderMode,
+      branch: b,
+      slotType: 'midSlot'
+    });
+
+    svg += `<path d="M ${bx} 148 V 178" fill="none" stroke="${midOut[b] ? hotStroke : idleStroke}" stroke-width="2.6"/>`;
+
+    svg += renderSchematicLoadComponent({
+      load: loadComp,
+      x: bx,
+      yCenter: 194,
+      energized: midOut[b],
+      l1,
+      l2,
+      relayOn,
+      builderMode,
+      branch: b
+    });
+
+    if (loadComp || builderMode) {
+      svg += `<path d="M ${bx} 210 V 236" fill="none" stroke="${gndStroke}" stroke-width="2.6"/>`;
+      svg += `<circle cx="${bx}" cy="236" r="4" fill="#0f172a"/>`;
+    }
+  }
+
+  // Draw Parallel Bridges
+  if (schematic.bridge12 || builderMode) {
+    const isHot12 = topOut[0] || topOut[1];
+    const bridgeStroke = schematic.bridge12 ? (isHot12 ? hotStroke : idleStroke) : '#334155';
+    const bridgeDash = schematic.bridge12 ? 'none' : '3 3';
+    svg += `
+      <g class="bridge-line-group" data-bridge="12">
+        <path d="M 85 100 H 195" fill="none" stroke="${bridgeStroke}" stroke-width="2.6" stroke-dasharray="${bridgeDash}"/>
+      </g>
+    `;
+  }
+
+  if (schematic.bridge23 || builderMode) {
+    const isHot23 = topOut[1] || topOut[2];
+    const bridgeStroke = schematic.bridge23 ? (isHot23 ? hotStroke : idleStroke) : '#334155';
+    const bridgeDash = schematic.bridge23 ? 'none' : '3 3';
+    svg += `
+      <g class="bridge-line-group" data-bridge="23">
+        <path d="M 195 100 H 305" fill="none" stroke="${bridgeStroke}" stroke-width="2.6" stroke-dasharray="${bridgeDash}"/>
+      </g>
+    `;
+  }
+
+  // Bottom Rail: 0V
+  svg += `
+      <path d="M 41 236 H 305" fill="none" stroke="${gndStroke}" stroke-width="2.8"/>
+      <circle cx="36" cy="236" r="5" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
+      <text x="18" y="224" font-size="13" font-weight="700" fill="#0f172a">0V</text>
+    </svg>
+  `;
+
+  return svg;
+}
+
 // Render Dynamic Schematic Diagram based on current lab & live simulation state
 function renderSchematic() {
   const container = document.getElementById('schematicContainer');
+  const lab = LABS[state.currentLabId];
   const s1 = state.switches.S1.pressed;
   const s2 = state.switches.S2.pressed;
   const l1 = state.simResult.L1;
@@ -1372,6 +1733,16 @@ function renderSchematic() {
         <text x="18" y="220" font-size="13" font-weight="700" fill="#0f172a">0V</text>
       </svg>
     `;
+  } else if (lab && lab.customSchematic) {
+    svgContent = generateCustomSchematicSvg(lab.customSchematic, {
+      s1,
+      s2,
+      l1,
+      l2,
+      relayOn,
+      interactive: true,
+      builderMode: false
+    });
   }
 
   container.innerHTML = svgContent;
@@ -2174,6 +2545,10 @@ function loadLab(labId) {
   if (!lab) return;
 
   state.currentLabId = labId;
+  const labSelect = document.getElementById('labSelect');
+  if (labSelect && labSelect.value !== labId) {
+    labSelect.value = labId;
+  }
   state.showingHints = false;
   state.selectedTerminal = null;
   state.activeWaypoints = [];
@@ -2897,9 +3272,811 @@ function initInteractions() {
   });
 }
 
+// ============================================================================
+// Custom Lab Builder & Manager (Password Gate: 'tatc')
+// ============================================================================
+
+const TEACHER_PASSWORD = 'tatc';
+const CUSTOM_LABS_STORAGE_KEY = 'tatc_custom_labs_v1';
+
+const builderState = {
+  editingLabId: null,
+  title: '',
+  objective: '',
+  logicComparison: '',
+  branches: [
+    { topSlot: 'S1_NO', midSlot: 'S2_NO', loadSlot: 'L1' },
+    { topSlot: null, midSlot: null, loadSlot: null },
+    { topSlot: null, midSlot: null, loadSlot: null }
+  ],
+  bridge12: false,
+  bridge23: false,
+  selectedPaletteComp: null,
+  selectedPaletteLoad: null,
+  capturedWires: null,
+  truthTable: []
+};
+
+function getStoredCustomLabs() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_LABS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    console.warn('Failed to load custom labs from storage:', e);
+    return {};
+  }
+}
+
+function saveStoredCustomLabs(customLabs) {
+  try {
+    localStorage.setItem(CUSTOM_LABS_STORAGE_KEY, JSON.stringify(customLabs));
+  } catch (e) {
+    console.warn('Failed to save custom labs to storage:', e);
+  }
+}
+
+function loadStoredCustomLabsIntoApp() {
+  const stored = getStoredCustomLabs();
+  Object.keys(stored).forEach((id) => {
+    LABS[id] = stored[id];
+  });
+  refreshCustomLabsInSelect();
+}
+
+function refreshCustomLabsInSelect(selectedId = null) {
+  const select = document.getElementById('labSelect');
+  if (!select) return;
+
+  let optGroup = document.getElementById('customLabsOptGroup');
+  const stored = getStoredCustomLabs();
+  const keys = Object.keys(stored);
+
+  if (keys.length === 0) {
+    if (optGroup) optGroup.remove();
+    return;
+  }
+
+  if (!optGroup) {
+    optGroup = document.createElement('optgroup');
+    optGroup.id = 'customLabsOptGroup';
+    optGroup.label = '⭐ โจทย์ใบงานเพิ่มเติม (สร้างเอง)';
+    select.appendChild(optGroup);
+  }
+
+  optGroup.innerHTML = '';
+  keys.forEach((id) => {
+    const lab = stored[id];
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = `★ ${lab.title}`;
+    optGroup.appendChild(opt);
+  });
+
+  if (selectedId) {
+    select.value = selectedId;
+  }
+}
+
+function simulateCustomSchematic(schematic, s1, s2, prevRelay = false) {
+  const branches = (schematic && schematic.branches) ? schematic.branches : [];
+  let relayActive = Boolean(prevRelay);
+
+  const isClosed = (comp, rActive) => {
+    if (!comp) return false;
+    if (comp === 'WIRE_V') return true;
+    if (comp === 'S1_NO') return s1 === 1;
+    if (comp === 'S1_NC') return s1 === 0;
+    if (comp === 'S2_NO') return s2 === 1;
+    if (comp === 'S2_NC') return s2 === 0;
+    if (comp === 'K1_NO') return rActive === true;
+    if (comp === 'K1_NC') return rActive === false;
+    return false;
+  };
+
+  let l1 = 0, l2 = 0;
+
+  for (let iter = 0; iter < 3; iter++) {
+    const topOut = [false, false, false];
+    for (let b = 0; b < 3; b++) {
+      const bObj = branches[b] || {};
+      topOut[b] = isClosed(bObj.topSlot, relayActive);
+    }
+
+    if (schematic.bridge12) {
+      const m12 = topOut[0] || topOut[1];
+      topOut[0] = m12;
+      topOut[1] = m12;
+    }
+    if (schematic.bridge23) {
+      const m23 = topOut[1] || topOut[2];
+      topOut[1] = m23;
+      topOut[2] = m23;
+    }
+    if (schematic.bridge12) {
+      const m12 = topOut[0] || topOut[1];
+      topOut[0] = m12;
+      topOut[1] = m12;
+    }
+
+    const midOut = [false, false, false];
+    for (let b = 0; b < 3; b++) {
+      const bObj = branches[b] || {};
+      midOut[b] = topOut[b] && isClosed(bObj.midSlot, relayActive);
+    }
+
+    l1 = 0;
+    l2 = 0;
+    let coilActive = false;
+    for (let b = 0; b < 3; b++) {
+      const bObj = branches[b] || {};
+      if (midOut[b]) {
+        if (bObj.loadSlot === 'L1') l1 = 1;
+        if (bObj.loadSlot === 'L2') l2 = 1;
+        if (bObj.loadSlot === 'K1_COIL') coilActive = true;
+      }
+    }
+    relayActive = coilActive;
+  }
+
+  return {
+    L1: l1,
+    L2: l2,
+    RELAY: relayActive ? 1 : 0
+  };
+}
+
+function generateTruthTableForCustomSchematic(schematic) {
+  const branches = schematic.branches || [];
+  let usesS1 = false;
+  let usesS2 = false;
+  let usesRelay = false;
+  let usesL1 = false;
+  let usesL2 = false;
+
+  branches.forEach((b) => {
+    [b.topSlot, b.midSlot].forEach((s) => {
+      if (s === 'S1_NO' || s === 'S1_NC') usesS1 = true;
+      if (s === 'S2_NO' || s === 'S2_NC') usesS2 = true;
+      if (s === 'K1_NO' || s === 'K1_NC') usesRelay = true;
+    });
+    if (b.loadSlot === 'L1') usesL1 = true;
+    if (b.loadSlot === 'L2') usesL2 = true;
+    if (b.loadSlot === 'K1_COIL') usesRelay = true;
+  });
+
+  const testCases = [];
+  const combos = (usesS2 || usesS1)
+    ? [
+        { S1: 0, S2: 0 },
+        { S1: 0, S2: 1 },
+        { S1: 1, S2: 0 },
+        { S1: 1, S2: 1 }
+      ]
+    : [
+        { S1: 0 },
+        { S1: 1 }
+      ];
+
+  let simRelayState = false;
+  combos.forEach((c) => {
+    const s1 = c.S1 !== undefined ? c.S1 : 0;
+    const s2 = c.S2 !== undefined ? c.S2 : 0;
+    const sim = simulateCustomSchematic(schematic, s1, s2, simRelayState);
+    simRelayState = Boolean(sim.RELAY);
+
+    const expected = {};
+    if (usesL1 || (!usesL1 && !usesL2)) expected.L1 = sim.L1;
+    if (usesL2) expected.L2 = sim.L2;
+    if (usesRelay) expected.RELAY = sim.RELAY;
+
+    testCases.push({
+      ...c,
+      expected
+    });
+  });
+
+  return testCases;
+}
+
+function generateHintWiresFromSchematic(schematic) {
+  const hintWires = [];
+  const branches = schematic.branches || [];
+
+  branches.forEach((b, bIdx) => {
+    let currentPos = (bIdx === 0) ? 'PWR_POS' : `TB_${bIdx + 1}_T`;
+
+    if (bIdx > 0 && (b.topSlot || b.loadSlot)) {
+      hintWires.push({
+        from: 'PWR_POS',
+        to: `TB_${bIdx + 1}_T`,
+        color: '#ef4444',
+        waypoints: []
+      });
+      currentPos = `TB_${bIdx + 1}_B`;
+    }
+
+    let topTermOut = null;
+    if (b.topSlot === 'S1_NO') {
+      hintWires.push({ from: currentPos, to: 'S1_NO_1', color: '#ef4444', waypoints: [] });
+      topTermOut = 'S1_NO_2';
+    } else if (b.topSlot === 'S1_NC') {
+      hintWires.push({ from: currentPos, to: 'S1_NC_1', color: '#ef4444', waypoints: [] });
+      topTermOut = 'S1_NC_2';
+    } else if (b.topSlot === 'S2_NO') {
+      hintWires.push({ from: currentPos, to: 'S2_NO_1', color: '#ef4444', waypoints: [] });
+      topTermOut = 'S2_NO_2';
+    } else if (b.topSlot === 'S2_NC') {
+      hintWires.push({ from: currentPos, to: 'S2_NC_1', color: '#ef4444', waypoints: [] });
+      topTermOut = 'S2_NC_2';
+    } else if (b.topSlot === 'K1_NO') {
+      hintWires.push({ from: currentPos, to: 'K1_9', color: '#eab308', waypoints: [] });
+      topTermOut = 'K1_5';
+    } else if (b.topSlot === 'K1_NC') {
+      hintWires.push({ from: currentPos, to: 'K1_9', color: '#eab308', waypoints: [] });
+      topTermOut = 'K1_1';
+    } else if (b.topSlot === 'WIRE_V') {
+      topTermOut = currentPos;
+    }
+
+    let midTermOut = topTermOut;
+    if (b.midSlot === 'S1_NO') {
+      hintWires.push({ from: topTermOut || currentPos, to: 'S1_NO_1', color: '#ef4444', waypoints: [] });
+      midTermOut = 'S1_NO_2';
+    } else if (b.midSlot === 'S1_NC') {
+      hintWires.push({ from: topTermOut || currentPos, to: 'S1_NC_1', color: '#ef4444', waypoints: [] });
+      midTermOut = 'S1_NC_2';
+    } else if (b.midSlot === 'S2_NO') {
+      hintWires.push({ from: topTermOut || currentPos, to: 'S2_NO_1', color: '#ef4444', waypoints: [] });
+      midTermOut = 'S2_NO_2';
+    } else if (b.midSlot === 'S2_NC') {
+      hintWires.push({ from: topTermOut || currentPos, to: 'S2_NC_1', color: '#ef4444', waypoints: [] });
+      midTermOut = 'S2_NC_2';
+    } else if (b.midSlot === 'K1_NO') {
+      hintWires.push({ from: topTermOut || currentPos, to: 'K1_9', color: '#eab308', waypoints: [] });
+      midTermOut = 'K1_5';
+    } else if (b.midSlot === 'K1_NC') {
+      hintWires.push({ from: topTermOut || currentPos, to: 'K1_9', color: '#eab308', waypoints: [] });
+      midTermOut = 'K1_1';
+    }
+
+    if (b.loadSlot === 'L1') {
+      hintWires.push({ from: midTermOut || currentPos, to: 'L1_A', color: '#3b82f6', waypoints: [] });
+      hintWires.push({ from: 'L1_B', to: 'PWR_NEG', color: '#1e293b', waypoints: [] });
+    } else if (b.loadSlot === 'L2') {
+      hintWires.push({ from: midTermOut || currentPos, to: 'L2_A', color: '#3b82f6', waypoints: [] });
+      hintWires.push({ from: 'L2_B', to: 'PWR_NEG', color: '#1e293b', waypoints: [] });
+    } else if (b.loadSlot === 'K1_COIL') {
+      hintWires.push({ from: midTermOut || currentPos, to: 'K1_14', color: '#3b82f6', waypoints: [] });
+      hintWires.push({ from: 'K1_13', to: 'PWR_NEG', color: '#1e293b', waypoints: [] });
+    }
+  });
+
+  return hintWires;
+}
+
+function openPasswordModal() {
+  const modal = document.getElementById('teacherPasswordModal');
+  const input = document.getElementById('teacherPassInput');
+  const err = document.getElementById('teacherPassError');
+  if (modal) modal.hidden = false;
+  if (input) {
+    input.value = '';
+    input.focus();
+  }
+  if (err) err.hidden = true;
+}
+
+function closePasswordModal() {
+  const modal = document.getElementById('teacherPasswordModal');
+  if (modal) modal.hidden = true;
+}
+
+function handlePasswordSubmit() {
+  const input = document.getElementById('teacherPassInput');
+  const err = document.getElementById('teacherPassError');
+  const val = (input ? input.value : '').trim().toLowerCase();
+
+  if (val === TEACHER_PASSWORD) {
+    closePasswordModal();
+    openBuilderModal();
+  } else {
+    if (err) err.hidden = false;
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  }
+}
+
+function openBuilderModal(labIdToEdit = null) {
+  const modal = document.getElementById('customLabModal');
+  if (!modal) return;
+  modal.hidden = false;
+
+  if (labIdToEdit) {
+    editCustomLab(labIdToEdit);
+  } else if (!builderState.editingLabId) {
+    resetBuilderState();
+  }
+
+  renderBuilderCustomLabsList();
+  renderBuilderWorkspace();
+}
+
+function closeBuilderModal() {
+  const modal = document.getElementById('customLabModal');
+  if (modal) modal.hidden = true;
+}
+
+function resetBuilderState() {
+  builderState.editingLabId = null;
+  builderState.title = '';
+  builderState.objective = '';
+  builderState.logicComparison = '';
+  builderState.branches = [
+    { topSlot: 'S1_NO', midSlot: 'S2_NO', loadSlot: 'L1' },
+    { topSlot: null, midSlot: null, loadSlot: null },
+    { topSlot: null, midSlot: null, loadSlot: null }
+  ];
+  builderState.bridge12 = false;
+  builderState.bridge23 = false;
+  builderState.selectedPaletteComp = null;
+  builderState.selectedPaletteLoad = null;
+  builderState.capturedWires = null;
+  builderState.truthTable = generateTruthTableForCustomSchematic(builderState);
+
+  const titleInp = document.getElementById('customLabTitle');
+  const objInp = document.getElementById('customLabObj');
+  const logicInp = document.getElementById('customLabLogic');
+  const notice = document.getElementById('capturedWiresNotice');
+
+  if (titleInp) titleInp.value = '';
+  if (objInp) objInp.value = '';
+  if (logicInp) logicInp.value = '';
+  if (notice) notice.hidden = true;
+}
+
+function editCustomLab(labId) {
+  const lab = LABS[labId] || getStoredCustomLabs()[labId];
+  if (!lab) return;
+
+  builderState.editingLabId = labId;
+  builderState.title = lab.title || '';
+  builderState.objective = lab.objective || '';
+  builderState.logicComparison = lab.logicComparison || '';
+
+  if (lab.customSchematic && lab.customSchematic.branches) {
+    builderState.branches = JSON.parse(JSON.stringify(lab.customSchematic.branches));
+    builderState.bridge12 = Boolean(lab.customSchematic.bridge12);
+    builderState.bridge23 = Boolean(lab.customSchematic.bridge23);
+  }
+
+  builderState.capturedWires = lab.hintWires ? cloneWires(lab.hintWires) : null;
+  builderState.truthTable = lab.truthTable
+    ? JSON.parse(JSON.stringify(lab.truthTable))
+    : generateTruthTableForCustomSchematic(builderState);
+
+  const titleInp = document.getElementById('customLabTitle');
+  const objInp = document.getElementById('customLabObj');
+  const logicInp = document.getElementById('customLabLogic');
+  const notice = document.getElementById('capturedWiresNotice');
+  const countEl = document.getElementById('capturedWiresCount');
+
+  if (titleInp) titleInp.value = builderState.title;
+  if (objInp) objInp.value = builderState.objective;
+  if (logicInp) logicInp.value = builderState.logicComparison;
+
+  if (notice && countEl) {
+    if (builderState.capturedWires && builderState.capturedWires.length > 0) {
+      notice.hidden = false;
+      countEl.textContent = builderState.capturedWires.length;
+    } else {
+      notice.hidden = true;
+    }
+  }
+
+  renderBuilderWorkspace();
+  renderBuilderCustomLabsList();
+}
+
+function deleteCustomLab(labId) {
+  const lab = LABS[labId] || getStoredCustomLabs()[labId];
+  const name = lab ? lab.title : labId;
+  if (!confirm(`ต้องการลบโจทย์ใบงาน "${name}" ใช่หรือไม่?`)) return;
+
+  const stored = getStoredCustomLabs();
+  delete stored[labId];
+  saveStoredCustomLabs(stored);
+
+  delete LABS[labId];
+  refreshCustomLabsInSelect();
+  renderBuilderCustomLabsList();
+
+  if (state.currentLabId === labId) {
+    loadLab('lab1_1');
+  }
+  if (builderState.editingLabId === labId) {
+    resetBuilderState();
+    renderBuilderWorkspace();
+  }
+}
+
+function saveCustomLab() {
+  const titleInput = document.getElementById('customLabTitle');
+  const title = (titleInput ? titleInput.value : '').trim();
+  if (!title) {
+    alert('กรุณากรอกชื่อโจทย์ใบงาน');
+    if (titleInput) titleInput.focus();
+    return;
+  }
+
+  const obj = (document.getElementById('customLabObj')?.value || '').trim() || 'เชื่อมต่อวงจรตามวงจรสัญลักษณ์ที่กำหนดให้ถูกต้องสมบูรณ์';
+  const logic = (document.getElementById('customLabLogic')?.value || '').trim() || 'วงจรควบคุมที่ออกแบบเอง (Custom Control Circuit)';
+
+  let hasS1 = false, hasS2 = false, hasL1 = false, hasL2 = false, hasRelay = false;
+  builderState.branches.forEach((b) => {
+    [b.topSlot, b.midSlot].forEach((s) => {
+      if (s === 'S1_NO' || s === 'S1_NC') hasS1 = true;
+      if (s === 'S2_NO' || s === 'S2_NC') hasS2 = true;
+      if (s === 'K1_NO' || s === 'K1_NC') hasRelay = true;
+    });
+    if (b.loadSlot === 'L1') hasL1 = true;
+    if (b.loadSlot === 'L2') hasL2 = true;
+    if (b.loadSlot === 'K1_COIL') hasRelay = true;
+  });
+
+  if (!hasL1 && !hasL2 && !hasRelay) {
+    alert('กรุณาวางหลอดไฟ L1 หรือ L2 หรือคอยล์รีเลย์ K1 อย่างน้อย 1 อุปกรณ์ในแถวล่าง');
+    return;
+  }
+
+  const inputs = (hasS2 || hasS1) ? ['S1', 'S2'] : ['S1'];
+  const outputs = [];
+  if (hasL1) outputs.push('L1');
+  if (hasL2) outputs.push('L2');
+  if (outputs.length === 0) outputs.push('L1');
+
+  const labId = builderState.editingLabId || `custom_${Date.now()}`;
+  const labDef = {
+    id: labId,
+    isCustom: true,
+    title: title,
+    objective: obj,
+    logicComparison: logic,
+    inputs: inputs,
+    outputs: outputs,
+    showL2: hasL2,
+    showS2: hasS2 || inputs.includes('S2'),
+    showRelays: hasRelay,
+    requireRelay: hasRelay,
+    customSchematic: {
+      branches: JSON.parse(JSON.stringify(builderState.branches)),
+      bridge12: builderState.bridge12,
+      bridge23: builderState.bridge23
+    },
+    truthTable: JSON.parse(JSON.stringify(builderState.truthTable)),
+    hintWires: (builderState.capturedWires && builderState.capturedWires.length > 0)
+      ? builderState.capturedWires
+      : generateHintWiresFromSchematic(builderState)
+  };
+
+  LABS[labId] = labDef;
+  const stored = getStoredCustomLabs();
+  stored[labId] = labDef;
+  saveStoredCustomLabs(stored);
+
+  refreshCustomLabsInSelect(labId);
+  closeBuilderModal();
+  loadLab(labId);
+}
+
+function renderBuilderCustomLabsList() {
+  const listEl = document.getElementById('customLabsList');
+  if (!listEl) return;
+
+  const stored = getStoredCustomLabs();
+  const keys = Object.keys(stored);
+
+  if (keys.length === 0) {
+    listEl.innerHTML = `
+      <div style="font-size:0.78rem;color:#64748b;text-align:center;padding:1.5rem 0.5rem">
+        ยังไม่มีโจทย์ที่สร้างไว้<br>กดปุ่ม <b>➕ สร้างโจทย์ใหม่</b> เพื่อเริ่มต้น
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  keys.forEach((id) => {
+    const lab = stored[id];
+    const isEditing = builderState.editingLabId === id;
+    html += `
+      <div class="custom-lab-item ${isEditing ? 'active' : ''}" data-lab-id="${id}">
+        <div class="custom-lab-title">${lab.title}</div>
+        <div class="custom-lab-meta">${lab.logicComparison || 'Custom Logic'}</div>
+        <div class="custom-lab-actions">
+          <button type="button" class="btn-mini-action select btn-use-custom" data-lab-id="${id}" title="เปิดใช้งานโจทย์นี้บนกระดานหลัก">▶ เลือกใช้</button>
+          <button type="button" class="btn-mini-action btn-edit-custom" data-lab-id="${id}" title="แก้ไขโจทย์นี้">✏️ แก้ไข</button>
+          <button type="button" class="btn-mini-action delete btn-del-custom" data-lab-id="${id}" title="ลบโจทย์นี้">🗑️ ลบ</button>
+        </div>
+      </div>
+    `;
+  });
+
+  listEl.innerHTML = html;
+
+  listEl.querySelectorAll('.btn-use-custom').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-lab-id');
+      closeBuilderModal();
+      loadLab(id);
+    });
+  });
+
+  listEl.querySelectorAll('.btn-edit-custom').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-lab-id');
+      editCustomLab(id);
+    });
+  });
+
+  listEl.querySelectorAll('.btn-del-custom').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-lab-id');
+      deleteCustomLab(id);
+    });
+  });
+}
+
+function renderBuilderWorkspace() {
+  const btnB12 = document.getElementById('btnToggleBridge12');
+  const btnB23 = document.getElementById('btnToggleBridge23');
+  if (btnB12) btnB12.classList.toggle('active', builderState.bridge12);
+  if (btnB23) btnB23.classList.toggle('active', builderState.bridge23);
+
+  const container = document.getElementById('svgBoardContainer');
+  if (container) {
+    container.innerHTML = generateCustomSchematicSvg(builderState, {
+      builderMode: true
+    });
+
+    container.querySelectorAll('.svg-slot-group').forEach((slotGroup) => {
+      const b = parseInt(slotGroup.getAttribute('data-branch'), 10);
+      const slotType = slotGroup.getAttribute('data-slot');
+
+      slotGroup.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        slotGroup.classList.add('drag-over');
+      });
+
+      slotGroup.addEventListener('dragleave', () => {
+        slotGroup.classList.remove('drag-over');
+      });
+
+      slotGroup.addEventListener('drop', (e) => {
+        e.preventDefault();
+        slotGroup.classList.remove('drag-over');
+        try {
+          const raw = e.dataTransfer.getData('text/plain');
+          const data = JSON.parse(raw);
+          if (slotType === 'loadSlot' && data.load) {
+            builderState.branches[b].loadSlot = data.load === 'EMPTY_LOAD' ? null : data.load;
+          } else if ((slotType === 'topSlot' || slotType === 'midSlot') && data.comp) {
+            builderState.branches[b][slotType] = data.comp === 'EMPTY' ? null : data.comp;
+          }
+          builderState.truthTable = generateTruthTableForCustomSchematic(builderState);
+          renderBuilderWorkspace();
+        } catch (err) {
+          console.warn('Drop parse error', err);
+        }
+      });
+
+      slotGroup.addEventListener('click', () => {
+        if (slotType === 'loadSlot') {
+          if (builderState.selectedPaletteLoad) {
+            builderState.branches[b].loadSlot = builderState.selectedPaletteLoad === 'EMPTY_LOAD' ? null : builderState.selectedPaletteLoad;
+          } else {
+            builderState.branches[b].loadSlot = null;
+          }
+        } else {
+          if (builderState.selectedPaletteComp) {
+            builderState.branches[b][slotType] = builderState.selectedPaletteComp === 'EMPTY' ? null : builderState.selectedPaletteComp;
+          } else {
+            builderState.branches[b][slotType] = null;
+          }
+        }
+        builderState.truthTable = generateTruthTableForCustomSchematic(builderState);
+        renderBuilderWorkspace();
+      });
+    });
+  }
+
+  renderBuilderTruthTablePreview();
+}
+
+function renderBuilderTruthTablePreview() {
+  const table = document.getElementById('customTruthTablePreview');
+  if (!table) return;
+
+  if (!builderState.truthTable || builderState.truthTable.length === 0) {
+    builderState.truthTable = generateTruthTableForCustomSchematic(builderState);
+  }
+
+  const branches = builderState.branches || [];
+  let usesS1 = false, usesS2 = false, usesRelay = false, usesL1 = false, usesL2 = false;
+  branches.forEach((b) => {
+    [b.topSlot, b.midSlot].forEach((s) => {
+      if (s === 'S1_NO' || s === 'S1_NC') usesS1 = true;
+      if (s === 'S2_NO' || s === 'S2_NC') usesS2 = true;
+      if (s === 'K1_NO' || s === 'K1_NC') usesRelay = true;
+    });
+    if (b.loadSlot === 'L1') usesL1 = true;
+    if (b.loadSlot === 'L2') usesL2 = true;
+    if (b.loadSlot === 'K1_COIL') usesRelay = true;
+  });
+
+  let headers = '<thead><tr><th>ลำดับ</th>';
+  if (usesS1 || usesS2) headers += '<th>S1</th>';
+  if (usesS2) headers += '<th>S2</th>';
+  if (usesRelay) headers += '<th>Coil K1 (คาดหวัง)</th>';
+  if (usesL1 || (!usesL1 && !usesL2)) headers += '<th>LOAD (L1)</th>';
+  if (usesL2) headers += '<th>LOAD (L2)</th>';
+  headers += '</tr></thead>';
+
+  let rows = '<tbody>';
+  builderState.truthTable.forEach((row, idx) => {
+    rows += `<tr><td>${idx + 1}</td>`;
+    if (usesS1 || usesS2) rows += `<td><b>${row.S1 !== undefined ? row.S1 : 0}</b></td>`;
+    if (usesS2) rows += `<td><b>${row.S2 !== undefined ? row.S2 : 0}</b></td>`;
+
+    if (usesRelay) {
+      const expRelay = row.expected && row.expected.RELAY !== undefined ? row.expected.RELAY : 0;
+      rows += `<td><button type="button" class="toggle-expected-btn val-${expRelay}" data-idx="${idx}" data-key="RELAY">${expRelay} (สลับ)</button></td>`;
+    }
+    if (usesL1 || (!usesL1 && !usesL2)) {
+      const expL1 = row.expected && row.expected.L1 !== undefined ? row.expected.L1 : 0;
+      rows += `<td><button type="button" class="toggle-expected-btn val-${expL1}" data-idx="${idx}" data-key="L1">${expL1} (สลับ)</button></td>`;
+    }
+    if (usesL2) {
+      const expL2 = row.expected && row.expected.L2 !== undefined ? row.expected.L2 : 0;
+      rows += `<td><button type="button" class="toggle-expected-btn val-${expL2}" data-idx="${idx}" data-key="L2">${expL2} (สลับ)</button></td>`;
+    }
+    rows += `</tr>`;
+  });
+  rows += '</tbody>';
+
+  table.innerHTML = headers + rows;
+
+  table.querySelectorAll('.toggle-expected-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const rIdx = parseInt(btn.getAttribute('data-idx'), 10);
+      const key = btn.getAttribute('data-key');
+      if (builderState.truthTable[rIdx] && builderState.truthTable[rIdx].expected) {
+        builderState.truthTable[rIdx].expected[key] = builderState.truthTable[rIdx].expected[key] === 1 ? 0 : 1;
+        renderBuilderTruthTablePreview();
+      }
+    });
+  });
+}
+
+function initCustomLabManager() {
+  loadStoredCustomLabsIntoApp();
+
+  const btnOpen = document.getElementById('btnOpenLabBuilder');
+  if (btnOpen) {
+    btnOpen.addEventListener('click', () => openPasswordModal());
+  }
+
+  const btnClosePass = document.getElementById('btnClosePassModal');
+  const btnCancelPass = document.getElementById('btnCancelPass');
+  const btnSubmitPass = document.getElementById('btnSubmitPass');
+  const passInput = document.getElementById('teacherPassInput');
+
+  if (btnClosePass) btnClosePass.addEventListener('click', () => closePasswordModal());
+  if (btnCancelPass) btnCancelPass.addEventListener('click', () => closePasswordModal());
+  if (btnSubmitPass) btnSubmitPass.addEventListener('click', () => handlePasswordSubmit());
+  if (passInput) {
+    passInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handlePasswordSubmit();
+    });
+  }
+
+  const btnCloseBuilder = document.getElementById('btnCloseBuilder');
+  const btnNewCustomLab = document.getElementById('btnNewCustomLab');
+  const btnToggleBridge12 = document.getElementById('btnToggleBridge12');
+  const btnToggleBridge23 = document.getElementById('btnToggleBridge23');
+  const btnClearSchem = document.getElementById('btnClearBuilderSchem');
+  const btnCaptureWires = document.getElementById('btnCaptureCurrentWires');
+  const btnSave = document.getElementById('btnSaveCustomLab');
+
+  if (btnCloseBuilder) btnCloseBuilder.addEventListener('click', () => closeBuilderModal());
+  if (btnNewCustomLab) {
+    btnNewCustomLab.addEventListener('click', () => {
+      resetBuilderState();
+      renderBuilderWorkspace();
+      renderBuilderCustomLabsList();
+    });
+  }
+
+  if (btnToggleBridge12) {
+    btnToggleBridge12.addEventListener('click', () => {
+      builderState.bridge12 = !builderState.bridge12;
+      builderState.truthTable = generateTruthTableForCustomSchematic(builderState);
+      renderBuilderWorkspace();
+    });
+  }
+
+  if (btnToggleBridge23) {
+    btnToggleBridge23.addEventListener('click', () => {
+      builderState.bridge23 = !builderState.bridge23;
+      builderState.truthTable = generateTruthTableForCustomSchematic(builderState);
+      renderBuilderWorkspace();
+    });
+  }
+
+  if (btnClearSchem) {
+    btnClearSchem.addEventListener('click', () => {
+      builderState.branches = [
+        { topSlot: null, midSlot: null, loadSlot: null },
+        { topSlot: null, midSlot: null, loadSlot: null },
+        { topSlot: null, midSlot: null, loadSlot: null }
+      ];
+      builderState.bridge12 = false;
+      builderState.bridge23 = false;
+      builderState.capturedWires = null;
+      builderState.truthTable = generateTruthTableForCustomSchematic(builderState);
+      renderBuilderWorkspace();
+    });
+  }
+
+  if (btnCaptureWires) {
+    btnCaptureWires.addEventListener('click', () => {
+      if (state.wires.length === 0) {
+        alert('ยังไม่มีสายไฟที่เชื่อมต่อบนกระดานหลัก กรุณาลากสายไฟบนกระดานชุดทดลองก่อนกดปุ่มนี้');
+        return;
+      }
+      builderState.capturedWires = cloneWires(state.wires);
+      const notice = document.getElementById('capturedWiresNotice');
+      const countEl = document.getElementById('capturedWiresCount');
+      if (notice && countEl) {
+        notice.hidden = false;
+        countEl.textContent = builderState.capturedWires.length;
+      }
+    });
+  }
+
+  if (btnSave) {
+    btnSave.addEventListener('click', () => saveCustomLab());
+  }
+
+  document.querySelectorAll('#schemPalette .palette-item').forEach((item) => {
+    item.addEventListener('dragstart', (e) => {
+      const comp = item.getAttribute('data-comp') || null;
+      const load = item.getAttribute('data-load') || null;
+      e.dataTransfer.setData('text/plain', JSON.stringify({ comp, load }));
+      builderState.selectedPaletteComp = comp;
+      builderState.selectedPaletteLoad = load;
+    });
+
+    item.addEventListener('click', () => {
+      const isSelected = item.classList.contains('selected');
+      document.querySelectorAll('#schemPalette .palette-item').forEach((p) => p.classList.remove('selected'));
+      if (!isSelected) {
+        item.classList.add('selected');
+        builderState.selectedPaletteComp = item.getAttribute('data-comp') || null;
+        builderState.selectedPaletteLoad = item.getAttribute('data-load') || null;
+      } else {
+        builderState.selectedPaletteComp = null;
+        builderState.selectedPaletteLoad = null;
+      }
+    });
+  });
+}
+
 // Initialize Application
 window.addEventListener('DOMContentLoaded', () => {
   initWorkbenchComponents();
   initInteractions();
+  initCustomLabManager();
   loadLab('lab1_1');
 });

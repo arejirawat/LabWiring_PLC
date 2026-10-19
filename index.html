@@ -29,14 +29,19 @@
     <div class="header-controls">
       <div class="lab-selector-group">
         <label for="labSelect">เลือกโจทย์ใบงาน:</label>
-        <select id="labSelect" class="lab-select">
-          <option value="lab1_1">ใบงานที่ 1.1: วงจรสวิตช์อนุกรม (Series NO - AND Logic)</option>
-          <option value="lab1_2">ใบงานที่ 1.2: วงจรสวิตช์ขนาน NC (Parallel NC - NAND Logic)</option>
-          <option value="lab1_ex">ใบงานที่ 1 (แบบฝึกหัด): วงจร NOR Logic (0,0 = 1)</option>
-          <option value="lab2_1">ใบงานที่ 2.1: การต่อวงจรรีเลย์เบื้องต้น (ควบคุมหลอดไฟ 1 หลอด)</option>
-          <option value="lab2_2">ใบงานที่ 2.2: การต่อวงจรรีเลย์สลับหน้าสัมผัส NO/NC (หลอดไฟ L1, L2)</option>
-          <option value="lab2_latch">โจทย์เสริม: วงจรรีเลย์ค้างสถานะ (Self-Holding / Latching Circuit)</option>
-        </select>
+        <div class="lab-select-wrapper">
+          <select id="labSelect" class="lab-select">
+            <option value="lab1_1">ใบงานที่ 1.1: วงจรสวิตช์อนุกรม (Series NO - AND Logic)</option>
+            <option value="lab1_2">ใบงานที่ 1.2: วงจรสวิตช์ขนาน NC (Parallel NC - NAND Logic)</option>
+            <option value="lab1_ex">ใบงานที่ 1 (แบบฝึกหัด): วงจร NOR Logic (0,0 = 1)</option>
+            <option value="lab2_1">ใบงานที่ 2.1: การต่อวงจรรีเลย์เบื้องต้น (ควบคุมหลอดไฟ 1 หลอด)</option>
+            <option value="lab2_2">ใบงานที่ 2.2: การต่อวงจรรีเลย์สลับหน้าสัมผัส NO/NC (หลอดไฟ L1, L2)</option>
+            <option value="lab2_latch">โจทย์เสริม: วงจรรีเลย์ค้างสถานะ (Self-Holding / Latching Circuit)</option>
+          </select>
+          <button type="button" id="btnOpenLabBuilder" class="btn btn-builder-menu" title="สร้างและจัดการโจทย์ใบงานเพิ่มเติม (สำหรับผู้สอน)">
+            🛠️ สร้างโจทย์เพิ่มเติม
+          </button>
+        </div>
       </div>
 
       <div class="wire-color-picker" role="radiogroup" aria-label="เลือกสีสายไฟ">
@@ -477,6 +482,186 @@
       </div>
     </section>
   </main>
+
+  <!-- Teacher Password Gate Modal -->
+  <div id="teacherPasswordModal" class="modal-backdrop" hidden>
+    <div class="modal-card password-card" role="dialog" aria-labelledby="teacherPassTitle" aria-modal="true">
+      <div class="modal-header">
+        <h3 id="teacherPassTitle">🔒 ยืนยันรหัสผ่านสำหรับสร้าง/จัดการโจทย์ใบงาน</h3>
+        <button type="button" id="btnClosePassModal" class="btn-close-modal" aria-label="ปิด">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">เฉพาะครูผู้สอน / ผู้ดูแลระบบ กรุณากรอกรหัสผ่านเพื่อเข้าสู่ระบบสร้างและจัดการโจทย์ใบงาน</p>
+        <div class="input-field-group">
+          <label for="teacherPassInput">รหัสผ่าน:</label>
+          <input type="password" id="teacherPassInput" class="modal-input" placeholder="กรอกรหัสผ่าน (tatc)" autocomplete="off" />
+        </div>
+        <p id="teacherPassError" class="modal-error" hidden>⚠️ รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="btnCancelPass" class="btn btn-secondary">ยกเลิก</button>
+        <button type="button" id="btnSubmitPass" class="btn btn-primary">เข้าสู่ระบบสร้างโจทย์ ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Lab Builder & Manager Modal -->
+  <div id="customLabModal" class="modal-backdrop" hidden>
+    <div class="modal-card builder-modal-card" role="dialog" aria-labelledby="customLabModalTitle" aria-modal="true">
+      <div class="modal-header">
+        <div class="builder-modal-title-row">
+          <span class="builder-badge">ครูผู้สอน</span>
+          <h2 id="customLabModalTitle">🛠️ ระบบสร้างและจัดการโจทย์ใบงาน (Drag & Drop Schematic Builder)</h2>
+        </div>
+        <button type="button" id="btnCloseBuilder" class="btn-close-modal" aria-label="ปิดหน้าต่าง">✕</button>
+      </div>
+
+      <div class="builder-modal-layout">
+        <!-- Sidebar: Saved Custom Labs List -->
+        <aside class="builder-sidebar">
+          <div class="sidebar-header">
+            <h3>📋 โจทย์ที่สร้างไว้</h3>
+            <button type="button" id="btnNewCustomLab" class="btn btn-primary btn-sm">➕ สร้างโจทย์ใหม่</button>
+          </div>
+          <div id="customLabsList" class="custom-labs-list">
+            <!-- Rendered dynamically -->
+          </div>
+        </aside>
+
+        <!-- Main Builder Editor Area -->
+        <div class="builder-main">
+          <!-- Form Header Fields -->
+          <div class="builder-form-grid">
+            <div class="form-group">
+              <label for="customLabTitle">ชื่อโจทย์ใบงาน:</label>
+              <input type="text" id="customLabTitle" class="builder-input" placeholder="เช่น ใบงานเสริม: วงจรสลับหลอดไฟ..." />
+            </div>
+            <div class="form-group">
+              <label for="customLabLogic">ชนิดลอจิก / คำอธิบายสรุป:</label>
+              <input type="text" id="customLabLogic" class="builder-input" placeholder="เช่น Exclusive OR (XOR) / Latching" />
+            </div>
+            <div class="form-group full-width">
+              <label for="customLabObj">คำสั่ง / วัตถุประสงค์ของใบงาน:</label>
+              <textarea id="customLabObj" class="builder-textarea" rows="2" placeholder="อธิบายเงื่อนไขการทำงานของวงจร..."></textarea>
+            </div>
+          </div>
+
+          <!-- Schematic Diagram Builder Section -->
+          <div class="schem-builder-section">
+            <div class="section-title-bar">
+              <h4>📐 ออกแบบวงจรสัญลักษณ์ IEC 60617 (Drag & Drop หรือแตะเลือกแล้ววางบนผังวงจร)</h4>
+              <div class="bridge-toggles">
+                <button type="button" id="btnToggleBridge12" class="btn btn-toggle-bridge" data-active="false">
+                  🔗 เชื่อมขนานกิ่ง 1 ↔ 2
+                </button>
+                <button type="button" id="btnToggleBridge23" class="btn btn-toggle-bridge" data-active="false">
+                  🔗 เชื่อมขนานกิ่ง 2 ↔ 3
+                </button>
+              </div>
+            </div>
+
+            <div class="schem-builder-workspace">
+              <!-- Component Palette -->
+              <div class="palette-panel" id="schemPalette">
+                <div class="palette-category">
+                  <span class="palette-cat-label">หน้าสัมผัสสวิตช์ / รีเลย์:</span>
+                  <div class="palette-items" id="paletteContacts">
+                    <div class="palette-item" draggable="true" data-comp="S1_NO" title="สวิตช์ S1 ปกติเปิด (NO)">
+                      <span class="comp-badge sw-no">S1 NO</span>
+                    </div>
+                    <div class="palette-item" draggable="true" data-comp="S1_NC" title="สวิตช์ S1 ปกติปิด (NC)">
+                      <span class="comp-badge sw-nc">S1 NC</span>
+                    </div>
+                    <div class="palette-item" draggable="true" data-comp="S2_NO" title="สวิตช์ S2 ปกติเปิด (NO)">
+                      <span class="comp-badge sw-no">S2 NO</span>
+                    </div>
+                    <div class="palette-item" draggable="true" data-comp="S2_NC" title="สวิตช์ S2 ปกติปิด (NC)">
+                      <span class="comp-badge sw-nc">S2 NC</span>
+                    </div>
+                    <div class="palette-item" draggable="true" data-comp="K1_NO" title="หน้าสัมผัสรีเลย์ K1 ปกติเปิด (9-5)">
+                      <span class="comp-badge relay-no">K1 NO</span>
+                    </div>
+                    <div class="palette-item" draggable="true" data-comp="K1_NC" title="หน้าสัมผัสรีเลย์ K1 ปกติปิด (9-1)">
+                      <span class="comp-badge relay-nc">K1 NC</span>
+                    </div>
+                    <div class="palette-item" draggable="true" data-comp="WIRE_V" title="สายต่อตรงแนวตั้ง">
+                      <span class="comp-badge wire-v">│ สายตรง</span>
+                    </div>
+                    <div class="palette-item palette-item-clear" draggable="true" data-comp="EMPTY" title="ลบออก / เว้นว่าง">
+                      <span class="comp-badge empty">❌ ลบออก</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="palette-category">
+                  <span class="palette-cat-label">โหลด / คอยล์รีเลย์ (แถวล่าง):</span>
+                  <div class="palette-items" id="paletteLoads">
+                    <div class="palette-item" draggable="true" data-load="L1" title="หลอดไฟ L1">
+                      <span class="comp-badge load-l1">💡 หลอด L1</span>
+                    </div>
+                    <div class="palette-item" draggable="true" data-load="L2" title="หลอดไฟ L2">
+                      <span class="comp-badge load-l2">💡 หลอด L2</span>
+                    </div>
+                    <div class="palette-item" draggable="true" data-load="K1_COIL" title="คอยล์รีเลย์ K1 (ขา 14-13)">
+                      <span class="comp-badge load-coil">⚡ คอยล์ K1</span>
+                    </div>
+                    <div class="palette-item palette-item-clear" draggable="true" data-load="EMPTY_LOAD" title="ลบออก / เว้นว่าง">
+                      <span class="comp-badge empty">❌ ลบออก</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="palette-tip">
+                  <span>💡 <b>วิธีวาง:</b> ลากจากถาดวางลงบนช่องในวงจร หรือคลิกเลือกชิ้นส่วนในถาดแล้วแตะช่องที่ต้องการวาง</span>
+                </div>
+              </div>
+
+              <!-- Interactive Live Schematic SVG Board -->
+              <div class="schem-board-panel" id="schemBuilderBoard">
+                <div class="schem-board-header">
+                  <span class="schem-rail top-rail">+12V (ไฟจ่าย)</span>
+                </div>
+                <div class="svg-board-container" id="svgBoardContainer">
+                  <!-- Real-time SVG representation rendered via JS -->
+                </div>
+                <div class="schem-board-footer">
+                  <span class="schem-rail bot-rail">0V (กราวด์)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Auto-Generated & Editable Truth Table Preview Section -->
+          <div class="builder-truth-section">
+            <div class="truth-header-row">
+              <h4>📊 ตารางความจริงเป้าหมาย (คำนวณจากผังวงจรอัตโนมัติ หรือคลิกค่า 0/1 เพื่อปรับแต่งเองได้)</h4>
+              <button type="button" id="btnCaptureCurrentWires" class="btn btn-secondary btn-sm" title="นำสายไฟที่ต่ออยู่บนกระดานปัจจุบันมาบันทึกเป็นเฉลยอัตโนมัติ">
+                📌 บันทึกสายไฟบนกระดานเป็นเฉลย
+              </button>
+            </div>
+            <div id="capturedWiresNotice" class="captured-notice" hidden>
+              ✓ บันทึกสายไฟเฉลยแล้ว (<span id="capturedWiresCount">0</span> เส้น)
+            </div>
+            <div class="builder-truth-table-wrap">
+              <table id="customTruthTablePreview" class="truth-table builder-truth-table">
+                <!-- Populated via JS -->
+              </table>
+            </div>
+          </div>
+
+          <!-- Bottom Actions -->
+          <div class="builder-modal-footer">
+            <button type="button" id="btnClearBuilderSchem" class="btn btn-secondary">
+              🧹 ล้างผังวงจร
+            </button>
+            <button type="button" id="btnSaveCustomLab" class="btn btn-success">
+              💾 บันทึกโจทย์ใบงาน
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <footer class="app-footer">
     <span>ระบบจำลองการเชื่อมต่อวงจรไฟฟ้าควบคุมด้วย RELAY</span>
