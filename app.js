@@ -20,6 +20,8 @@ const state = {
   wires: [], // { id, from, to, color, waypoints: [{x, y}, ...] }
   undoStack: [], // Stores up to MAX_UNDO_STEPS (5) snapshots of wires
   redoStack: [],
+  liveTestedRows: {}, // Stores live test results for truth table: { [rowIdx]: { passed, actual: { L1, L2, RELAY } } }
+  lastVerificationResults: null, // Cached automated verification results
   showingHints: false,
   selectedTerminal: null,
   activeWaypoints: [], // [{x, y}] while routing a wire
@@ -1393,11 +1395,15 @@ function renderSchematic() {
 
 // Render Truth Table for Current Lab
 function renderTruthTable(verificationResults = null) {
+  if (verificationResults !== null) {
+    state.lastVerificationResults = verificationResults;
+  }
+
   const lab = LABS[state.currentLabId];
   const table = document.getElementById('truthTable');
-  const thead = table.querySelector('thead');
-  const tbody = table.querySelector('tbody');
+  if (!lab || !table) return;
 
+  const thead = table.querySelector('thead');
   let headers = '<tr><th>ลำดับ</th>';
   if (lab.isSequentialLatch) {
     headers += '<th>สภาวะการทดสอบ</th>';
@@ -1415,55 +1421,180 @@ function renderTruthTable(verificationResults = null) {
   headers += '<th>สถานะ</th></tr>';
   thead.innerHTML = headers;
 
-  let rowsHtml = '';
-  lab.truthTable.forEach((row, idx) => {
-    const vRow = verificationResults ? verificationResults.rows[idx] : null;
-    rowsHtml += `<tr data-row-idx="${idx}">`;
-    rowsHtml += `<td>${idx + 1}</td>`;
-    if (lab.isSequentialLatch) {
-      rowsHtml += `<td style="text-align:left">${row.step}</td>`;
-    }
-    lab.inputs.forEach((inp) => {
-      rowsHtml += `<td><b>${row[inp]}</b></td>`;
-    });
-    if (lab.requireRelay) {
-      const expRelay = row.expected.RELAY;
-      const actRelay = vRow ? (vRow.actual.RELAY ? 1 : 0) : '-';
-      rowsHtml += `<td>${expRelay} ${vRow ? `(ได้ ${actRelay})` : ''}</td>`;
-    }
-    lab.outputs.forEach((out) => {
-      const expVal = row.expected[out];
-      const actVal = vRow ? (vRow.actual[out] ? 1 : 0) : '-';
-      rowsHtml += `<td><b>${expVal}</b></td>`;
-      rowsHtml += `<td>${actVal}</td>`;
-    });
-
-    if (!vRow) {
-      rowsHtml += `<td><span class="status-pill" style="background:#334155;color:#cbd5e1">รอตรวจ</span></td>`;
-    } else if (vRow.passed) {
-      rowsHtml += `<td><span class="status-pill ok">✓ ถูกต้อง</span></td>`;
-    } else {
-      rowsHtml += `<td><span class="status-pill err">✗ ผิดพลาด</span></td>`;
-    }
-    rowsHtml += `</tr>`;
-  });
-
-  tbody.innerHTML = rowsHtml;
   highlightActiveTruthRow();
 }
 
 function highlightActiveTruthRow() {
   const lab = LABS[state.currentLabId];
-  if (lab.isSequentialLatch) return;
+  const table = document.getElementById('truthTable');
+  if (!lab || !table) return;
+  const tbody = table.querySelector('tbody');
+  if (!tbody) return;
+
   const s1 = state.switches.S1.pressed ? 1 : 0;
   const s2 = state.switches.S2.pressed ? 1 : 0;
+  const relayOn = (state.simResult.K1 || state.simResult.K2) ? 1 : 0;
 
-  document.querySelectorAll('#truthTable tbody tr').forEach((tr, idx) => {
-    const row = lab.truthTable[idx];
-    if (!row) return;
-    const matchS1 = row.S1 === undefined || row.S1 === s1;
-    const matchS2 = row.S2 === undefined || row.S2 === s2;
-    tr.classList.toggle('active-row', matchS1 && matchS2);
+  // 1. Determine currently active row in lab.truthTable
+  let activeRowIdx = -1;
+  if (lab.isSequentialLatch) {
+    if (s2 === 1) {
+      activeRowIdx = 3;
+    } else if (s1 === 1 && s2 === 0) {
+      activeRowIdx = 1;
+    } else if (s1 === 0 && s2 === 0 && relayOn) {
+      activeRowIdx = 2;
+    } else if (s1 === 0 && s2 === 0 && !relayOn) {
+      activeRowIdx = 0;
+    }
+  } else {
+    activeRowIdx = lab.truthTable.findIndex((row) => {
+      const matchS1 = row.S1 === undefined || row.S1 === s1;
+      const matchS2 = row.S2 === undefined || row.S2 === s2;
+      return matchS1 && matchS2;
+    });
+  }
+
+  // 2. If wires are connected, power is ON, and activeRowIdx is valid, compute live actual output
+  if (!state.liveTestedRows) state.liveTestedRows = {};
+
+  if (state.wires.length > 0 && state.powerOn && activeRowIdx !== -1) {
+    const actualRelay = Boolean(state.simResult.K1 || state.simResult.K2);
+    let rowPass = !state.simResult.shortCircuit;
+
+    lab.outputs.forEach((out) => {
+      const actualOut = state.simResult[out] ? 1 : 0;
+      if (actualOut !== lab.truthTable[activeRowIdx].expected[out]) {
+        rowPass = false;
+      }
+    });
+
+    if (lab.requireRelay && (actualRelay ? 1 : 0) !== lab.truthTable[activeRowIdx].expected.RELAY) {
+      rowPass = false;
+    }
+
+    state.liveTestedRows[activeRowIdx] = {
+      passed: rowPass,
+      actual: {
+        L1: state.simResult.L1,
+        L2: state.simResult.L2,
+        RELAY: actualRelay
+      }
+    };
+  }
+
+  // 3. Render / update the rows in #truthTable tbody
+  let rowsHtml = '';
+  lab.truthTable.forEach((row, idx) => {
+    const isActive = idx === activeRowIdx;
+    const vRow = (state.liveTestedRows && state.liveTestedRows[idx])
+      ? state.liveTestedRows[idx]
+      : (state.lastVerificationResults && state.lastVerificationResults.rows && state.lastVerificationResults.rows[idx])
+        ? state.lastVerificationResults.rows[idx]
+        : null;
+
+    rowsHtml += `<tr data-row-idx="${idx}" class="${isActive ? 'active-row' : ''}">`;
+
+    // Column: ลำดับ
+    rowsHtml += `<td>${isActive ? '<span class="live-row-indicator">▶</span> ' : ''}${idx + 1}</td>`;
+
+    // Column: สภาวะการทดสอบ (Sequential Latch only)
+    if (lab.isSequentialLatch) {
+      rowsHtml += `<td style="text-align:left">${row.step}</td>`;
+    }
+
+    // Columns: Inputs (S1, S2)
+    lab.inputs.forEach((inp) => {
+      if (isActive) {
+        const isPressed = row[inp] === 1;
+        rowsHtml += `<td><span class="live-input-pill ${isPressed ? 'on' : 'off'}">${isPressed ? '1 (กด ON)' : '0 (ปล่อย)'}</span></td>`;
+      } else {
+        rowsHtml += `<td><b>${row[inp]}</b></td>`;
+      }
+    });
+
+    // Column: Coil Relay (if required)
+    if (lab.requireRelay) {
+      const expRelay = row.expected.RELAY;
+      if (vRow) {
+        const relayActive = Boolean(vRow.actual.RELAY);
+        rowsHtml += `<td><span class="live-out-pill ${relayActive ? 'on' : 'off'}">${relayActive ? '⚡ 1 (ทำงาน)' : '0 (หยุด)'}</span> <span style="font-size:0.75rem;color:#94a3b8">(${expRelay})</span></td>`;
+      } else if (isActive && state.wires.length === 0) {
+        rowsHtml += `<td><span class="live-out-pill idle">0 (ยังไม่ต่อสาย)</span> <span style="font-size:0.75rem;color:#94a3b8">(${expRelay})</span></td>`;
+      } else {
+        rowsHtml += `<td><b>${expRelay}</b></td>`;
+      }
+    }
+
+    // Columns: Outputs (L1, L2)
+    lab.outputs.forEach((out) => {
+      const expVal = row.expected[out];
+      rowsHtml += `<td><b>${expVal}</b></td>`;
+
+      if (vRow) {
+        const isLampOn = Boolean(vRow.actual[out]);
+        rowsHtml += `<td><span class="live-out-pill ${isLampOn ? 'lamp-on' : 'lamp-off'}">${isLampOn ? '💡 1 (สว่าง)' : '⚫ 0 (ดับ)'}</span></td>`;
+      } else if (isActive && state.wires.length === 0) {
+        rowsHtml += `<td><span class="live-out-pill idle">⚫ 0 (ยังไม่ต่อสาย)</span></td>`;
+      } else {
+        rowsHtml += `<td>-</td>`;
+      }
+    });
+
+    // Column: สถานะ
+    if (vRow) {
+      if (vRow.passed) {
+        rowsHtml += `<td><span class="status-pill ok">${isActive ? '⚡ ทำงานถูกต้อง' : '✓ ถูกต้อง'}</span></td>`;
+      } else {
+        rowsHtml += `<td><span class="status-pill err">${isActive ? '⚠️ ไม่ตรงเงื่อนไข' : '✗ ผิดพลาด'}</span></td>`;
+      }
+    } else if (isActive && state.wires.length === 0) {
+      rowsHtml += `<td><span class="status-pill" style="background:#334155;color:#cbd5e1">รอต่อสาย</span></td>`;
+    } else {
+      rowsHtml += `<td><span class="status-pill" style="background:#334155;color:#cbd5e1">รอตรวจ</span></td>`;
+    }
+
+    rowsHtml += `</tr>`;
+  });
+
+  tbody.innerHTML = rowsHtml;
+
+  // Add click listener on each table row for interactive switch setting
+  tbody.querySelectorAll('tr').forEach((tr) => {
+    tr.addEventListener('click', () => {
+      const rowIdx = parseInt(tr.getAttribute('data-row-idx'), 10);
+      if (isNaN(rowIdx)) return;
+      const row = lab.truthTable[rowIdx];
+      if (!row) return;
+
+      if (lab.isSequentialLatch) {
+        if (rowIdx === 0) {
+          state.switches.S1.pressed = false;
+          state.switches.S2.pressed = false;
+          state.simResult.K1 = false;
+          state.simResult.K2 = false;
+        } else if (rowIdx === 1) {
+          state.switches.S1.pressed = true;
+          state.switches.S2.pressed = false;
+        } else if (rowIdx === 2) {
+          if (!state.simResult.K1 && !state.simResult.K2) {
+            state.switches.S1.pressed = true;
+            state.switches.S2.pressed = false;
+            const res = evaluateCircuit(null, { K1: false, K2: false });
+            state.simResult = res;
+          }
+          state.switches.S1.pressed = false;
+          state.switches.S2.pressed = false;
+        } else if (rowIdx === 3) {
+          state.switches.S1.pressed = false;
+          state.switches.S2.pressed = true;
+        }
+      } else {
+        if (row.S1 !== undefined) state.switches.S1.pressed = Boolean(row.S1);
+        if (row.S2 !== undefined) state.switches.S2.pressed = Boolean(row.S2);
+      }
+      updateSimulationUI();
+    });
   });
 }
 
@@ -1619,6 +1750,8 @@ function performUndo() {
     state.redoStack.shift();
   }
   state.wires = state.undoStack.pop();
+  state.liveTestedRows = {};
+  state.lastVerificationResults = null;
   updateSimulationUI();
 }
 
@@ -1629,6 +1762,8 @@ function performRedo() {
     state.undoStack.shift();
   }
   state.wires = state.redoStack.pop();
+  state.liveTestedRows = {};
+  state.lastVerificationResults = null;
   updateSimulationUI();
 }
 
@@ -2006,6 +2141,8 @@ function addWire(fromTerm, toTerm, waypoints = []) {
     waypoints: finalWaypoints
   });
 
+  state.liveTestedRows = {};
+  state.lastVerificationResults = null;
   updateSimulationUI();
 }
 
@@ -2015,6 +2152,8 @@ function removeWire(wireId) {
 
   recordHistorySnapshot();
   state.wires = state.wires.filter((w) => w.id !== wireId);
+  state.liveTestedRows = {};
+  state.lastVerificationResults = null;
   updateSimulationUI();
 }
 
@@ -2038,6 +2177,8 @@ function loadLab(labId) {
   state.showingHints = false;
   state.selectedTerminal = null;
   state.activeWaypoints = [];
+  state.liveTestedRows = {};
+  state.lastVerificationResults = null;
   state.switches.S1.pressed = false;
   state.switches.S2.pressed = false;
   // For Latching Start-Stop lab, momentary mode is natural; for other labs, locked hold mode is default
@@ -2707,6 +2848,8 @@ function initInteractions() {
     }
     state.wires = [];
     state.showingHints = false;
+    state.liveTestedRows = {};
+    state.lastVerificationResults = null;
     cancelActiveWireRouting();
     loadLab(state.currentLabId);
   });
@@ -2726,6 +2869,8 @@ function initInteractions() {
         waypoints: (hw.waypoints || []).map((pt) => ({ x: pt.x, y: pt.y }))
       }));
       state.showingHints = false;
+      state.liveTestedRows = {};
+      state.lastVerificationResults = null;
       updateSimulationUI();
       runAutomatedVerification();
     }

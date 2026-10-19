@@ -426,8 +426,110 @@ body {
   font-weight: 600;
 }
 
-.truth-table tr.active-row {
-  background: rgba(56, 189, 248, 0.15);
+.truth-table tbody tr {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.truth-table tbody tr:hover {
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.truth-table tbody tr.active-row {
+  background: rgba(56, 189, 248, 0.22);
+  box-shadow: inset 4px 0 0 #38bdf8;
+  animation: activeRowPulse 2s infinite ease-in-out;
+}
+
+@keyframes activeRowPulse {
+  0%, 100% {
+    background: rgba(56, 189, 248, 0.22);
+  }
+  50% {
+    background: rgba(56, 189, 248, 0.35);
+  }
+}
+
+.live-row-indicator {
+  display: inline-block;
+  color: #38bdf8;
+  margin-right: 4px;
+  font-size: 0.75rem;
+  animation: liveIndicatorPulse 1.2s infinite ease-in-out;
+}
+
+@keyframes liveIndicatorPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.7;
+  }
+}
+
+.live-input-pill {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.live-input-pill.on {
+  background: rgba(34, 197, 94, 0.25);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.4);
+}
+
+.live-input-pill.off {
+  background: rgba(148, 163, 184, 0.15);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.live-out-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.live-out-pill.lamp-on {
+  background: rgba(234, 179, 8, 0.25);
+  color: #fde047;
+  border: 1px solid rgba(253, 224, 71, 0.5);
+  box-shadow: 0 0 10px rgba(250, 204, 21, 0.35);
+}
+
+.live-out-pill.lamp-off {
+  background: rgba(15, 23, 42, 0.65);
+  color: #94a3b8;
+  border: 1px solid #334155;
+}
+
+.live-out-pill.on {
+  background: rgba(56, 189, 248, 0.22);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+}
+
+.live-out-pill.off {
+  background: rgba(15, 23, 42, 0.65);
+  color: #94a3b8;
+  border: 1px solid #334155;
+}
+
+.live-out-pill.idle {
+  background: rgba(51, 65, 85, 0.3);
+  color: #64748b;
+  border: 1px dashed #475569;
 }
 
 .status-pill {
