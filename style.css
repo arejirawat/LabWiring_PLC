@@ -611,12 +611,12 @@ body {
 }
 
 .wire-group {
-  cursor: pointer;
+  cursor: grab;
 }
 
 .wire-group .wire-hit {
   stroke: transparent;
-  stroke-width: 16px;
+  stroke-width: 22px;
   fill: none;
   stroke-linecap: round;
 }
@@ -631,18 +631,29 @@ body {
 }
 
 .wire-group .wire-waypoint {
+  cursor: grab;
   transition: transform 0.12s ease;
   transform-box: fill-box;
   transform-origin: center;
 }
 
-.wire-group:hover .wire-waypoint {
-  transform: scale(1.25);
+.wire-group:hover .wire-waypoint,
+.wire-group.bending-wire .wire-waypoint {
+  transform: scale(1.35);
 }
 
 .wire-group:hover .wire-path {
+  stroke-width: 6.5px;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.85));
+}
+
+.wire-group.bending-wire {
+  cursor: grabbing;
+}
+
+.wire-group.bending-wire .wire-path {
   stroke-width: 7px;
-  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.9));
+  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.95));
 }
 
 .wire-group.hint-wire .wire-path {

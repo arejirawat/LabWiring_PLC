@@ -613,8 +613,19 @@ function updateSnapIndicator(snapTarget) {
   }
 }
 
-// Compute wire path supporting intermediate waypoints (rounded corners) or direct curve
-function computeWirePath(p1, p2, waypoints = []) {
+function pointToSegmentDist(p, a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+  const projX = a.x + t * dx;
+  const projY = a.y + t * dy;
+  return Math.hypot(p.x - projX, p.y - projY);
+}
+
+// Compute wire path supporting intermediate waypoints (rounded corners), custom dragged bendPoint, or default curve
+function computeWirePath(p1, p2, waypoints = [], bendPoint = null) {
   if (waypoints && waypoints.length > 0) {
     const pts = [p1, ...waypoints, p2];
     let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
@@ -632,7 +643,7 @@ function computeWirePath(p1, p2, waypoints = []) {
       const v2y = next.y - curr.y;
       const len2 = Math.hypot(v2x, v2y);
 
-      const r = Math.min(14, len1 * 0.35, len2 * 0.35);
+      const r = Math.min(22, len1 * 0.4, len2 * 0.4);
       if (r > 2) {
         const startX = curr.x - (v1x / len1) * r;
         const startY = curr.y - (v1y / len1) * r;
@@ -647,6 +658,13 @@ function computeWirePath(p1, p2, waypoints = []) {
     const last = pts[pts.length - 1];
     d += ` L ${last.x.toFixed(1)} ${last.y.toFixed(1)}`;
     return d;
+  }
+
+  // If user dragged/bent this wire, curve smoothly right through bendPoint while keeping p1 & p2 fixed!
+  if (bendPoint) {
+    const cx = 2 * bendPoint.x - 0.5 * (p1.x + p2.x);
+    const cy = 2 * bendPoint.y - 0.5 * (p1.y + p2.y);
+    return `M ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
   }
 
   const dx = p2.x - p1.x;
@@ -910,29 +928,30 @@ function renderWires() {
     const p1 = getTerminalPosition(w.from);
     const p2 = getTerminalPosition(w.to);
     const waypoints = w.waypoints || [];
-    const d = computeWirePath(p1, p2, waypoints);
+    const d = computeWirePath(p1, p2, waypoints, w.bendPoint || null);
     const isHot = state.simResult.posTerminals.has(w.from) || state.simResult.posTerminals.has(w.to);
+    const isBending = state.bendingWire && state.bendingWire.wireId === w.id && state.bendingWire.hasMoved;
 
     const g = document.createElementNS(SVG_NS, 'g');
-    g.setAttribute('class', `wire-group ${isHot ? 'hot-wire' : ''}`);
+    g.setAttribute('class', `wire-group ${isHot ? 'hot-wire' : ''} ${isBending ? 'bending-wire' : ''}`);
     g.setAttribute('data-wire-id', w.id);
 
     let waypointDots = '';
-    waypoints.forEach((wp) => {
-      waypointDots += `<circle class="wire-waypoint" cx="${wp.x.toFixed(1)}" cy="${wp.y.toFixed(1)}" r="4.2" fill="${w.color}" stroke="#ffffff" stroke-width="1.5" />`;
+    waypoints.forEach((wp, idx) => {
+      waypointDots += `<circle class="wire-waypoint" data-wp-index="${idx}" cx="${wp.x.toFixed(1)}" cy="${wp.y.toFixed(1)}" r="5" fill="${w.color}" stroke="#ffffff" stroke-width="1.8" />`;
     });
 
+    if (waypoints.length === 0 && w.bendPoint) {
+      waypointDots += `<circle class="wire-waypoint wire-bend-handle" cx="${w.bendPoint.x.toFixed(1)}" cy="${w.bendPoint.y.toFixed(1)}" r="5.5" fill="${w.color}" stroke="#ffffff" stroke-width="2" />`;
+    }
+
     g.innerHTML = `
-      <title>คลิกเพื่อลบสายไฟเส้นนี้ (${w.from} ↔ ${w.to})</title>
+      <title>กดค้างแล้วลากเพื่อดัดโค้งสายไฟ / คลิก 1 ครั้งเพื่อลบสาย (${w.from} ↔ ${w.to})</title>
       <path class="wire-hit" d="${d}" />
       <path class="wire-path" d="${d}" stroke="${w.color}" />
       <path class="wire-flow-overlay" d="${d}" />
       ${waypointDots}
     `;
-    g.addEventListener('click', (e) => {
-      e.stopPropagation();
-      removeWire(w.id);
-    });
     layer.appendChild(g);
   });
 
@@ -1569,7 +1588,8 @@ function runAutomatedVerification() {
 function cloneWires(wires) {
   return wires.map((w) => ({
     ...w,
-    waypoints: (w.waypoints || []).map((pt) => ({ x: pt.x, y: pt.y }))
+    waypoints: (w.waypoints || []).map((pt) => ({ x: pt.x, y: pt.y })),
+    bendPoint: w.bendPoint ? { x: w.bendPoint.x, y: w.bendPoint.y } : null
   }));
 }
 
@@ -1868,8 +1888,8 @@ function initInteractions() {
 
     // Check direct hit or magnetic proximity snap on pointerdown
     let termNode = e.target.closest('.terminal-node');
-    const hitWireOrSwitch =
-      e.target.closest('.wire-group') || e.target.closest('.switch-actuator');
+    const wireGroup = e.target.closest('.wire-group:not(.hint-wire)');
+    const hitWireOrSwitch = wireGroup || e.target.closest('.switch-actuator');
 
     if (!termNode && !hitWireOrSwitch && !state.panMode && e.button === 0) {
       const touchPt = clientToSvgPoint(e.clientX, e.clientY);
@@ -1891,6 +1911,70 @@ function initInteractions() {
     }
 
     if (e.button !== 0) return;
+
+    // Press-and-hold + drag on an existing wire to bend/curve it (keeping both endpoints fixed),
+    // or tap quickly (< 6px movement) to delete the wire!
+    if (wireGroup && !termNode && !state.selectedTerminal) {
+      e.preventDefault();
+      e.stopPropagation();
+      const wireId = wireGroup.getAttribute('data-wire-id');
+      const wireObj = state.wires.find((w) => w.id === wireId);
+      if (wireObj) {
+        const touchPt = clientToSvgPoint(e.clientX, e.clientY);
+        const wps = wireObj.waypoints || [];
+        let mode = 'curve';
+        let wpIndex = -1;
+
+        if (wps.length > 0) {
+          // Check if user grabbed an existing waypoint dot or near one
+          const attrIdx = e.target.getAttribute('data-wp-index');
+          if (attrIdx !== null) {
+            mode = 'waypoint';
+            wpIndex = Number(attrIdx);
+          } else {
+            let nearestIdx = -1;
+            let nearestDist = 26;
+            wps.forEach((wp, idx) => {
+              const d = Math.hypot(wp.x - touchPt.x, wp.y - touchPt.y);
+              if (d <= nearestDist) {
+                nearestDist = d;
+                nearestIdx = idx;
+              }
+            });
+            if (nearestIdx !== -1) {
+              mode = 'waypoint';
+              wpIndex = nearestIdx;
+            } else {
+              // Find closest segment to insert a bend waypoint when dragged
+              const p1 = getTerminalPosition(wireObj.from);
+              const p2 = getTerminalPosition(wireObj.to);
+              const chain = [p1, ...wps, p2];
+              let bestSeg = 0;
+              let bestSegDist = Infinity;
+              for (let i = 0; i < chain.length - 1; i++) {
+                const sd = pointToSegmentDist(touchPt, chain[i], chain[i + 1]);
+                if (sd < bestSegDist) {
+                  bestSegDist = sd;
+                  bestSeg = i;
+                }
+              }
+              mode = 'insert_waypoint';
+              wpIndex = bestSeg;
+            }
+          }
+        }
+
+        state.bendingWire = {
+          wireId,
+          startClient: { x: e.clientX, y: e.clientY },
+          hasMoved: false,
+          historyRecorded: false,
+          mode,
+          wpIndex
+        };
+      }
+      return;
+    }
 
     if (termNode) {
       e.preventDefault();
@@ -1961,6 +2045,7 @@ function initInteractions() {
 
     // Handle 2-finger pinch zoom & pan on mobile
     if (activePointers.size === 2) {
+      state.bendingWire = null;
       const pts = Array.from(activePointers.values());
       const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
       const midClient = {
@@ -1985,6 +2070,56 @@ function initInteractions() {
 
       lastPinchDist = dist;
       lastPinchMidClient = midClient;
+      return;
+    }
+
+    // Handle live wire bending/curving when user holds & drags an existing wire
+    if (state.bendingWire) {
+      const wireObj = state.wires.find((w) => w.id === state.bendingWire.wireId);
+      if (!wireObj) {
+        state.bendingWire = null;
+        return;
+      }
+
+      const moveDist = Math.hypot(
+        e.clientX - state.bendingWire.startClient.x,
+        e.clientY - state.bendingWire.startClient.y
+      );
+
+      if (moveDist >= 6 || state.bendingWire.hasMoved) {
+        const rawPt = clientToSvgPoint(e.clientX, e.clientY);
+        const clampedPt = {
+          x: Math.max(14, Math.min(906, rawPt.x)),
+          y: Math.max(14, Math.min(606, rawPt.y))
+        };
+
+        if (!state.bendingWire.historyRecorded) {
+          recordHistorySnapshot();
+          state.bendingWire.historyRecorded = true;
+          state.bendingWire.hasMoved = true;
+
+          if (state.bendingWire.mode === 'insert_waypoint') {
+            wireObj.waypoints.splice(state.bendingWire.wpIndex, 0, {
+              x: clampedPt.x,
+              y: clampedPt.y
+            });
+            state.bendingWire.mode = 'waypoint';
+          }
+        }
+
+        if (state.bendingWire.mode === 'curve') {
+          wireObj.bendPoint = clampedPt;
+        } else if (state.bendingWire.mode === 'waypoint') {
+          wireObj.waypoints[state.bendingWire.wpIndex] = clampedPt;
+        }
+
+        tooltip.textContent = '〰️ กำลังดัดโค้งสายไฟ (ขั้วหัว-ท้ายคงเดิม)';
+        tooltip.hidden = false;
+        tooltip.style.left = `${Math.min(window.innerWidth - 230, Math.max(8, e.clientX - 60))}px`;
+        tooltip.style.top = `${Math.max(8, e.clientY - 48)}px`;
+
+        renderWires();
+      }
       return;
     }
 
@@ -2054,6 +2189,19 @@ function initInteractions() {
   window.addEventListener('pointerup', (e) => {
     handlePointerEnd(e);
     tooltip.hidden = true;
+
+    // Finish wire bending or delete wire if it was a quick tap without dragging
+    if (state.bendingWire) {
+      const bw = state.bendingWire;
+      state.bendingWire = null;
+      if (!bw.hasMoved) {
+        removeWire(bw.wireId);
+      } else {
+        updateSimulationUI();
+      }
+      return;
+    }
+
     if (!state.draggingFrom) return;
 
     const dragDist = state.pointerDownPos
