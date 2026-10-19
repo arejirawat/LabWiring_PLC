@@ -1298,8 +1298,13 @@ function renderSchematic() {
 
   container.innerHTML = svgContent;
 
+  const fsClone = document.getElementById('fsSchematicClone');
+  if (fsClone) {
+    fsClone.innerHTML = svgContent;
+  }
+
   // Allow clicking switch symbols directly inside the schematic to toggle S1/S2
-  container.querySelectorAll('.schem-sw').forEach((el) => {
+  document.querySelectorAll('.schem-sw').forEach((el) => {
     el.addEventListener('click', () => {
       const sw = el.getAttribute('data-sw');
       if (sw && state.switches[sw]) {
@@ -1487,6 +1492,18 @@ function runAutomatedVerification() {
     scoreBadge.className = 'score-badge fail';
     scoreBadge.textContent = `${score} / 10 คะแนน`;
   }
+
+  // Show toast inside Fullscreen Popup if active
+  const fsToast = document.getElementById('fsVerifyToast');
+  if (fsToast && document.body.classList.contains('fullscreen-popup-open')) {
+    fsToast.className = `fs-verify-toast ${banner.className}`;
+    fsToast.innerHTML = banner.innerHTML;
+    fsToast.hidden = false;
+    clearTimeout(fsToast._hideTimer);
+    fsToast._hideTimer = setTimeout(() => {
+      fsToast.hidden = true;
+    }, 5500);
+  }
 }
 
 // ============================================================================
@@ -1542,9 +1559,14 @@ function updateUndoRedoUI() {
   const btnUndo = document.getElementById('btnUndo');
   const undoBtnText = document.getElementById('undoBtnText');
   const btnRedo = document.getElementById('btnRedo');
+  const btnFsUndo = document.getElementById('btnFsUndo');
+  const btnFsRedo = document.getElementById('btnFsRedo');
 
   const canUndoWaypoint = Boolean(state.selectedTerminal);
   const undoCount = state.undoStack.length;
+  const labelText = canUndoWaypoint
+    ? '↩ ลบจุดพักสาย'
+    : `↩ ย้อนกลับ (${undoCount}/${MAX_UNDO_STEPS})`;
 
   if (btnUndo) {
     btnUndo.disabled = !canUndoWaypoint && undoCount === 0;
@@ -1557,6 +1579,40 @@ function updateUndoRedoUI() {
   if (btnRedo) {
     btnRedo.disabled = state.redoStack.length === 0;
   }
+  if (btnFsUndo) {
+    btnFsUndo.disabled = !canUndoWaypoint && undoCount === 0;
+    btnFsUndo.textContent = labelText;
+  }
+  if (btnFsRedo) {
+    btnFsRedo.disabled = state.redoStack.length === 0;
+  }
+}
+
+// ============================================================================
+// Fullscreen Popup Mode (Locks Mobile Viewport Scrolling Completely)
+// ============================================================================
+function setFullscreenPopupMode(enable) {
+  const card = document.getElementById('workbenchCard');
+  const quickBar = document.getElementById('fullscreenQuickBar');
+  const fsBtnText = document.getElementById('fullscreenBtnText');
+  const fsIcon = document.getElementById('fullscreenIcon');
+  const fsSchem = document.getElementById('fsSchematicOverlay');
+  const fsToast = document.getElementById('fsVerifyToast');
+
+  document.body.classList.toggle('fullscreen-popup-open', enable);
+  if (card) card.classList.toggle('is-fullscreen', enable);
+  if (quickBar) quickBar.hidden = !enable;
+  if (!enable && fsSchem) fsSchem.hidden = true;
+  if (!enable && fsToast) fsToast.hidden = true;
+
+  if (fsBtnText) {
+    fsBtnText.textContent = enable ? 'ย่อกลับหน้าปกติ' : 'ขยายเต็มจอ (โหมดมือถือ)';
+  }
+  if (fsIcon) {
+    fsIcon.textContent = enable ? '🗗' : '⛶';
+  }
+
+  updateSimulationUI();
 }
 
 // ============================================================================
@@ -1687,7 +1743,7 @@ function loadLab(labId) {
   banner.innerHTML = `
     <div class="banner-icon">ℹ️</div>
     <div class="banner-text">
-      <strong>คำแนะนำ:</strong> แตะขั้วเริ่มต้น → แตะจุดพักสาย (Waypoint) บนบอร์ดเพื่ออ้อมอุปกรณ์ → แตะขั้วปลายทาง (สามารถซูมดูใกล้ๆ ด้วยปุ่ม ➕/➖ หรือใช้ 2 นิ้วถ่างซูมบนมือถือได้)
+      <strong>คำแนะนำ:</strong> บนมือถือแนะนำให้กดปุ่ม <b>"⛶ ขยายเต็มจอ (โหมดมือถือ)"</b> เพื่อล็อกหน้าจอไม่ให้เลื่อนขณะลากสายไฟ
     </div>
   `;
   const scoreBadge = document.getElementById('scoreBadge');
@@ -1701,8 +1757,23 @@ function loadLab(labId) {
 // Setup Pointer Events for Wire Dragging, Multi-Waypoint Routing, Pinch Zoom & Switch Controls
 function initInteractions() {
   const svg = document.getElementById('workbenchSvg');
+  const boardViewport = document.getElementById('boardViewport');
   const preview = document.getElementById('dragWirePreview');
   const tooltip = document.getElementById('terminalTooltip');
+
+  // Crucial for iOS Safari / Android Chrome: block native page scroll when touching the board viewport
+  ['touchstart', 'touchmove'].forEach((evtName) => {
+    boardViewport.addEventListener(
+      evtName,
+      (e) => {
+        // Allow tapping floating HTML buttons inside viewport, block scrolling on SVG canvas
+        if (!e.target.closest('button')) {
+          e.preventDefault();
+        }
+      },
+      { passive: false }
+    );
+  });
 
   // Track active pointers for multi-touch pinch-to-zoom & two-finger pan on mobile
   const activePointers = new Map();
@@ -1948,6 +2019,45 @@ function initInteractions() {
     });
   }
 
+  // Fullscreen Popup Mode Controls
+  const btnFullscreenToggle = document.getElementById('btnFullscreenToggle');
+  const btnFsClose = document.getElementById('btnFsClose');
+  const btnFsSchematic = document.getElementById('btnFsSchematic');
+  const btnCloseFsSchem = document.getElementById('btnCloseFsSchem');
+  const fsSchematicOverlay = document.getElementById('fsSchematicOverlay');
+  const btnFsUndo = document.getElementById('btnFsUndo');
+  const btnFsRedo = document.getElementById('btnFsRedo');
+  const btnFsVerify = document.getElementById('btnFsVerify');
+
+  if (btnFullscreenToggle) {
+    btnFullscreenToggle.addEventListener('click', () => {
+      const isNowFs = !document.body.classList.contains('fullscreen-popup-open');
+      setFullscreenPopupMode(isNowFs);
+    });
+  }
+  if (btnFsClose) {
+    btnFsClose.addEventListener('click', () => setFullscreenPopupMode(false));
+  }
+  if (btnFsSchematic && fsSchematicOverlay) {
+    btnFsSchematic.addEventListener('click', () => {
+      fsSchematicOverlay.hidden = !fsSchematicOverlay.hidden;
+    });
+  }
+  if (btnCloseFsSchem && fsSchematicOverlay) {
+    btnCloseFsSchem.addEventListener('click', () => {
+      fsSchematicOverlay.hidden = true;
+    });
+  }
+  if (btnFsUndo) {
+    btnFsUndo.addEventListener('click', () => performUndo());
+  }
+  if (btnFsRedo) {
+    btnFsRedo.addEventListener('click', () => performRedo());
+  }
+  if (btnFsVerify) {
+    btnFsVerify.addEventListener('click', () => runAutomatedVerification());
+  }
+
   // Mobile / Floating Routing Helper Bar Buttons
   const btnUndoWaypoint = document.getElementById('btnUndoWaypoint');
   const btnCancelWire = document.getElementById('btnCancelWire');
@@ -1982,8 +2092,12 @@ function initInteractions() {
 
   // Keyboard shortcuts: Escape, Backspace, Ctrl+Z (Undo), Ctrl+Y (Redo)
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && state.selectedTerminal) {
-      cancelActiveWireRouting();
+    if (e.key === 'Escape') {
+      if (state.selectedTerminal) {
+        cancelActiveWireRouting();
+      } else if (document.body.classList.contains('fullscreen-popup-open')) {
+        setFullscreenPopupMode(false);
+      }
     } else if (e.key === 'Backspace' && state.selectedTerminal && state.activeWaypoints.length > 0) {
       e.preventDefault();
       state.activeWaypoints.pop();
@@ -2045,9 +2159,11 @@ function initInteractions() {
 
   document.querySelectorAll('.color-swatch').forEach((btn) => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.color-swatch').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.wireColor = btn.getAttribute('data-color');
+      const chosenColor = btn.getAttribute('data-color');
+      document.querySelectorAll('.color-swatch').forEach((b) => {
+        b.classList.toggle('active', b.getAttribute('data-color') === chosenColor);
+      });
+      state.wireColor = chosenColor;
     });
   });
 

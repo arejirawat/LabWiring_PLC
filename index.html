@@ -134,7 +134,7 @@
 
     <!-- Right Column: Physical Workbench Simulation -->
     <section class="right-panel">
-      <div class="panel-card workbench-card">
+      <div class="panel-card workbench-card" id="workbenchCard">
         <div class="workbench-toolbar">
           <div class="toolbar-left">
             <span class="badge badge-board">ชุดทดลองการเชื่อมต่อวงจรไฟฟ้าควบคุมด้วย RELAY</span>
@@ -142,6 +142,10 @@
           </div>
 
           <div class="toolbar-right">
+            <button type="button" id="btnFullscreenToggle" class="btn-fullscreen-popup" title="เปิดโหมดขยายเต็มจอ (Popup เต็มจอสำหรับมือถือเพื่อลากสายโดยหน้าเว็บไม่เลื่อน)">
+              <span id="fullscreenIcon">⛶</span>
+              <span id="fullscreenBtnText">ขยายเต็มจอ (โหมดมือถือ)</span>
+            </button>
             <div class="switch-mode-wrap">
               <span class="power-label">โหมดปุ่มกด S1, S2:</span>
               <button type="button" id="btnSwitchModeToggle" class="mode-toggle locked" title="สลับระหว่างโหมดกดค้าง (ON/OFF) และโหมดกดติดปล่อยดับ">
@@ -155,6 +159,25 @@
                 <span class="power-state-text">ON (จ่ายไฟ)</span>
               </button>
             </div>
+          </div>
+        </div>
+
+        <!-- Quick Controls Bar shown only when Fullscreen Popup Mode is active -->
+        <div id="fullscreenQuickBar" class="fullscreen-quick-bar" hidden>
+          <div class="fs-color-group" aria-label="เลือกสีสายไฟ">
+            <span class="fs-label">สีสาย:</span>
+            <button type="button" class="color-swatch active" data-color="#ef4444" style="--swatch: #ef4444"></button>
+            <button type="button" class="color-swatch" data-color="#3b82f6" style="--swatch: #3b82f6"></button>
+            <button type="button" class="color-swatch" data-color="#eab308" style="--swatch: #eab308"></button>
+            <button type="button" class="color-swatch" data-color="#22c55e" style="--swatch: #22c55e"></button>
+            <button type="button" class="color-swatch" data-color="#1e293b" style="--swatch: #1e293b"></button>
+          </div>
+          <div class="fs-action-group">
+            <button type="button" id="btnFsSchematic" class="btn-mini btn-mini-info">📐 ดูวงจรสัญลักษณ์</button>
+            <button type="button" id="btnFsUndo" class="btn-mini btn-mini-secondary" disabled>↩ ย้อนกลับ (0/5)</button>
+            <button type="button" id="btnFsRedo" class="btn-mini btn-mini-secondary" disabled>↪ ทำซ้ำ</button>
+            <button type="button" id="btnFsVerify" class="btn-mini btn-mini-success">✓ ตรวจคำตอบ</button>
+            <button type="button" id="btnFsClose" class="btn-mini btn-mini-danger">✕ ปิดเต็มจอ</button>
           </div>
         </div>
 
@@ -417,6 +440,18 @@
             <button type="button" id="btnZoomIn" class="zoom-btn" title="ซูมเข้าดูใกล้ๆ">➕</button>
             <button type="button" id="btnZoomReset" class="zoom-btn" title="รีเซ็ตมุมมอง 100%">รีเซ็ต</button>
           </div>
+
+          <!-- Floating Schematic Mini-Overlay inside Fullscreen Popup -->
+          <div id="fsSchematicOverlay" class="fs-schematic-overlay" hidden>
+            <div class="fs-schem-header">
+              <span>📐 วงจรสัญลักษณ์อ้างอิง</span>
+              <button type="button" id="btnCloseFsSchem" class="btn-mini btn-mini-danger">✕ ซ่อน</button>
+            </div>
+            <div id="fsSchematicClone" class="fs-schem-body"></div>
+          </div>
+
+          <!-- Floating Verification Result Toast inside Fullscreen Popup -->
+          <div id="fsVerifyToast" class="fs-verify-toast" hidden></div>
         </div>
 
         <div class="workbench-footer">
