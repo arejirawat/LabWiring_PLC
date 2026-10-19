@@ -3278,6 +3278,60 @@ function initInteractions() {
 
 const TEACHER_PASSWORD = 'tatc';
 const CUSTOM_LABS_STORAGE_KEY = 'tatc_custom_labs_v1';
+const DELETED_LABS_STORAGE_KEY = 'tatc_deleted_custom_labs_v1';
+
+// Multi-Tier Cloud Sync Configuration
+const CLOUD_POINTER_GET_URL = 'https://keyvalue.immanuel.co/api/KeyVal/GetValue/rxkvtq0k/tatc_cloud_id';
+const CLOUD_POINTER_SET_URL = 'https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/rxkvtq0k/tatc_cloud_id';
+const CLOUD_OBJECTS_BASE_URL = 'https://api.restful-api.dev/objects';
+const DEFAULT_CLOUD_OBJECT_ID = 'ff808181a09d98f701a153af69fa1795';
+const STATIC_CUSTOM_LABS_URL = './custom_labs.json';
+
+let currentCloudObjectId = DEFAULT_CLOUD_OBJECT_ID;
+let isCloudSyncing = false;
+
+function getDeletedCustomLabIds() {
+  try {
+    const raw = localStorage.getItem(DELETED_LABS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    console.warn('Failed to load deleted lab IDs:', e);
+    return [];
+  }
+}
+
+function saveDeletedCustomLabIds(ids) {
+  try {
+    const unique = Array.from(new Set(ids || []));
+    localStorage.setItem(DELETED_LABS_STORAGE_KEY, JSON.stringify(unique));
+  } catch (e) {
+    console.warn('Failed to save deleted lab IDs:', e);
+  }
+}
+
+function recordDeletedCustomLabId(labId) {
+  if (!labId) return;
+  const current = getDeletedCustomLabIds();
+  if (!current.includes(labId)) {
+    current.push(labId);
+    saveDeletedCustomLabIds(current);
+  }
+}
+
+function removeDeletedCustomLabId(labId) {
+  if (!labId) return;
+  const current = getDeletedCustomLabIds();
+  const next = current.filter((id) => id !== labId);
+  saveDeletedCustomLabIds(next);
+}
+
+function setCloudSyncBadge(stateType, text) {
+  const badge = document.getElementById('cloudSyncStatus');
+  if (!badge) return;
+  badge.classList.remove('synced', 'syncing', 'error');
+  if (stateType) badge.classList.add(stateType);
+  if (text) badge.textContent = text;
+}
 
 const builderState = {
   editingLabId: null,
@@ -3315,12 +3369,264 @@ function saveStoredCustomLabs(customLabs) {
   }
 }
 
+async function fetchCustomLabsFromServer(silent = true) {
+  if (isCloudSyncing) return { success: false, inProgress: true };
+  isCloudSyncing = true;
+  setCloudSyncBadge('syncing', '⏳ กำลังซิงค์ข้อมูลกับเซิร์ฟเวอร์...');
+
+  let fetchedData = null;
+
+  // 1. Discover latest active object ID from cloud pointer
+  try {
+    const pointerRes = await fetch(CLOUD_POINTER_GET_URL, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined
+    });
+    if (pointerRes.ok) {
+      let pointerVal = await pointerRes.text();
+      pointerVal = (pointerVal || '').replace(/["'\s]/g, '').trim();
+      if (pointerVal && pointerVal.length >= 8) {
+        currentCloudObjectId = pointerVal;
+      }
+    }
+  } catch (err) {
+    console.warn('Pointer lookup fallback to default:', err);
+  }
+
+  // 2. Fetch object from REST API
+  try {
+    const objRes = await fetch(`${CLOUD_OBJECTS_BASE_URL}/${currentCloudObjectId}?t=${Date.now()}`, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined
+    });
+    if (objRes.ok) {
+      const objData = await objRes.json();
+      if (objData && objData.data) {
+        fetchedData = objData.data;
+      }
+    }
+  } catch (err) {
+    console.warn('REST API fetch error:', err);
+  }
+
+  // 3. Fallback to static custom_labs.json if remote failed
+  if (!fetchedData) {
+    try {
+      const staticRes = await fetch(`${STATIC_CUSTOM_LABS_URL}?t=${Date.now()}`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined
+      });
+      if (staticRes.ok) {
+        fetchedData = await staticRes.json();
+      }
+    } catch (err) {
+      console.warn('Static custom_labs.json fetch error:', err);
+    }
+  }
+
+  // 4. Merge incoming data with local storage & memory
+  if (fetchedData && typeof fetchedData === 'object') {
+    const incomingLabs = fetchedData.customLabs || {};
+    const incomingDeleted = Array.isArray(fetchedData.deletedIds) ? fetchedData.deletedIds : [];
+
+    const localDeleted = getDeletedCustomLabIds();
+    const mergedDeleted = Array.from(new Set([...localDeleted, ...incomingDeleted]));
+    saveDeletedCustomLabIds(mergedDeleted);
+
+    const localLabs = getStoredCustomLabs();
+
+    // Remove any labs marked as deleted
+    mergedDeleted.forEach((dId) => {
+      delete localLabs[dId];
+      delete LABS[dId];
+    });
+
+    // Merge incoming labs
+    Object.keys(incomingLabs).forEach((id) => {
+      if (mergedDeleted.includes(id)) return;
+      const incomingLab = incomingLabs[id];
+      const existingLab = localLabs[id];
+
+      if (!existingLab) {
+        localLabs[id] = incomingLab;
+        LABS[id] = incomingLab;
+      } else {
+        const incomingTime = incomingLab.updatedAt || 0;
+        const existingTime = existingLab.updatedAt || 0;
+        if (incomingTime >= existingTime) {
+          localLabs[id] = incomingLab;
+          LABS[id] = incomingLab;
+        }
+      }
+    });
+
+    saveStoredCustomLabs(localLabs);
+    refreshCustomLabsInSelect();
+    renderBuilderCustomLabsList();
+
+    const labCount = Object.keys(localLabs).length;
+    setCloudSyncBadge('synced', `☁️ ซิงค์กับเซิร์ฟเวอร์แล้ว (${labCount} โจทย์)`);
+    isCloudSyncing = false;
+
+    if (!silent) {
+      alert(`ซิงค์ข้อมูลกับเซิร์ฟเวอร์เรียบร้อยแล้ว (มีโจทย์ทั้งหมด ${labCount} ใบงาน)`);
+    }
+    return { success: true, count: labCount };
+  } else {
+    isCloudSyncing = false;
+    setCloudSyncBadge('error', '⚠️ ซิงค์ไม่สำเร็จ (ใช้ข้อมูลในเครื่อง)');
+    if (!silent) {
+      alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ออนไลน์ได้ในขณะนี้ ระบบจะใช้ข้อมูลที่บันทึกไว้ในเครื่องของคุณ');
+    }
+    return { success: false };
+  }
+}
+
+async function pushCustomLabsToServer() {
+  const customLabs = getStoredCustomLabs();
+  const deletedIds = getDeletedCustomLabIds();
+  const payload = {
+    name: 'tatc_custom_labs',
+    data: {
+      customLabs: customLabs,
+      deletedIds: deletedIds,
+      updatedAt: Date.now()
+    }
+  };
+
+  setCloudSyncBadge('syncing', '⏳ กำลังอัปโหลดไปยังเซิร์ฟเวอร์...');
+
+  try {
+    // 1. Try PUT to update existing object
+    let putRes = await fetch(`${CLOUD_OBJECTS_BASE_URL}/${currentCloudObjectId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined
+    });
+
+    if (putRes.ok) {
+      setCloudSyncBadge('synced', '☁️ บันทึกลงเซิร์ฟเวอร์ออนไลน์แล้ว');
+      return { success: true };
+    }
+
+    // 2. If object missing (404), POST new object
+    if (putRes.status === 404) {
+      const postRes = await fetch(CLOUD_OBJECTS_BASE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined
+      });
+      if (postRes.ok) {
+        const newObj = await postRes.json();
+        if (newObj && newObj.id) {
+          currentCloudObjectId = newObj.id;
+          try {
+            await fetch(`${CLOUD_POINTER_SET_URL}/${currentCloudObjectId}`, { method: 'POST' });
+          } catch (e) {
+            console.warn('Pointer update warning:', e);
+          }
+          setCloudSyncBadge('synced', '☁️ บันทึกลงเซิร์ฟเวอร์ออนไลน์แล้ว');
+          return { success: true };
+        }
+      }
+    }
+
+    setCloudSyncBadge('error', '⚠️ อัปโหลดเซิร์ฟเวอร์ไม่สำเร็จ');
+    return { success: false };
+  } catch (err) {
+    console.warn('pushCustomLabsToServer error:', err);
+    setCloudSyncBadge('error', '⚠️ ออฟไลน์ (บันทึกในเครื่องแล้ว)');
+    return { success: false, error: err };
+  }
+}
+
+function exportCustomLabsJson() {
+  const customLabs = getStoredCustomLabs();
+  const deletedIds = getDeletedCustomLabIds();
+  const exportData = {
+    version: 'tatc_v1',
+    exportedAt: new Date().toISOString(),
+    updatedAt: Date.now(),
+    deletedIds: deletedIds,
+    customLabs: customLabs
+  };
+
+  const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(exportData, null, 2));
+  const dlAnchor = document.createElement('a');
+  dlAnchor.setAttribute('href', dataStr);
+  dlAnchor.setAttribute('download', `tatc_custom_labs_${new Date().toISOString().slice(0, 10)}.json`);
+  document.body.appendChild(dlAnchor);
+  dlAnchor.click();
+  dlAnchor.remove();
+}
+
+function handleImportCustomLabsFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const content = JSON.parse(e.target.result);
+      let incomingLabs = {};
+      let incomingDeleted = [];
+
+      if (content && typeof content === 'object') {
+        if (content.customLabs && typeof content.customLabs === 'object') {
+          incomingLabs = content.customLabs;
+          incomingDeleted = Array.isArray(content.deletedIds) ? content.deletedIds : [];
+        } else {
+          incomingLabs = content;
+        }
+      }
+
+      const keys = Object.keys(incomingLabs);
+      if (keys.length === 0) {
+        alert('ไม่พบข้อมูลโจทย์ใบงานในไฟล์ที่เลือก');
+        return;
+      }
+
+      const localDeleted = getDeletedCustomLabIds();
+      const mergedDeleted = Array.from(new Set([...localDeleted, ...incomingDeleted]));
+      saveDeletedCustomLabIds(mergedDeleted);
+
+      const localLabs = getStoredCustomLabs();
+      let importedCount = 0;
+
+      keys.forEach((id) => {
+        const lab = incomingLabs[id];
+        if (lab && lab.title) {
+          lab.updatedAt = lab.updatedAt || Date.now();
+          localLabs[id] = lab;
+          LABS[id] = lab;
+          removeDeletedCustomLabId(id);
+          importedCount++;
+        }
+      });
+
+      saveStoredCustomLabs(localLabs);
+      refreshCustomLabsInSelect();
+      renderBuilderCustomLabsList();
+
+      alert(`นำเข้าโจทย์สำเร็จจำนวน ${importedCount} ใบงาน\nระบบกำลังซิงค์ขึ้นเซิร์ฟเวอร์ออนไลน์...`);
+      await pushCustomLabsToServer();
+    } catch (err) {
+      console.error('Import error:', err);
+      alert('เกิดข้อผิดพลาดในการอ่านไฟล์ JSON: ไฟล์อาจเสียหายหรือไม่ถูกต้อง');
+    }
+  };
+  reader.readAsText(file);
+}
+
 function loadStoredCustomLabsIntoApp() {
   const stored = getStoredCustomLabs();
   Object.keys(stored).forEach((id) => {
     LABS[id] = stored[id];
   });
   refreshCustomLabsInSelect();
+
+  // Background sync with cloud server
+  fetchCustomLabsFromServer(true);
 }
 
 function refreshCustomLabsInSelect(selectedId = null) {
@@ -3601,6 +3907,9 @@ function openBuilderModal(labIdToEdit = null) {
 
   renderBuilderCustomLabsList();
   renderBuilderWorkspace();
+
+  // Background fetch latest custom labs from online cloud
+  fetchCustomLabsFromServer(true);
 }
 
 function closeBuilderModal() {
@@ -3684,6 +3993,8 @@ function deleteCustomLab(labId) {
   const name = lab ? lab.title : labId;
   if (!confirm(`ต้องการลบโจทย์ใบงาน "${name}" ใช่หรือไม่?`)) return;
 
+  recordDeletedCustomLabId(labId);
+
   const stored = getStoredCustomLabs();
   delete stored[labId];
   saveStoredCustomLabs(stored);
@@ -3699,6 +4010,9 @@ function deleteCustomLab(labId) {
     resetBuilderState();
     renderBuilderWorkspace();
   }
+
+  // Push deletion to online cloud
+  pushCustomLabsToServer();
 }
 
 function saveCustomLab() {
@@ -3737,9 +4051,11 @@ function saveCustomLab() {
   if (outputs.length === 0) outputs.push('L1');
 
   const labId = builderState.editingLabId || `custom_${Date.now()}`;
+  const now = Date.now();
   const labDef = {
     id: labId,
     isCustom: true,
+    updatedAt: now,
     title: title,
     objective: obj,
     logicComparison: logic,
@@ -3764,10 +4080,14 @@ function saveCustomLab() {
   const stored = getStoredCustomLabs();
   stored[labId] = labDef;
   saveStoredCustomLabs(stored);
+  removeDeletedCustomLabId(labId);
 
   refreshCustomLabsInSelect(labId);
   closeBuilderModal();
   loadLab(labId);
+
+  // Push new/updated lab to online cloud
+  pushCustomLabsToServer();
 }
 
 function renderBuilderCustomLabsList() {
@@ -4047,6 +4367,34 @@ function initCustomLabManager() {
 
   if (btnSave) {
     btnSave.addEventListener('click', () => saveCustomLab());
+  }
+
+  const btnForceCloudSync = document.getElementById('btnForceCloudSync');
+  if (btnForceCloudSync) {
+    btnForceCloudSync.addEventListener('click', () => {
+      fetchCustomLabsFromServer(false);
+    });
+  }
+
+  const btnExportCustomLabs = document.getElementById('btnExportCustomLabs');
+  if (btnExportCustomLabs) {
+    btnExportCustomLabs.addEventListener('click', () => {
+      exportCustomLabsJson();
+    });
+  }
+
+  const btnImportCustomLabs = document.getElementById('btnImportCustomLabs');
+  const importCustomLabsInput = document.getElementById('importCustomLabsInput');
+  if (btnImportCustomLabs && importCustomLabsInput) {
+    btnImportCustomLabs.addEventListener('click', () => {
+      importCustomLabsInput.value = '';
+      importCustomLabsInput.click();
+    });
+    importCustomLabsInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        handleImportCustomLabsFile(e.target.files[0]);
+      }
+    });
   }
 
   document.querySelectorAll('#schemPalette .palette-item').forEach((item) => {

@@ -513,6 +513,10 @@
           <span class="builder-badge">ครูผู้สอน</span>
           <h2 id="customLabModalTitle">🛠️ ระบบสร้างและจัดการโจทย์ใบงาน (Drag & Drop Schematic Builder)</h2>
         </div>
+        <div class="cloud-sync-bar">
+          <span id="cloudSyncStatus" class="cloud-sync-badge synced">☁️ เชื่อมต่อเซิร์ฟเวอร์ออนไลน์พร้อมใช้งาน</span>
+          <button type="button" id="btnForceCloudSync" class="btn-mini btn-mini-info" title="ดึงข้อมูลโจทย์ล่าสุดจากเซิร์ฟเวอร์ออนไลน์">🔄 ซิงค์เซิร์ฟเวอร์</button>
+        </div>
         <button type="button" id="btnCloseBuilder" class="btn-close-modal" aria-label="ปิดหน้าต่าง">✕</button>
       </div>
 
@@ -525,6 +529,11 @@
           </div>
           <div id="customLabsList" class="custom-labs-list">
             <!-- Rendered dynamically -->
+          </div>
+          <div class="sidebar-cloud-actions">
+            <button type="button" id="btnExportCustomLabs" class="btn-mini btn-mini-secondary" title="ดาวน์โหลดไฟล์โจทย์ทั้งหมดเก็บไว้ (JSON)">📥 ส่งออก JSON</button>
+            <button type="button" id="btnImportCustomLabs" class="btn-mini btn-mini-secondary" title="นำเข้าไฟล์โจทย์ (JSON) และอัปโหลดขึ้นเซิร์ฟเวอร์">📤 นำเข้า JSON</button>
+            <input type="file" id="importCustomLabsInput" accept=".json" hidden />
           </div>
         </aside>
 
