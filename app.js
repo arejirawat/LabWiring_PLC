@@ -556,6 +556,63 @@ function clientToSvgPoint(clientX, clientY) {
   return pt.matrixTransform(ctm.inverse());
 }
 
+// Magnetic Snap-In Radius (in SVG viewBox units) so dragging near a pin automatically locks onto it
+const MAGNETIC_SNAP_RADIUS = 36;
+const TAP_SNAP_RADIUS = 28;
+
+function findNearestSnapTerminal(svgPt, excludeTermId = null, maxDist = MAGNETIC_SNAP_RADIUS) {
+  const svg = document.getElementById('workbenchSvg');
+  if (!svg || !svgPt) return null;
+
+  const nodes = svg.querySelectorAll('.terminal-node');
+  let best = null;
+  let minDist = maxDist;
+
+  nodes.forEach((node) => {
+    const termId = node.getAttribute('data-terminal');
+    if (!termId || termId === excludeTermId) return;
+    const pos = getTerminalPosition(termId);
+    const dist = Math.hypot(pos.x - svgPt.x, pos.y - svgPt.y);
+    if (dist <= minDist) {
+      minDist = dist;
+      best = {
+        termId,
+        label: node.getAttribute('data-label') || termId,
+        node,
+        pos,
+        dist
+      };
+    }
+  });
+
+  return best;
+}
+
+function updateSnapIndicator(snapTarget) {
+  const snapEl = document.getElementById('snapTargetIndicator');
+  const outerRing = document.getElementById('snapRingOuter');
+  const innerRing = document.getElementById('snapRingInner');
+
+  document.querySelectorAll('.terminal-node.snap-target-active').forEach((el) => {
+    el.classList.remove('snap-target-active');
+  });
+
+  if (!snapEl || !outerRing || !innerRing) return;
+
+  if (snapTarget) {
+    outerRing.setAttribute('cx', snapTarget.pos.x.toFixed(1));
+    outerRing.setAttribute('cy', snapTarget.pos.y.toFixed(1));
+    innerRing.setAttribute('cx', snapTarget.pos.x.toFixed(1));
+    innerRing.setAttribute('cy', snapTarget.pos.y.toFixed(1));
+    snapEl.setAttribute('opacity', '1');
+    if (snapTarget.node) {
+      snapTarget.node.classList.add('snap-target-active');
+    }
+  } else {
+    snapEl.setAttribute('opacity', '0');
+  }
+}
+
 // Compute wire path supporting intermediate waypoints (rounded corners) or direct curve
 function computeWirePath(p1, p2, waypoints = []) {
   if (waypoints && waypoints.length > 0) {
@@ -1707,6 +1764,8 @@ function cancelActiveWireRouting() {
   state.selectedTerminal = null;
   state.activeWaypoints = [];
   state.draggingFrom = null;
+  state.snapTerminal = null;
+  updateSnapIndicator(null);
   if (preview) preview.setAttribute('opacity', '0');
   updateSimulationUI();
 }
@@ -1789,6 +1848,8 @@ function initInteractions() {
     // If 2 fingers are touching on mobile, switch to pinch-zoom / two-finger pan
     if (activePointers.size === 2) {
       state.draggingFrom = null;
+      state.snapTerminal = null;
+      updateSnapIndicator(null);
       isSinglePanning = false;
       const pts = Array.from(activePointers.values());
       lastPinchDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
@@ -1805,12 +1866,20 @@ function initInteractions() {
       return;
     }
 
-    // Middle mouse button or Pan Mode enabled on empty space -> pan the zoomed board
-    const termNode = e.target.closest('.terminal-node');
-    const isInteractiveTarget =
-      termNode ||
-      e.target.closest('.wire-group') ||
-      e.target.closest('.switch-actuator');
+    // Check direct hit or magnetic proximity snap on pointerdown
+    let termNode = e.target.closest('.terminal-node');
+    const hitWireOrSwitch =
+      e.target.closest('.wire-group') || e.target.closest('.switch-actuator');
+
+    if (!termNode && !hitWireOrSwitch && !state.panMode && e.button === 0) {
+      const touchPt = clientToSvgPoint(e.clientX, e.clientY);
+      const nearSnap = findNearestSnapTerminal(touchPt, null, TAP_SNAP_RADIUS);
+      if (nearSnap) {
+        termNode = nearSnap.node;
+      }
+    }
+
+    const isInteractiveTarget = termNode || hitWireOrSwitch;
 
     if (e.button === 1 || (state.panMode && !termNode && !e.target.closest('.switch-actuator'))) {
       e.preventDefault();
@@ -1834,6 +1903,8 @@ function initInteractions() {
         state.selectedTerminal = null;
         state.activeWaypoints = [];
         state.draggingFrom = null;
+        state.snapTerminal = null;
+        updateSnapIndicator(null);
         preview.setAttribute('opacity', '0');
         updateSimulationUI();
         return;
@@ -1849,6 +1920,7 @@ function initInteractions() {
       state.selectedTerminal = termId;
       state.activeWaypoints = [];
       state.draggingFrom = termId;
+      state.snapTerminal = null;
       state.pointerDownPos = { x: e.clientX, y: e.clientY };
 
       const startPt = getTerminalPosition(termId);
@@ -1927,25 +1999,42 @@ function initInteractions() {
       return;
     }
 
-    const termNode = e.target.closest('.terminal-node');
-    if (termNode) {
-      const label = termNode.getAttribute('data-label') || termNode.getAttribute('data-terminal');
-      tooltip.textContent = label;
+    const activeStart = state.selectedTerminal || state.draggingFrom;
+    const rawPt = clientToSvgPoint(e.clientX, e.clientY);
+
+    if (!activeStart) {
+      const termNode = e.target.closest('.terminal-node');
+      if (termNode) {
+        const label = termNode.getAttribute('data-label') || termNode.getAttribute('data-terminal');
+        tooltip.textContent = label;
+        tooltip.hidden = false;
+        tooltip.style.left = `${e.clientX + 14}px`;
+        tooltip.style.top = `${Math.max(8, e.clientY - 38)}px`;
+      } else {
+        tooltip.hidden = true;
+      }
+      return;
+    }
+
+    // Magnetic Snap-In: Check if finger/cursor is near any target terminal
+    const snapTarget = findNearestSnapTerminal(rawPt, activeStart, MAGNETIC_SNAP_RADIUS);
+    state.snapTerminal = snapTarget ? snapTarget.termId : null;
+    updateSnapIndicator(snapTarget);
+
+    if (snapTarget) {
+      tooltip.textContent = `🧲 ดูดเข้าขั้ว: ${snapTarget.label} (ปล่อยเพื่อต่อสาย)`;
       tooltip.hidden = false;
-      tooltip.style.left = `${e.clientX + 14}px`;
-      tooltip.style.top = `${e.clientY + 14}px`;
+      tooltip.style.left = `${Math.min(window.innerWidth - 240, Math.max(8, e.clientX - 60))}px`;
+      tooltip.style.top = `${Math.max(8, e.clientY - 48)}px`;
     } else {
       tooltip.hidden = true;
     }
 
-    const activeStart = state.selectedTerminal || state.draggingFrom;
-    if (!activeStart) return;
-
     const startPt = getTerminalPosition(activeStart);
-    const currPt = clientToSvgPoint(e.clientX, e.clientY);
+    const currPt = snapTarget ? snapTarget.pos : rawPt;
     preview.setAttribute('stroke', state.wireColor);
     preview.setAttribute('d', computeWirePath(startPt, currPt, state.activeWaypoints));
-    preview.setAttribute('opacity', '0.9');
+    preview.setAttribute('opacity', '0.95');
   });
 
   const handlePointerEnd = (e) => {
@@ -1966,11 +2055,31 @@ function initInteractions() {
     handlePointerEnd(e);
     tooltip.hidden = true;
     if (!state.draggingFrom) return;
-    const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-    const termNode = targetEl ? targetEl.closest('.terminal-node') : null;
 
-    if (termNode) {
-      const toTerm = termNode.getAttribute('data-terminal');
+    const dragDist = state.pointerDownPos
+      ? Math.hypot(e.clientX - state.pointerDownPos.x, e.clientY - state.pointerDownPos.y)
+      : 999;
+
+    // Only complete drag-and-drop if user actually dragged their finger/mouse (dragDist >= 10px)
+    if (dragDist >= 10) {
+      let toTerm = state.snapTerminal;
+
+      if (!toTerm) {
+        const upSvgPt = clientToSvgPoint(e.clientX, e.clientY);
+        const snapUp = findNearestSnapTerminal(upSvgPt, state.draggingFrom, MAGNETIC_SNAP_RADIUS);
+        if (snapUp) {
+          toTerm = snapUp.termId;
+        }
+      }
+
+      if (!toTerm) {
+        const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+        const termNode = targetEl ? targetEl.closest('.terminal-node') : null;
+        if (termNode) {
+          toTerm = termNode.getAttribute('data-terminal');
+        }
+      }
+
       if (toTerm && toTerm !== state.draggingFrom) {
         addWire(state.draggingFrom, toTerm, state.activeWaypoints);
         state.selectedTerminal = null;
@@ -1978,6 +2087,9 @@ function initInteractions() {
         preview.setAttribute('opacity', '0');
       }
     }
+
+    state.snapTerminal = null;
+    updateSnapIndicator(null);
     state.draggingFrom = null;
     updateSimulationUI();
   });

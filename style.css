@@ -1134,3 +1134,12 @@ body.fullscreen-popup-open {
   letter-spacing: 0.02em;
 }
 
+/* Magnetic Snap-In Target Highlight */
+.terminal-node.snap-target-active .term-screw,
+.terminal-node.snap-target-active .term-outer {
+  stroke: #22c55e !important;
+  stroke-width: 3.5px !important;
+  filter: drop-shadow(0 0 8px rgba(34, 197, 94, 0.95));
+}
+
+
