@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=20261019_2" />
 </head>
 <body>
   <header class="app-header">
@@ -41,6 +41,10 @@
           <button type="button" id="btnOpenLabBuilder" class="btn btn-builder-menu" title="สร้างและจัดการโจทย์ใบงานเพิ่มเติม (สำหรับผู้สอน)">
             🛠️ สร้างโจทย์เพิ่มเติม
           </button>
+          <div class="cloud-sync-bar">
+            <span id="cloudSyncStatus" class="cloud-sync-badge" title="สถานะการซิงค์โจทย์ออนไลน์">☁️ กำลังเชื่อมต่อเซิร์ฟเวอร์...</span>
+            <button id="btnMainCloudSync" type="button" class="btn-cloud-refresh" title="กดเพื่อดึง/อัปโหลดโจทย์ล่าสุดกับเซิร์ฟเวอร์">🔄 ซิงค์</button>
+          </div>
         </div>
       </div>
 
@@ -513,8 +517,8 @@
           <span class="builder-badge">ครูผู้สอน</span>
           <h2 id="customLabModalTitle">🛠️ ระบบสร้างและจัดการโจทย์ใบงาน (Drag & Drop Schematic Builder)</h2>
         </div>
-        <div class="cloud-sync-bar">
-          <span id="cloudSyncStatus" class="cloud-sync-badge synced">☁️ เชื่อมต่อเซิร์ฟเวอร์ออนไลน์พร้อมใช้งาน</span>
+        <div class="cloud-sync-bar modal-sync-bar">
+          <span id="modalCloudSyncStatus" class="cloud-sync-badge synced">☁️ เชื่อมต่อเซิร์ฟเวอร์ออนไลน์พร้อมใช้งาน</span>
           <button type="button" id="btnForceCloudSync" class="btn-mini btn-mini-info" title="ดึงข้อมูลโจทย์ล่าสุดจากเซิร์ฟเวอร์ออนไลน์">🔄 ซิงค์เซิร์ฟเวอร์</button>
         </div>
         <button type="button" id="btnCloseBuilder" class="btn-close-modal" aria-label="ปิดหน้าต่าง">✕</button>
@@ -678,6 +682,6 @@
     <strong class="footer-author">designed by Kru-Jirawat TATC .2026</strong>
   </footer>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=20261019_2"></script>
 </body>
 </html>

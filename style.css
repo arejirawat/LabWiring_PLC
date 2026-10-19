@@ -2019,7 +2019,7 @@ body.fullscreen-popup-open {
     padding-right: 0;
     padding-bottom: 0.75rem;
   }
-  .cloud-sync-bar {
+  .modal-sync-bar {
     display: none;
   }
 }
@@ -2028,21 +2028,51 @@ body.fullscreen-popup-open {
 .cloud-sync-bar {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 6px;
+}
+
+.cloud-sync-bar.modal-sync-bar {
   margin-left: auto;
   margin-right: 0.75rem;
 }
 
 .cloud-sync-badge {
+  flex: 1;
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
   font-size: 0.72rem;
   font-weight: 600;
   transition: all 0.2s ease;
   white-space: nowrap;
+}
+
+.btn-cloud-refresh {
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  border-radius: 6px;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  background: rgba(15, 23, 42, 0.7);
+  color: #38bdf8;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-cloud-refresh:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #7dd3fc;
+}
+
+.btn-cloud-refresh:active {
+  transform: scale(0.96);
 }
 
 .cloud-sync-badge.synced {

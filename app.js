@@ -3326,11 +3326,12 @@ function removeDeletedCustomLabId(labId) {
 }
 
 function setCloudSyncBadge(stateType, text) {
-  const badge = document.getElementById('cloudSyncStatus');
-  if (!badge) return;
-  badge.classList.remove('synced', 'syncing', 'error');
-  if (stateType) badge.classList.add(stateType);
-  if (text) badge.textContent = text;
+  const badges = document.querySelectorAll('.cloud-sync-badge');
+  badges.forEach((badge) => {
+    badge.classList.remove('synced', 'syncing', 'error');
+    if (stateType) badge.classList.add(stateType);
+    if (text) badge.textContent = text;
+  });
 }
 
 const builderState = {
@@ -3369,12 +3370,13 @@ function saveStoredCustomLabs(customLabs) {
   }
 }
 
-async function fetchCustomLabsFromServer(silent = true) {
+async function fetchCustomLabsFromServer(silent = true, allowPushBack = true) {
   if (isCloudSyncing) return { success: false, inProgress: true };
   isCloudSyncing = true;
   setCloudSyncBadge('syncing', '⏳ กำลังซิงค์ข้อมูลกับเซิร์ฟเวอร์...');
 
   let fetchedData = null;
+  let remoteServerReachable = false;
 
   // 1. Discover latest active object ID from cloud pointer
   try {
@@ -3403,6 +3405,7 @@ async function fetchCustomLabsFromServer(silent = true) {
       const objData = await objRes.json();
       if (objData && objData.data) {
         fetchedData = objData.data;
+        remoteServerReachable = true;
       }
     }
   } catch (err) {
@@ -3434,12 +3437,29 @@ async function fetchCustomLabsFromServer(silent = true) {
     saveDeletedCustomLabIds(mergedDeleted);
 
     const localLabs = getStoredCustomLabs();
+    let needsPushToServer = false;
+
+    // Detect if local storage has any unsynced changes that the remote server does NOT have
+    Object.keys(localLabs).forEach((id) => {
+      if (!mergedDeleted.includes(id)) {
+        if (!incomingLabs[id] || (localLabs[id].updatedAt || 0) > (incomingLabs[id].updatedAt || 0)) {
+          needsPushToServer = true;
+          localLabs[id].updatedAt = localLabs[id].updatedAt || Date.now();
+        }
+      }
+    });
+
+    if (localDeleted.some((dId) => !incomingDeleted.includes(dId))) {
+      needsPushToServer = true;
+    }
 
     // Remove any labs marked as deleted
     mergedDeleted.forEach((dId) => {
       delete localLabs[dId];
       delete LABS[dId];
     });
+
+    let currentLabUpdated = false;
 
     // Merge incoming labs
     Object.keys(incomingLabs).forEach((id) => {
@@ -3450,12 +3470,14 @@ async function fetchCustomLabsFromServer(silent = true) {
       if (!existingLab) {
         localLabs[id] = incomingLab;
         LABS[id] = incomingLab;
+        if (state.currentLabId === id) currentLabUpdated = true;
       } else {
         const incomingTime = incomingLab.updatedAt || 0;
         const existingTime = existingLab.updatedAt || 0;
         if (incomingTime >= existingTime) {
           localLabs[id] = incomingLab;
           LABS[id] = incomingLab;
+          if (state.currentLabId === id) currentLabUpdated = true;
         }
       }
     });
@@ -3464,9 +3486,27 @@ async function fetchCustomLabsFromServer(silent = true) {
     refreshCustomLabsInSelect();
     renderBuilderCustomLabsList();
 
-    const labCount = Object.keys(localLabs).length;
+    if (currentLabUpdated && state.currentLabId && LABS[state.currentLabId]) {
+      const cur = LABS[state.currentLabId];
+      const tEl = document.getElementById('labTitle');
+      if (tEl) tEl.textContent = cur.title;
+      const oEl = document.getElementById('labObjective');
+      if (oEl) oEl.textContent = cur.objective || '';
+      renderSchematic();
+      renderTruthTable();
+    }
+
+    let labCount = Object.keys(localLabs).length;
     setCloudSyncBadge('synced', `☁️ ซิงค์กับเซิร์ฟเวอร์แล้ว (${labCount} โจทย์)`);
     isCloudSyncing = false;
+
+    if (allowPushBack && (needsPushToServer || (!remoteServerReachable && labCount > 0))) {
+      const pushRes = await pushCustomLabsToServer();
+      if (pushRes && pushRes.success) {
+        labCount = Object.keys(getStoredCustomLabs()).length;
+        setCloudSyncBadge('synced', `☁️ ซิงค์ข้อมูลออนไลน์แล้ว (${labCount} โจทย์)`);
+      }
+    }
 
     if (!silent) {
       alert(`ซิงค์ข้อมูลกับเซิร์ฟเวอร์เรียบร้อยแล้ว (มีโจทย์ทั้งหมด ${labCount} ใบงาน)`);
@@ -3474,6 +3514,21 @@ async function fetchCustomLabsFromServer(silent = true) {
     return { success: true, count: labCount };
   } else {
     isCloudSyncing = false;
+    const localLabs = getStoredCustomLabs();
+    let labCount = Object.keys(localLabs).length;
+
+    if (allowPushBack && labCount > 0) {
+      const pushRes = await pushCustomLabsToServer();
+      if (pushRes && pushRes.success) {
+        labCount = Object.keys(getStoredCustomLabs()).length;
+        setCloudSyncBadge('synced', `☁️ ซิงค์ข้อมูลออนไลน์แล้ว (${labCount} โจทย์)`);
+        if (!silent) {
+          alert(`ซิงค์ข้อมูลกับเซิร์ฟเวอร์เรียบร้อยแล้ว (มีโจทย์ทั้งหมด ${labCount} ใบงาน)`);
+        }
+        return { success: true, count: labCount };
+      }
+    }
+
     setCloudSyncBadge('error', '⚠️ ซิงค์ไม่สำเร็จ (ใช้ข้อมูลในเครื่อง)');
     if (!silent) {
       alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ออนไลน์ได้ในขณะนี้ ระบบจะใช้ข้อมูลที่บันทึกไว้ในเครื่องของคุณ');
@@ -3483,13 +3538,89 @@ async function fetchCustomLabsFromServer(silent = true) {
 }
 
 async function pushCustomLabsToServer() {
-  const customLabs = getStoredCustomLabs();
-  const deletedIds = getDeletedCustomLabIds();
+  // 1. Try to fetch the latest pointer and latest remote object with short timeout (4000ms) to merge changes from other devices
+  try {
+    const pointerRes = await fetch(CLOUD_POINTER_GET_URL, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined
+    });
+    if (pointerRes.ok) {
+      let pointerVal = await pointerRes.text();
+      pointerVal = (pointerVal || '').replace(/["'\s]/g, '').trim();
+      if (pointerVal && pointerVal.length >= 8) {
+        currentCloudObjectId = pointerVal;
+      }
+    }
+  } catch (err) {
+    console.warn('Pointer pre-push check warning:', err);
+  }
+
+  let remoteLabs = {};
+  let remoteDeleted = [];
+  try {
+    const remoteRes = await fetch(`${CLOUD_OBJECTS_BASE_URL}/${currentCloudObjectId}?t=${Date.now()}`, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined
+    });
+    if (remoteRes.ok) {
+      const remoteData = await remoteRes.json();
+      if (remoteData && remoteData.data) {
+        remoteLabs = remoteData.data.customLabs || {};
+        remoteDeleted = Array.isArray(remoteData.data.deletedIds) ? remoteData.data.deletedIds : [];
+      }
+    }
+  } catch (err) {
+    console.warn('Remote object pre-push fetch warning:', err);
+  }
+
+  // Merge remote customLabs and deletedIds with local
+  const localDeleted = getDeletedCustomLabIds();
+  const mergedDeleted = Array.from(new Set([...localDeleted, ...remoteDeleted]));
+  saveDeletedCustomLabIds(mergedDeleted);
+
+  const localLabs = getStoredCustomLabs();
+
+  // Remove deleted labs
+  mergedDeleted.forEach((dId) => {
+    delete localLabs[dId];
+    delete LABS[dId];
+  });
+
+  // Merge remote labs
+  Object.keys(remoteLabs).forEach((id) => {
+    if (mergedDeleted.includes(id)) return;
+    const rLab = remoteLabs[id];
+    const lLab = localLabs[id];
+    if (!lLab) {
+      localLabs[id] = rLab;
+      LABS[id] = rLab;
+    } else {
+      const rTime = rLab.updatedAt || 0;
+      const lTime = lLab.updatedAt || 0;
+      if (rTime > lTime) {
+        localLabs[id] = rLab;
+        LABS[id] = rLab;
+      }
+    }
+  });
+
+  // Ensure updatedAt is set on all local labs
+  Object.keys(localLabs).forEach((id) => {
+    if (!localLabs[id].updatedAt) {
+      localLabs[id].updatedAt = Date.now();
+    }
+    LABS[id] = localLabs[id];
+  });
+
+  saveStoredCustomLabs(localLabs);
+  refreshCustomLabsInSelect();
+  renderBuilderCustomLabsList();
+
   const payload = {
     name: 'tatc_custom_labs',
     data: {
-      customLabs: customLabs,
-      deletedIds: deletedIds,
+      customLabs: localLabs,
+      deletedIds: mergedDeleted,
       updatedAt: Date.now()
     }
   };
@@ -3506,30 +3637,30 @@ async function pushCustomLabsToServer() {
     });
 
     if (putRes.ok) {
-      setCloudSyncBadge('synced', '☁️ บันทึกลงเซิร์ฟเวอร์ออนไลน์แล้ว');
+      const count = Object.keys(localLabs).length;
+      setCloudSyncBadge('synced', `☁️ ซิงค์ออนไลน์แล้ว (${count} โจทย์)`);
       return { success: true };
     }
 
-    // 2. If object missing (404), POST new object
-    if (putRes.status === 404) {
-      const postRes = await fetch(CLOUD_OBJECTS_BASE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined
-      });
-      if (postRes.ok) {
-        const newObj = await postRes.json();
-        if (newObj && newObj.id) {
-          currentCloudObjectId = newObj.id;
-          try {
-            await fetch(`${CLOUD_POINTER_SET_URL}/${currentCloudObjectId}`, { method: 'POST' });
-          } catch (e) {
-            console.warn('Pointer update warning:', e);
-          }
-          setCloudSyncBadge('synced', '☁️ บันทึกลงเซิร์ฟเวอร์ออนไลน์แล้ว');
-          return { success: true };
+    // 2. Fallback to POST if !putRes.ok (ANY non-2xx status, not just 404!)
+    const postRes = await fetch(CLOUD_OBJECTS_BASE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined
+    });
+    if (postRes.ok) {
+      const newObj = await postRes.json();
+      if (newObj && newObj.id) {
+        currentCloudObjectId = newObj.id;
+        try {
+          await fetch(`${CLOUD_POINTER_SET_URL}/${currentCloudObjectId}`, { method: 'POST' });
+        } catch (e) {
+          console.warn('Pointer update warning:', e);
         }
+        const count = Object.keys(localLabs).length;
+        setCloudSyncBadge('synced', `☁️ ซิงค์ออนไลน์แล้ว (${count} โจทย์)`);
+        return { success: true };
       }
     }
 
@@ -4372,9 +4503,22 @@ function initCustomLabManager() {
   const btnForceCloudSync = document.getElementById('btnForceCloudSync');
   if (btnForceCloudSync) {
     btnForceCloudSync.addEventListener('click', () => {
-      fetchCustomLabsFromServer(false);
+      fetchCustomLabsFromServer(false, true);
     });
   }
+
+  const btnMainCloudSync = document.getElementById('btnMainCloudSync');
+  if (btnMainCloudSync) {
+    btnMainCloudSync.addEventListener('click', () => {
+      fetchCustomLabsFromServer(false, true);
+    });
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      fetchCustomLabsFromServer(true, true);
+    }
+  });
 
   const btnExportCustomLabs = document.getElementById('btnExportCustomLabs');
   if (btnExportCustomLabs) {
