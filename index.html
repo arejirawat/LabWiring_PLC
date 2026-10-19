@@ -57,9 +57,12 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
           <span id="redoBtnText">ทำซ้ำ</span>
         </button>
+        <button type="button" id="btnDeleteMode" class="btn btn-delete-mode" aria-pressed="false" title="เลือกโหมดลบสาย แล้วคลิกที่สายไฟเพื่อลบทีละเส้น">
+          ✂️ <span class="delete-mode-label">ลบสายไฟ</span>
+        </button>
         <button type="button" id="btnClear" class="btn btn-danger-outline" title="ล้างสายไฟทั้งหมด">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-          ล้างสายไฟ
+          ล้างทั้งหมด
         </button>
         <button type="button" id="btnHint" class="btn btn-warning" title="ดูคำใบ้การต่อสาย">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
@@ -145,6 +148,9 @@
           </div>
 
           <div class="toolbar-right">
+            <button type="button" id="btnToolbarDeleteMode" class="btn-toolbar-delete" aria-pressed="false" title="เปิดโหมดลบสาย แล้วคลิกที่สายไฟที่ต้องการลบ">
+              ✂️ <span class="delete-mode-label">ลบสายไฟ</span>
+            </button>
             <button type="button" id="btnFullscreenToggle" class="btn-fullscreen-popup" title="เปิดโหมดขยายเต็มจอ (Popup เต็มจอสำหรับมือถือเพื่อลากสายโดยหน้าเว็บไม่เลื่อน)">
               <span id="fullscreenIcon">⛶</span>
               <span id="fullscreenBtnText">ขยายเต็มจอ (โหมดมือถือ)</span>
@@ -177,6 +183,7 @@
           </div>
           <div class="fs-action-group">
             <button type="button" id="btnFsSchematic" class="btn-mini btn-mini-info">📐 ดูวงจรสัญลักษณ์</button>
+            <button type="button" id="btnFsDeleteMode" class="btn-mini btn-mini-delete">✂️ <span class="delete-mode-label">ลบสายไฟ</span></button>
             <button type="button" id="btnFsUndo" class="btn-mini btn-mini-secondary" disabled>↩ ย้อนกลับ (0/5)</button>
             <button type="button" id="btnFsRedo" class="btn-mini btn-mini-secondary" disabled>↪ ทำซ้ำ</button>
             <button type="button" id="btnFsVerify" class="btn-mini btn-mini-success">✓ ตรวจคำตอบ</button>

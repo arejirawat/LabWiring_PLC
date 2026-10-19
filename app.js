@@ -1748,7 +1748,240 @@ function resetZoom() {
   applyViewBox();
 }
 
-// Add or Remove Wire (supports waypoints array & records 5-step undo history)
+// ============================================================================
+// Delete Wire Mode Toggle (Prevents accidental wire deletion on click/tap)
+// ============================================================================
+function setDeleteWireMode(enable) {
+  state.deleteWireMode = Boolean(enable);
+  if (state.deleteWireMode && state.selectedTerminal) {
+    cancelActiveWireRouting();
+  }
+
+  const svg = document.getElementById('workbenchSvg');
+  if (svg) {
+    svg.classList.toggle('delete-wire-mode', state.deleteWireMode);
+  }
+
+  const btns = [
+    document.getElementById('btnDeleteMode'),
+    document.getElementById('btnToolbarDeleteMode'),
+    document.getElementById('btnFsDeleteMode')
+  ];
+
+  btns.forEach((btn) => {
+    if (!btn) return;
+    btn.classList.toggle('active', state.deleteWireMode);
+    btn.setAttribute('aria-pressed', String(state.deleteWireMode));
+    const lbl = btn.querySelector('.delete-mode-label');
+    if (lbl) {
+      lbl.textContent = state.deleteWireMode ? 'โหมดลบสาย: เปิด (แตะสาย)' : 'ลบสายไฟ';
+    }
+  });
+}
+
+// ============================================================================
+// Smart Obstacle-Avoiding Auto-Router (Automatically routes wires around pins)
+// ============================================================================
+function simplifyWaypoints(p1, p2, rawWaypoints) {
+  const all = [p1, ...(rawWaypoints || []), p2];
+  const deduped = [all[0]];
+  for (let i = 1; i < all.length; i++) {
+    const prev = deduped[deduped.length - 1];
+    if (Math.hypot(all[i].x - prev.x, all[i].y - prev.y) > 4) {
+      deduped.push(all[i]);
+    }
+  }
+  if (deduped.length <= 2) return [];
+
+  const simplified = [];
+  for (let i = 1; i < deduped.length - 1; i++) {
+    const a = simplified.length > 0 ? simplified[simplified.length - 1] : deduped[0];
+    const b = deduped[i];
+    const c = deduped[i + 1];
+    const v1x = b.x - a.x;
+    const v1y = b.y - a.y;
+    const v2x = c.x - b.x;
+    const v2y = c.y - b.y;
+    const l1 = Math.hypot(v1x, v1y);
+    const l2 = Math.hypot(v2x, v2y);
+    if (l1 > 1 && l2 > 1) {
+      const cross = Math.abs(v1x * v2y - v1y * v2x) / (l1 * l2);
+      const dot = (v1x * v2x + v1y * v2y) / (l1 * l2);
+      // Skip collinear intermediate points
+      if (cross < 0.06 && dot > 0) continue;
+    }
+    simplified.push({ x: b.x, y: b.y });
+  }
+  return simplified;
+}
+
+function autoRouteWire(fromTerm, toTerm) {
+  const svg = document.getElementById('workbenchSvg');
+  if (!svg || !fromTerm || !toTerm) return [];
+
+  const p1 = getTerminalPosition(fromTerm);
+  const p2 = getTerminalPosition(toTerm);
+
+  // 1. Collect all other terminal positions as circular obstacles
+  const obstacles = [];
+  svg.querySelectorAll('.terminal-node').forEach((node) => {
+    const tid = node.getAttribute('data-terminal');
+    if (!tid || tid === fromTerm || tid === toTerm) return;
+    const pos = getTerminalPosition(tid);
+    obstacles.push({ x: pos.x, y: pos.y, r: 23 });
+  });
+
+  // 2. Collect existing wire segments to spread parallel wires into separate lanes
+  const existingSegments = [];
+  state.wires.forEach((w) => {
+    const wp1 = getTerminalPosition(w.from);
+    const wp2 = getTerminalPosition(w.to);
+    const chain = [wp1, ...(w.waypoints || []), wp2];
+    for (let i = 0; i < chain.length - 1; i++) {
+      existingSegments.push({ a: chain[i], b: chain[i + 1] });
+    }
+  });
+
+  // Switch plunger green actuator boxes to avoid covering PRESS buttons
+  const switchBoxes = [
+    { xMin: 214, xMax: 272, yMin: 235, yMax: 365 },
+    { xMin: 214, xMax: 272, yMin: 430, yMax: 560 }
+  ];
+
+  const scoreCandidate = (rawWps, extraPenalty = 0) => {
+    const wps = simplifyWaypoints(p1, p2, rawWps);
+    const pts = [p1, ...wps, p2];
+    let penalty = extraPenalty;
+    let totalLen = 0;
+
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i];
+      const b = pts[i + 1];
+      const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+      totalLen += segLen;
+
+      // Penalize passing over any other terminal
+      for (let k = 0; k < obstacles.length; k++) {
+        const obs = obstacles[k];
+        const d = pointToSegmentDist(obs, a, b);
+        if (d < obs.r) {
+          penalty += 100000 + (obs.r - d) * 2000;
+        } else if (d < obs.r + 8) {
+          penalty += (obs.r + 8 - d) * 140;
+        }
+      }
+
+      // Penalize crossing switch plungers
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      for (const box of switchBoxes) {
+        if (mid.x >= box.xMin && mid.x <= box.xMax && mid.y >= box.yMin && mid.y <= box.yMax) {
+          penalty += 30000;
+        }
+      }
+
+      // Penalize overlapping existing wire segments in the same lane
+      const isHoriz = Math.abs(b.y - a.y) < 3;
+      const isVert = Math.abs(b.x - a.x) < 3;
+      for (const es of existingSegments) {
+        const esHoriz = Math.abs(es.b.y - es.a.y) < 3;
+        const esVert = Math.abs(es.b.x - es.a.x) < 3;
+        if (isHoriz && esHoriz && Math.abs(a.y - es.a.y) < 9) {
+          const minA = Math.min(a.x, b.x);
+          const maxA = Math.max(a.x, b.x);
+          const minE = Math.min(es.a.x, es.b.x);
+          const maxE = Math.max(es.a.x, es.b.x);
+          if (Math.max(minA, minE) < Math.min(maxA, maxE)) {
+            penalty += 1400;
+          }
+        } else if (isVert && esVert && Math.abs(a.x - es.a.x) < 9) {
+          const minA = Math.min(a.y, b.y);
+          const maxA = Math.max(a.y, b.y);
+          const minE = Math.min(es.a.y, es.b.y);
+          const maxE = Math.max(es.a.y, es.b.y);
+          if (Math.max(minA, minE) < Math.min(maxA, maxE)) {
+            penalty += 1400;
+          }
+        }
+      }
+    }
+
+    const score = penalty + totalLen + wps.length * 42;
+    return { wps, score };
+  };
+
+  const candidates = [];
+  const directDist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+
+  // Candidate 0: Direct (only favored when close & completely clear, otherwise prefer neat orthogonal routing)
+  candidates.push(scoreCandidate([], directDist > 95 ? 220 : 0));
+
+  // Candidate 1 & 2: 1-Corner L-shapes
+  candidates.push(scoreCandidate([{ x: p1.x, y: p2.y }]));
+  candidates.push(scoreCandidate([{ x: p2.x, y: p1.y }]));
+
+  // Candidate 3: 2-Corner Horizontal Channel U/Z-shapes
+  const yChannels = [
+    18, 28, 40,
+    168, 178, 188, 198, 208, 218,
+    376, 386, 396, 408,
+    556, 568, 580, 592,
+    (p1.y + p2.y) / 2,
+    Math.min(p1.y, p2.y) - 36,
+    Math.min(p1.y, p2.y) - 52,
+    Math.max(p1.y, p2.y) + 36,
+    Math.max(p1.y, p2.y) + 52
+  ];
+  yChannels.forEach((yC) => {
+    const yc = Math.max(16, Math.min(598, yC));
+    candidates.push(scoreCandidate([{ x: p1.x, y: yc }, { x: p2.x, y: yc }]));
+  });
+
+  // Candidate 4: 2-Corner Vertical Channel U/Z-shapes
+  const xChannels = [
+    174, 186, 198, 210,
+    288, 298, 308,
+    372, 380,
+    448, 460, 472, 486, 502, 516, 528,
+    676, 686,
+    840, 854, 868,
+    (p1.x + p2.x) / 2,
+    Math.min(p1.x, p2.x) - 36,
+    Math.min(p1.x, p2.x) - 52,
+    Math.max(p1.x, p2.x) + 36,
+    Math.max(p1.x, p2.x) + 52
+  ];
+  xChannels.forEach((xC) => {
+    const xc = Math.max(16, Math.min(898, xC));
+    candidates.push(scoreCandidate([{ x: xc, y: p1.y }, { x: xc, y: p2.y }]));
+  });
+
+  // Candidate 5: 3-Corner Duct Combinations (for escaping inner component pins cleanly)
+  const keyYDucts = [20, 36, 180, 194, 388, 566, 582];
+  const keyXDucts = [186, 200, 300, 376, 456, 488, 516, 680, 850];
+  keyYDucts.forEach((yD) => {
+    keyXDucts.forEach((xD) => {
+      candidates.push(
+        scoreCandidate([
+          { x: p1.x, y: yD },
+          { x: xD, y: yD },
+          { x: xD, y: p2.y }
+        ])
+      );
+      candidates.push(
+        scoreCandidate([
+          { x: xD, y: p1.y },
+          { x: xD, y: yD },
+          { x: p2.x, y: yD }
+        ])
+      );
+    });
+  });
+
+  candidates.sort((a, b) => a.score - b.score);
+  return candidates[0] ? candidates[0].wps : [];
+}
+
+// Add or Remove Wire (supports manual waypoints or automatic obstacle-avoiding routing & records 5-step undo history)
 function addWire(fromTerm, toTerm, waypoints = []) {
   if (!fromTerm || !toTerm || fromTerm === toTerm) return;
 
@@ -1759,12 +1992,18 @@ function addWire(fromTerm, toTerm, waypoints = []) {
 
   recordHistorySnapshot();
 
+  // If user connected start -> end directly without manual waypoints, auto-route around terminals!
+  const finalWaypoints =
+    waypoints && waypoints.length > 0
+      ? waypoints.map((pt) => ({ x: pt.x, y: pt.y }))
+      : autoRouteWire(fromTerm, toTerm);
+
   state.wires.push({
     id: `wire_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     from: fromTerm,
     to: toTerm,
     color: state.wireColor,
-    waypoints: waypoints.map((pt) => ({ x: pt.x, y: pt.y }))
+    waypoints: finalWaypoints
   });
 
   updateSimulationUI();
@@ -1912,12 +2151,19 @@ function initInteractions() {
 
     if (e.button !== 0) return;
 
-    // Press-and-hold + drag on an existing wire to bend/curve it (keeping both endpoints fixed),
-    // or tap quickly (< 6px movement) to delete the wire!
+    // If user touches/clicks a wire:
+    // - In Delete Wire Mode (state.deleteWireMode === true): immediately delete that wire!
+    // - In Normal Mode (state.deleteWireMode === false): press-and-drag bends/curves the wire (never deletes by accident!)
     if (wireGroup && !termNode && !state.selectedTerminal) {
       e.preventDefault();
       e.stopPropagation();
       const wireId = wireGroup.getAttribute('data-wire-id');
+
+      if (state.deleteWireMode) {
+        removeWire(wireId);
+        return;
+      }
+
       const wireObj = state.wires.find((w) => w.id === wireId);
       if (wireObj) {
         const touchPt = clientToSvgPoint(e.clientX, e.clientY);
@@ -1979,6 +2225,9 @@ function initInteractions() {
     if (termNode) {
       e.preventDefault();
       e.stopPropagation();
+      if (state.deleteWireMode) {
+        setDeleteWireMode(false);
+      }
       const termId = termNode.getAttribute('data-terminal');
 
       // Complete wire if a start terminal was already selected
@@ -2167,8 +2416,12 @@ function initInteractions() {
 
     const startPt = getTerminalPosition(activeStart);
     const currPt = snapTarget ? snapTarget.pos : rawPt;
+    const previewWaypoints =
+      snapTarget && state.activeWaypoints.length === 0
+        ? autoRouteWire(activeStart, snapTarget.termId)
+        : state.activeWaypoints;
     preview.setAttribute('stroke', state.wireColor);
-    preview.setAttribute('d', computeWirePath(startPt, currPt, state.activeWaypoints));
+    preview.setAttribute('d', computeWirePath(startPt, currPt, previewWaypoints));
     preview.setAttribute('opacity', '0.95');
   });
 
@@ -2190,13 +2443,11 @@ function initInteractions() {
     handlePointerEnd(e);
     tooltip.hidden = true;
 
-    // Finish wire bending or delete wire if it was a quick tap without dragging
+    // Finish wire bending (never deletes wire on accidental tap when not in deleteWireMode!)
     if (state.bendingWire) {
       const bw = state.bendingWire;
       state.bendingWire = null;
-      if (!bw.hasMoved) {
-        removeWire(bw.wireId);
-      } else {
+      if (bw.hasMoved) {
         updateSimulationUI();
       }
       return;
@@ -2279,6 +2530,16 @@ function initInteractions() {
     });
   }
 
+  // Delete Wire Mode Toggle Buttons (Header, Workbench Toolbar, Fullscreen Quick Bar)
+  ['btnDeleteMode', 'btnToolbarDeleteMode', 'btnFsDeleteMode'].forEach((id) => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.addEventListener('click', () => {
+        setDeleteWireMode(!state.deleteWireMode);
+      });
+    }
+  });
+
   // Fullscreen Popup Mode Controls
   const btnFullscreenToggle = document.getElementById('btnFullscreenToggle');
   const btnFsClose = document.getElementById('btnFsClose');
@@ -2355,6 +2616,8 @@ function initInteractions() {
     if (e.key === 'Escape') {
       if (state.selectedTerminal) {
         cancelActiveWireRouting();
+      } else if (state.deleteWireMode) {
+        setDeleteWireMode(false);
       } else if (document.body.classList.contains('fullscreen-popup-open')) {
         setFullscreenPopupMode(false);
       }

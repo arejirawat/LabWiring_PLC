@@ -1153,4 +1153,59 @@ body.fullscreen-popup-open {
   filter: drop-shadow(0 0 8px rgba(34, 197, 94, 0.95));
 }
 
+/* Delete Wire Mode Buttons & Active Board State */
+.btn-delete-mode,
+.btn-toolbar-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.85rem;
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(244, 63, 94, 0.14);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.45);
+  transition: all 0.15s ease;
+}
+
+.btn-toolbar-delete {
+  border-radius: 999px;
+  padding: 0.36rem 0.8rem;
+  font-size: 0.78rem;
+}
+
+.btn-delete-mode:hover,
+.btn-toolbar-delete:hover {
+  background: rgba(244, 63, 94, 0.25);
+}
+
+.btn-delete-mode.active,
+.btn-toolbar-delete.active,
+.btn-mini-delete.active {
+  background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+  color: #ffffff !important;
+  border-color: #fca5a5 !important;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.65);
+}
+
+.btn-mini-delete {
+  background: rgba(244, 63, 94, 0.2);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.5);
+}
+
+#workbenchSvg.delete-wire-mode .wire-group {
+  cursor: pointer;
+}
+
+#workbenchSvg.delete-wire-mode .wire-group:hover .wire-path {
+  stroke: #ef4444 !important;
+  stroke-width: 7.5px;
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.95));
+}
+
+
 
