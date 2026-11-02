@@ -2121,5 +2121,205 @@ body.fullscreen-popup-open {
   white-space: nowrap;
 }
 
+/* ==========================================================================
+   Real-Time Timing Diagram (ไดอะแกรมเส้นเวลา) Styles
+   ========================================================================== */
+
+.timing-diagram-card {
+  padding: 1rem 1.15rem;
+  margin-top: 0.85rem;
+  background: #111a2e;
+  border: 1px solid #1e293b;
+  border-radius: 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.badge-timing {
+  background: rgba(16, 185, 129, 0.16);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.timing-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-bottom: 0.7rem;
+}
+
+.timing-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.timing-title-group h2 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.timing-controls {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.btn-timing {
+  padding: 0.36rem 0.7rem;
+  font-size: 0.78rem;
+  font-family: inherit;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  user-select: none;
+}
+
+.btn-timing:hover {
+  background: #334155;
+  border-color: #475569;
+  color: #ffffff;
+}
+
+.btn-timing:active {
+  transform: scale(0.97);
+}
+
+.btn-timing.active,
+.btn-timing-auto.playing {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+  color: #6ee7b7;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.25);
+}
+
+.btn-timing.paused {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: #f59e0b;
+  color: #fcd34d;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.25);
+}
+
+.btn-timing-clear:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #fca5a5;
+}
+
+.timing-canvas-wrap {
+  position: relative;
+  width: 100%;
+  background: #090d16;
+  border: 1px solid #1e293b;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+#timingDiagramCanvas {
+  display: block;
+  width: 100%;
+  height: 230px;
+  cursor: crosshair;
+  touch-action: pan-y;
+}
+
+.timing-footer-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  font-size: 0.76rem;
+  color: #94a3b8;
+}
+
+.timing-legend-items {
+  display: flex;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.timing-legend-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.t-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.t-dot.t-s1 {
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+}
+
+.t-dot.t-relay {
+  background: #a855f7;
+  box-shadow: 0 0 6px #a855f7;
+}
+
+.t-dot.t-lamp {
+  background: #facc15;
+  box-shadow: 0 0 6px #facc15;
+}
+
+.edge-icon {
+  color: #38bdf8;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+}
+
+.timing-hint-text {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .timing-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .timing-controls {
+    width: 100%;
+  }
+  .btn-timing {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .timing-footer-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
 
 

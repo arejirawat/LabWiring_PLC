@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20261019_4" />
+  <link rel="stylesheet" href="style.css?v=20261102_1" />
 </head>
 <body>
   <header class="app-header">
@@ -484,6 +484,44 @@
           </div>
         </div>
       </div>
+
+      <!-- Real-Time Timing Diagram Card -->
+      <div class="panel-card timing-diagram-card" id="timingDiagramCard">
+        <div class="card-header timing-card-header">
+          <div class="timing-title-group">
+            <span class="badge badge-timing">TIMING DIAGRAM</span>
+            <h2>📈 ไดอะแกรมเส้นเวลา (ความสัมพันธ์ของการกดปุ่มและเอาต์พุตตามแกนเวลา)</h2>
+          </div>
+          <div class="timing-controls">
+            <button type="button" id="btnTimingAutoPlay" class="btn-timing btn-timing-auto" title="จำลองการกดปุ่มตามตารางความจริงทีละขั้นโดยอัตโนมัติ">
+              ▶️ จำลองอัตโนมัติ
+            </button>
+            <button type="button" id="btnTimingPause" class="btn-timing" aria-pressed="false" title="หยุดภาพกราฟชั่วคราวเพื่อวิเคราะห์สัญญาณ">
+              ⏸️ หยุดภาพ
+            </button>
+            <button type="button" id="btnTimingWindow" class="btn-timing" title="เปลี่ยนความกว้างของแกนเวลา">
+              ⏱️ ช่วงเวลา: 15s
+            </button>
+            <button type="button" id="btnTimingClear" class="btn-timing btn-timing-clear" title="ล้างกราฟและเริ่มนับเวลาใหม่">
+              🧹 ล้างกราฟ
+            </button>
+          </div>
+        </div>
+
+        <div class="timing-canvas-wrap" id="timingCanvasWrap">
+          <canvas id="timingDiagramCanvas" height="230" aria-label="กราฟแสดงผล Timing Diagram ตามแกนเวลา"></canvas>
+        </div>
+
+        <div class="timing-footer-bar">
+          <div class="timing-legend-items">
+            <span class="timing-legend-pill"><i class="t-dot t-s1"></i> <b>S1 / S2:</b> สัญญาณอินพุตปุ่มกด (0=ปล่อย, 1=กด)</span>
+            <span class="timing-legend-pill"><i class="t-dot t-relay"></i> <b>K1:</b> คอยล์รีเลย์ทำงาน</span>
+            <span class="timing-legend-pill"><i class="t-dot t-lamp"></i> <b>L1 / L2:</b> หลอดไฟเอาต์พุตสว่าง</span>
+            <span class="timing-legend-pill"><span class="edge-icon">↑↓</span> <b>เส้นประแนวตั้ง:</b> จุดเปลี่ยนสถานะ (Rising / Falling Edge)</span>
+          </div>
+          <span class="timing-hint-text">💡 กดปุ่ม S1, S2 บนชุดทดลอง หรือคลิกแถวในตารางความจริง หรือกด <b>"▶️ จำลองอัตโนมัติ"</b> เพื่อดูกราฟแกนเวลา</span>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -682,6 +720,6 @@
     <strong class="footer-author">designed by Kru-Jirawat TATC .2026</strong>
   </footer>
 
-  <script src="app.js?v=20261019_4"></script>
+  <script src="app.js?v=20261102_1"></script>
 </body>
 </html>

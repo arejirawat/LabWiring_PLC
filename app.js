@@ -907,6 +907,10 @@ function updateSimulationUI() {
 
   // Highlight active row in truth table
   highlightActiveTruthRow();
+
+  // Record real-time timing sample and refresh canvas
+  recordTimingSample(true);
+  renderTimingDiagramCanvas();
 }
 
 function renderWires() {
@@ -1935,38 +1939,44 @@ function highlightActiveTruthRow() {
     tr.addEventListener('click', () => {
       const rowIdx = parseInt(tr.getAttribute('data-row-idx'), 10);
       if (isNaN(rowIdx)) return;
-      const row = lab.truthTable[rowIdx];
-      if (!row) return;
-
-      if (lab.isSequentialLatch) {
-        if (rowIdx === 0) {
-          state.switches.S1.pressed = false;
-          state.switches.S2.pressed = false;
-          state.simResult.K1 = false;
-          state.simResult.K2 = false;
-        } else if (rowIdx === 1) {
-          state.switches.S1.pressed = true;
-          state.switches.S2.pressed = false;
-        } else if (rowIdx === 2) {
-          if (!state.simResult.K1 && !state.simResult.K2) {
-            state.switches.S1.pressed = true;
-            state.switches.S2.pressed = false;
-            const res = evaluateCircuit(null, { K1: false, K2: false });
-            state.simResult = res;
-          }
-          state.switches.S1.pressed = false;
-          state.switches.S2.pressed = false;
-        } else if (rowIdx === 3) {
-          state.switches.S1.pressed = false;
-          state.switches.S2.pressed = true;
-        }
-      } else {
-        if (row.S1 !== undefined) state.switches.S1.pressed = Boolean(row.S1);
-        if (row.S2 !== undefined) state.switches.S2.pressed = Boolean(row.S2);
-      }
-      updateSimulationUI();
+      applyTruthTableRow(rowIdx);
     });
   });
+}
+
+// Apply Truth Table Row Inputs to Simulation
+function applyTruthTableRow(rowIdx) {
+  const lab = LABS[state.currentLabId];
+  if (!lab || !lab.truthTable || !lab.truthTable[rowIdx]) return;
+  const row = lab.truthTable[rowIdx];
+
+  if (lab.isSequentialLatch) {
+    if (rowIdx === 0) {
+      state.switches.S1.pressed = false;
+      state.switches.S2.pressed = false;
+      state.simResult.K1 = false;
+      state.simResult.K2 = false;
+    } else if (rowIdx === 1) {
+      state.switches.S1.pressed = true;
+      state.switches.S2.pressed = false;
+    } else if (rowIdx === 2) {
+      if (!state.simResult.K1 && !state.simResult.K2) {
+        state.switches.S1.pressed = true;
+        state.switches.S2.pressed = false;
+        const res = evaluateCircuit(null, { K1: false, K2: false });
+        state.simResult = res;
+      }
+      state.switches.S1.pressed = false;
+      state.switches.S2.pressed = false;
+    } else if (rowIdx === 3) {
+      state.switches.S1.pressed = false;
+      state.switches.S2.pressed = true;
+    }
+  } else {
+    if (row.S1 !== undefined) state.switches.S1.pressed = Boolean(row.S1);
+    if (row.S2 !== undefined) state.switches.S2.pressed = Boolean(row.S2);
+  }
+  updateSimulationUI();
 }
 
 // Automated Circuit Verification Engine
@@ -2539,10 +2549,745 @@ function cancelActiveWireRouting() {
   updateSimulationUI();
 }
 
+// ==========================================================================
+// Real-Time Timing Diagram (ไดอะแกรมเส้นเวลา) Engine
+// ==========================================================================
+
+const timingState = {
+  paused: false,
+  windowSec: 15, // cycles 10 -> 15 -> 30
+  startEpochMs: performance.now(),
+  pausedAtMs: 0,
+  totalPausedMs: 0,
+  samples: [], // Array of { t: secondsFromStart, S1: 0|1, S2: 0|1, RELAY: 0|1, L1: 0|1, L2: 0|1 }
+  transitions: [], // Array of { t: secondsFromStart, label: 'S1 ↑' | 'S1 ↓' | 'S2 ↑' | 'S2 ↓', color: string }
+  lastSnap: null,
+  hoverX: null,
+  hoverY: null,
+  autoPlayTimer: null,
+  autoPlayStepIdx: 0,
+  rafId: null
+};
+
+// Returns current seconds from start taking pauses into account
+function getTimingNowSec() {
+  const current = timingState.paused ? timingState.pausedAtMs : performance.now();
+  return (current - timingState.startEpochMs - timingState.totalPausedMs) / 1000;
+}
+
+// Returns active channels for the current lab
+function getTimingChannelsForCurrentLab() {
+  const lab = (typeof state !== 'undefined' && state.currentLabId) ? LABS[state.currentLabId] : null;
+  const channels = [];
+
+  // S1 (Input) is always present
+  channels.push({
+    key: 'S1',
+    name: 'S1 (Input)',
+    shortName: 'S1',
+    role: 'INPUT',
+    color: '#22c55e',
+    fill: 'rgba(34, 197, 94, 0.18)'
+  });
+
+  // S2 (Input)
+  if (!lab || lab.showS2 || (lab.inputs && lab.inputs.includes('S2'))) {
+    channels.push({
+      key: 'S2',
+      name: 'S2 (Input)',
+      shortName: 'S2',
+      role: 'INPUT',
+      color: '#38bdf8',
+      fill: 'rgba(56, 189, 248, 0.18)'
+    });
+  }
+
+  // K1 (Coil Relay)
+  if (lab && (lab.requireRelay || lab.showRelays)) {
+    channels.push({
+      key: 'RELAY',
+      name: 'K1 (Coil)',
+      shortName: 'K1',
+      role: 'COIL',
+      color: '#a855f7',
+      fill: 'rgba(168, 85, 247, 0.20)'
+    });
+  }
+
+  // L1 (Output) is always present
+  channels.push({
+    key: 'L1',
+    name: 'L1 (Output)',
+    shortName: 'L1',
+    role: 'OUTPUT',
+    color: '#facc15',
+    fill: 'rgba(250, 204, 21, 0.20)'
+  });
+
+  // L2 (Output)
+  if (lab && (lab.showL2 || (lab.outputs && lab.outputs.includes('L2')))) {
+    channels.push({
+      key: 'L2',
+      name: 'L2 (Output)',
+      shortName: 'L2',
+      role: 'OUTPUT',
+      color: '#fb923c',
+      fill: 'rgba(251, 146, 60, 0.20)'
+    });
+  }
+
+  return channels;
+}
+
+// Records a discrete sample snapshot into timingState
+function recordTimingSample(isImmediateChange = false) {
+  if (timingState.paused && !isImmediateChange) {
+    return;
+  }
+
+  const S1 = (typeof state !== 'undefined' && state.switches && state.switches.S1 && state.switches.S1.pressed) ? 1 : 0;
+  const S2 = (typeof state !== 'undefined' && state.switches && state.switches.S2 && state.switches.S2.pressed) ? 1 : 0;
+  const RELAY = (typeof state !== 'undefined' && state.powerOn && state.simResult && (state.simResult.K1 || state.simResult.K2)) ? 1 : 0;
+  const L1 = (typeof state !== 'undefined' && state.powerOn && state.simResult && state.simResult.L1) ? 1 : 0;
+  const L2 = (typeof state !== 'undefined' && state.powerOn && state.simResult && state.simResult.L2) ? 1 : 0;
+
+  const t = Math.max(0, getTimingNowSec());
+
+  if (timingState.lastSnap) {
+    const prev = timingState.lastSnap;
+    const hasChanged = (prev.S1 !== S1 || prev.S2 !== S2 || prev.RELAY !== RELAY || prev.L1 !== L1 || prev.L2 !== L2);
+
+    if (hasChanged) {
+      if (prev.S1 !== S1) {
+        timingState.transitions.push({
+          t,
+          label: S1 ? 'S1 ↑' : 'S1 ↓',
+          color: '#22c55e'
+        });
+      }
+      if (prev.S2 !== S2) {
+        timingState.transitions.push({
+          t,
+          label: S2 ? 'S2 ↑' : 'S2 ↓',
+          color: '#38bdf8'
+        });
+      }
+
+      // Pre-transition point with previous values ensures crisp 90-degree square edges
+      timingState.samples.push({
+        t,
+        S1: prev.S1,
+        S2: prev.S2,
+        RELAY: prev.RELAY,
+        L1: prev.L1,
+        L2: prev.L2
+      });
+      timingState.samples.push({ t, S1, S2, RELAY, L1, L2 });
+    } else {
+      // Keep array compact while maintaining sharp corner fidelity
+      if (timingState.samples.length >= 2) {
+        const last = timingState.samples[timingState.samples.length - 1];
+        const secondLast = timingState.samples[timingState.samples.length - 2];
+        if (
+          (t - last.t) < 0.05 &&
+          last.S1 === S1 && last.S2 === S2 && last.RELAY === RELAY && last.L1 === L1 && last.L2 === L2 &&
+          secondLast.S1 === S1 && secondLast.S2 === S2 && secondLast.RELAY === RELAY && secondLast.L1 === L1 && secondLast.L2 === L2
+        ) {
+          last.t = t;
+        } else {
+          timingState.samples.push({ t, S1, S2, RELAY, L1, L2 });
+        }
+      } else {
+        timingState.samples.push({ t, S1, S2, RELAY, L1, L2 });
+      }
+    }
+  } else {
+    // Initial sample
+    timingState.samples.push({ t, S1, S2, RELAY, L1, L2 });
+  }
+
+  // Prune samples & transitions older than t - 60 seconds
+  const cutoff = t - 60;
+  if (timingState.samples.length > 0 && timingState.samples[0].t < cutoff) {
+    timingState.samples = timingState.samples.filter((s) => s.t >= cutoff);
+  }
+  if (timingState.transitions.length > 0 && timingState.transitions[0].t < cutoff) {
+    timingState.transitions = timingState.transitions.filter((tr) => tr.t >= cutoff);
+  }
+
+  timingState.lastSnap = { S1, S2, RELAY, L1, L2 };
+}
+
+// Renders the Timing Diagram on HTML5 canvas with High-DPI support
+function renderTimingDiagramCanvas() {
+  const canvas = document.getElementById('timingDiagramCanvas');
+  if (!canvas) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.floor(rect.width) || (canvas.parentElement ? canvas.parentElement.clientWidth : 0) || 800;
+  const height = 230;
+  const dpr = window.devicePixelRatio || 1;
+
+  if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
+  }
+
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.scale(dpr, dpr);
+
+  // Background
+  ctx.fillStyle = '#090d16';
+  ctx.fillRect(0, 0, width, height);
+
+  const channels = getTimingChannelsForCurrentLab();
+  const numCh = channels.length || 1;
+  const leftPad = 132;
+  const rightPad = 16;
+  const topPad = 22;
+  const botPad = 26;
+  const plotX = leftPad;
+  const plotW = Math.max(20, width - leftPad - rightPad);
+  const plotH = height - topPad - botPad;
+  const rowH = plotH / numCh;
+
+  const nowT = Math.max(0, getTimingNowSec());
+  const minT = Math.max(0, nowT - timingState.windowSec);
+  const maxT = Math.max(timingState.windowSec, nowT);
+  const spanT = maxT - minT || 1;
+
+  function tToX(time) {
+    return plotX + ((time - minT) / spanT) * plotW;
+  }
+
+  // 1. Gridlines and bottom time axis
+  ctx.save();
+  const stepSec = timingState.windowSec >= 30 ? 5 : (timingState.windowSec >= 20 ? 2 : 1);
+  const firstTick = Math.ceil(minT / stepSec) * stepSec;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.font = '10px "JetBrains Mono", monospace';
+
+  for (let s = firstTick; s <= maxT; s += stepSec) {
+    const gx = tToX(s);
+    if (gx < plotX || gx > plotX + plotW) continue;
+
+    ctx.beginPath();
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 4]);
+    ctx.moveTo(gx, topPad);
+    ctx.lineTo(gx, topPad + plotH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#64748b';
+    ctx.fillText(`${s}s`, gx, topPad + plotH + 7);
+  }
+
+  // Bottom axis border
+  ctx.beginPath();
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1;
+  ctx.moveTo(plotX, topPad + plotH);
+  ctx.lineTo(plotX + plotW, topPad + plotH);
+  ctx.stroke();
+
+  // Axis caption
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '10px Prompt, sans-serif';
+  ctx.fillText('แกนเวลา t (วินาที)', plotX + plotW, topPad + plotH + 7);
+  ctx.restore();
+
+  // 2. Vertical transition dashed lines across all channels
+  timingState.transitions.forEach((tr) => {
+    if (tr.t < minT || tr.t > maxT) return;
+    const tx = tToX(tr.t);
+    if (tx < plotX || tx > plotX + plotW) return;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = tr.color || '#38bdf8';
+    ctx.lineWidth = 1.3;
+    ctx.moveTo(tx, topPad);
+    ctx.lineTo(tx, topPad + plotH);
+    ctx.stroke();
+
+    // Top transition tag badge
+    ctx.setLineDash([]);
+    ctx.font = 'bold 9px "JetBrains Mono", monospace';
+    const tagText = tr.label;
+    const tagW = ctx.measureText(tagText).width + 8;
+    const tagH = 14;
+    const tagY = 3;
+
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(tx - tagW / 2, tagY, tagW, tagH);
+    ctx.strokeStyle = tr.color || '#38bdf8';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(tx - tagW / 2, tagY, tagW, tagH);
+
+    ctx.fillStyle = tr.color || '#38bdf8';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(tagText, tx, tagY + tagH / 2);
+    ctx.restore();
+  });
+
+  // 3. Render each channel row
+  channels.forEach((ch, idx) => {
+    const rowY = topPad + idx * rowH;
+    const yHigh = rowY + 8;
+    const yLow = rowY + rowH - 8;
+    const currVal = (timingState.lastSnap ? timingState.lastSnap[ch.key] : 0) || 0;
+
+    // Row divider
+    if (idx > 0) {
+      ctx.beginPath();
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1;
+      ctx.moveTo(0, rowY);
+      ctx.lineTo(plotX + plotW, rowY);
+      ctx.stroke();
+    }
+
+    // Left Header Column
+    ctx.save();
+    ctx.fillStyle = (idx % 2 === 0) ? '#0c1322' : '#0f172a';
+    ctx.fillRect(0, rowY, leftPad, rowH);
+
+    // Accent strip
+    ctx.fillStyle = ch.color;
+    ctx.fillRect(0, rowY, 4, rowH);
+
+    // Channel name
+    ctx.font = 'bold 11px Prompt, sans-serif';
+    ctx.fillStyle = '#f8fafc';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(ch.name, 10, rowY + 5);
+
+    // Live State Pill
+    const pillY = rowY + rowH - 18;
+    const isHigh = currVal === 1;
+    ctx.font = 'bold 9px "JetBrains Mono", monospace';
+    const pillText = isHigh ? 'HIGH (1)' : 'LOW (0)';
+    const pillW = 54;
+    const pillH = 14;
+
+    ctx.fillStyle = isHigh ? ch.fill : '#1e293b';
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(10, pillY, pillW, pillH, 3);
+      ctx.fill();
+    } else {
+      ctx.fillRect(10, pillY, pillW, pillH);
+    }
+
+    ctx.strokeStyle = isHigh ? ch.color : '#334155';
+    ctx.lineWidth = 1;
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(10, pillY, pillW, pillH, 3);
+      ctx.stroke();
+    } else {
+      ctx.strokeRect(10, pillY, pillW, pillH);
+    }
+
+    ctx.fillStyle = isHigh ? ch.color : '#94a3b8';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(pillText, 10 + pillW / 2, pillY + pillH / 2);
+    ctx.restore();
+
+    // Plot Area for this channel
+    // Baseline and high guide lines
+    ctx.save();
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(51, 65, 85, 0.45)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([1, 4]);
+    ctx.moveTo(plotX, yHigh);
+    ctx.lineTo(plotX + plotW, yHigh);
+    ctx.moveTo(plotX, yLow);
+    ctx.lineTo(plotX + plotW, yLow);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 0 / 1 labels
+    ctx.fillStyle = '#475569';
+    ctx.font = '9px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('1', plotX + 4, yHigh);
+    ctx.fillText('0', plotX + 4, yLow);
+    ctx.restore();
+
+    // Build points array for this channel in [minT, nowT]
+    const samples = timingState.samples;
+    if (samples.length === 0) return;
+
+    const pts = [];
+    let startIdx = 0;
+    while (startIdx < samples.length && samples[startIdx].t < minT) {
+      startIdx++;
+    }
+    if (startIdx > 0) {
+      const prevS = samples[startIdx - 1];
+      pts.push({ t: minT, val: prevS[ch.key] !== undefined ? prevS[ch.key] : 0 });
+    } else if (samples.length > 0) {
+      pts.push({ t: Math.min(minT, samples[0].t), val: samples[0][ch.key] !== undefined ? samples[0][ch.key] : 0 });
+    }
+
+    for (let i = startIdx; i < samples.length; i++) {
+      const s = samples[i];
+      if (s.t > nowT) break;
+      pts.push({ t: s.t, val: s[ch.key] !== undefined ? s[ch.key] : 0 });
+    }
+
+    // Extend to nowT
+    pts.push({ t: nowT, val: currVal });
+
+    if (pts.length === 0) return;
+
+    // Fill area under HIGH (1)
+    ctx.save();
+    ctx.beginPath();
+    const firstX = Math.max(plotX, tToX(pts[0].t));
+    const firstY = pts[0].val === 1 ? yHigh : yLow;
+    ctx.moveTo(firstX, yLow);
+    ctx.lineTo(firstX, firstY);
+
+    for (let i = 1; i < pts.length; i++) {
+      const px = Math.min(plotX + plotW, Math.max(plotX, tToX(pts[i].t)));
+      const py = pts[i].val === 1 ? yHigh : yLow;
+      const prevPy = pts[i - 1].val === 1 ? yHigh : yLow;
+      ctx.lineTo(px, prevPy);
+      ctx.lineTo(px, py);
+    }
+    const lastX = Math.min(plotX + plotW, tToX(nowT));
+    ctx.lineTo(lastX, yLow);
+    ctx.closePath();
+    ctx.fillStyle = ch.fill;
+    ctx.fill();
+    ctx.restore();
+
+    // Stroke digital square waveform
+    ctx.save();
+    ctx.beginPath();
+    ctx.strokeStyle = ch.color;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'miter';
+    ctx.moveTo(firstX, firstY);
+
+    for (let i = 1; i < pts.length; i++) {
+      const px = Math.min(plotX + plotW, Math.max(plotX, tToX(pts[i].t)));
+      const py = pts[i].val === 1 ? yHigh : yLow;
+      const prevPy = pts[i - 1].val === 1 ? yHigh : yLow;
+      ctx.lineTo(px, prevPy);
+      ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // Draw transition dots
+    for (let i = 1; i < pts.length; i++) {
+      const prevVal = pts[i - 1].val;
+      const curV = pts[i].val;
+      if (prevVal !== curV) {
+        const px = tToX(pts[i].t);
+        if (px >= plotX && px <= plotX + plotW) {
+          ctx.beginPath();
+          ctx.fillStyle = ch.color;
+          ctx.arc(px, (yHigh + yLow) / 2, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    // Glowing head dot at nowT
+    const headX = Math.min(plotX + plotW, tToX(nowT));
+    const headY = currVal === 1 ? yHigh : yLow;
+
+    ctx.beginPath();
+    ctx.fillStyle = ch.fill;
+    ctx.arc(headX, headY, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.fillStyle = ch.color;
+    ctx.arc(headX, headY, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  });
+
+  // Vertical boundary line between left header and plot area
+  ctx.beginPath();
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1.5;
+  ctx.moveTo(plotX, 0);
+  ctx.lineTo(plotX, topPad + plotH);
+  ctx.stroke();
+
+  // 4. Cursor hover readout
+  if (timingState.hoverX !== null && timingState.hoverX >= plotX && timingState.hoverX <= plotX + plotW) {
+    const hx = timingState.hoverX;
+    const hoverT = minT + ((hx - plotX) / plotW) * spanT;
+
+    let matchedSample = null;
+    for (let i = timingState.samples.length - 1; i >= 0; i--) {
+      if (timingState.samples[i].t <= hoverT) {
+        matchedSample = timingState.samples[i];
+        break;
+      }
+    }
+    if (!matchedSample && timingState.samples.length > 0) {
+      matchedSample = timingState.samples[0];
+    }
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 3]);
+    ctx.moveTo(hx, topPad);
+    ctx.lineTo(hx, topPad + plotH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    let readout = `t = ${hoverT.toFixed(2)}s`;
+    if (matchedSample) {
+      channels.forEach((ch) => {
+        readout += ` | ${ch.shortName}:${matchedSample[ch.key] !== undefined ? matchedSample[ch.key] : 0}`;
+      });
+    }
+
+    ctx.font = 'bold 10px "JetBrains Mono", monospace';
+    const rw = ctx.measureText(readout).width + 16;
+    const rh = 18;
+    let rx = hx - rw / 2;
+    if (rx < plotX + 4) rx = plotX + 4;
+    if (rx + rw > plotX + plotW - 4) rx = plotX + plotW - rw - 4;
+    const ry = 2;
+
+    ctx.fillStyle = '#0f172a';
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(rx, ry, rw, rh, 4);
+      ctx.fill();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    } else {
+      ctx.fillRect(rx, ry, rw, rh);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.strokeRect(rx, ry, rw, rh);
+    }
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(readout, rx + rw / 2, ry + rh / 2);
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+// Timing loop running at ~35 fps
+function startTimingDiagramLoop() {
+  if (timingState.rafId) return;
+
+  let lastFrameTime = 0;
+  function timingLoop(timestamp) {
+    timingState.rafId = requestAnimationFrame(timingLoop);
+    if (!timingState.paused) {
+      if (timestamp - lastFrameTime >= 28) {
+        lastFrameTime = timestamp;
+        recordTimingSample(false);
+        renderTimingDiagramCanvas();
+      }
+    }
+  }
+  timingState.rafId = requestAnimationFrame(timingLoop);
+}
+
+// Stops truth-table auto-play demonstration
+function stopTimingAutoPlay() {
+  if (timingState.autoPlayTimer) {
+    clearInterval(timingState.autoPlayTimer);
+    timingState.autoPlayTimer = null;
+  }
+  timingState.autoPlayStepIdx = 0;
+  const btn = document.getElementById('btnTimingAutoPlay');
+  if (btn) {
+    btn.classList.remove('playing');
+    btn.textContent = '▶️ จำลองอัตโนมัติ';
+  }
+}
+
+// Toggles automatic demonstration stepping through truth table
+function toggleTimingAutoPlay() {
+  if (timingState.autoPlayTimer) {
+    stopTimingAutoPlay();
+    return;
+  }
+
+  // Unpause if paused
+  if (timingState.paused) {
+    timingState.paused = false;
+    timingState.totalPausedMs += (performance.now() - timingState.pausedAtMs);
+    timingState.pausedAtMs = 0;
+    const pauseBtn = document.getElementById('btnTimingPause');
+    if (pauseBtn) {
+      pauseBtn.classList.remove('paused');
+      pauseBtn.setAttribute('aria-pressed', 'false');
+      pauseBtn.textContent = '⏸️ หยุดภาพ';
+    }
+  }
+
+  const lab = LABS[state.currentLabId];
+  if (!lab || !lab.truthTable || lab.truthTable.length === 0) return;
+
+  const btn = document.getElementById('btnTimingAutoPlay');
+  if (btn) {
+    btn.classList.add('playing');
+    btn.textContent = '⏹️ หยุดจำลอง';
+  }
+
+  timingState.autoPlayStepIdx = 0;
+  applyTruthTableRow(timingState.autoPlayStepIdx);
+
+  timingState.autoPlayTimer = setInterval(() => {
+    const curLab = LABS[state.currentLabId];
+    if (!curLab || !curLab.truthTable || curLab.truthTable.length === 0) {
+      stopTimingAutoPlay();
+      return;
+    }
+    timingState.autoPlayStepIdx = (timingState.autoPlayStepIdx + 1) % curLab.truthTable.length;
+    applyTruthTableRow(timingState.autoPlayStepIdx);
+  }, 1800);
+}
+
+// Resets timing diagram records and restarts time axis
+function resetTimingDiagram() {
+  stopTimingAutoPlay();
+  timingState.samples = [];
+  timingState.transitions = [];
+  timingState.startEpochMs = performance.now();
+  timingState.pausedAtMs = 0;
+  timingState.totalPausedMs = 0;
+  timingState.lastSnap = null;
+  recordTimingSample(true);
+  renderTimingDiagramCanvas();
+}
+
+// Initializes Timing Diagram controls & events
+function initTimingDiagram() {
+  const pauseBtn = document.getElementById('btnTimingPause');
+  if (pauseBtn) {
+    pauseBtn.addEventListener('click', () => {
+      timingState.paused = !timingState.paused;
+      if (timingState.paused) {
+        timingState.pausedAtMs = performance.now();
+        pauseBtn.classList.add('paused');
+        pauseBtn.setAttribute('aria-pressed', 'true');
+        pauseBtn.textContent = '▶️ เล่นต่อ';
+      } else {
+        timingState.totalPausedMs += (performance.now() - timingState.pausedAtMs);
+        timingState.pausedAtMs = 0;
+        pauseBtn.classList.remove('paused');
+        pauseBtn.setAttribute('aria-pressed', 'false');
+        pauseBtn.textContent = '⏸️ หยุดภาพ';
+      }
+      renderTimingDiagramCanvas();
+    });
+  }
+
+  const windowBtn = document.getElementById('btnTimingWindow');
+  if (windowBtn) {
+    windowBtn.addEventListener('click', () => {
+      if (timingState.windowSec === 10) {
+        timingState.windowSec = 15;
+      } else if (timingState.windowSec === 15) {
+        timingState.windowSec = 30;
+      } else {
+        timingState.windowSec = 10;
+      }
+      windowBtn.textContent = `⏱️ ช่วงเวลา: ${timingState.windowSec}s`;
+      renderTimingDiagramCanvas();
+    });
+  }
+
+  const clearBtn = document.getElementById('btnTimingClear');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      resetTimingDiagram();
+    });
+  }
+
+  const autoBtn = document.getElementById('btnTimingAutoPlay');
+  if (autoBtn) {
+    autoBtn.addEventListener('click', () => {
+      toggleTimingAutoPlay();
+    });
+  }
+
+  const canvas = document.getElementById('timingDiagramCanvas');
+  if (canvas) {
+    const updateHover = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      timingState.hoverX = e.clientX - rect.left;
+      timingState.hoverY = e.clientY - rect.top;
+      renderTimingDiagramCanvas();
+    };
+    canvas.addEventListener('pointermove', updateHover);
+    canvas.addEventListener('pointerenter', updateHover);
+    canvas.addEventListener('pointerleave', () => {
+      timingState.hoverX = null;
+      timingState.hoverY = null;
+      renderTimingDiagramCanvas();
+    });
+    canvas.addEventListener('touchmove', (e) => {
+      if (e.touches && e.touches[0]) {
+        const rect = canvas.getBoundingClientRect();
+        timingState.hoverX = e.touches[0].clientX - rect.left;
+        timingState.hoverY = e.touches[0].clientY - rect.top;
+        renderTimingDiagramCanvas();
+      }
+    }, { passive: true });
+    canvas.addEventListener('touchend', () => {
+      timingState.hoverX = null;
+      timingState.hoverY = null;
+      renderTimingDiagramCanvas();
+    });
+  }
+
+  window.addEventListener('resize', () => {
+    renderTimingDiagramCanvas();
+  });
+
+  startTimingDiagramLoop();
+}
+
 // Load Selected Lab Configuration
 function loadLab(labId) {
   const lab = LABS[labId];
   if (!lab) return;
+
+  // Stop auto play if running and cleanly reset timing diagram
+  stopTimingAutoPlay();
+  if (typeof timingState !== 'undefined') {
+    timingState.samples = [];
+    timingState.transitions = [];
+    timingState.startEpochMs = performance.now();
+    timingState.pausedAtMs = 0;
+    timingState.totalPausedMs = 0;
+    timingState.lastSnap = null;
+  }
 
   state.currentLabId = labId;
   const labSelect = document.getElementById('labSelect');
@@ -4828,5 +5573,6 @@ window.addEventListener('DOMContentLoaded', () => {
   initWorkbenchComponents();
   initInteractions();
   initCustomLabManager();
+  initTimingDiagram();
   loadLab('lab1_1');
 });
