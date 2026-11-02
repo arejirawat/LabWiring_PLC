@@ -911,6 +911,9 @@ function updateSimulationUI() {
   // Record real-time timing sample and refresh canvas
   recordTimingSample(true);
   renderTimingDiagramCanvas();
+
+  // Render Schneider TM221CE16R PLC Ladder Diagram co-simulation
+  renderPlcLadderDiagram();
 }
 
 function renderWires() {
@@ -2583,8 +2586,8 @@ function getTimingChannelsForCurrentLab() {
   // S1 (Input) is always present
   channels.push({
     key: 'S1',
-    name: 'S1 (Input)',
-    shortName: 'S1',
+    name: 'S1 (%I0.0)',
+    shortName: 'S1(%I0.0)',
     role: 'INPUT',
     color: '#22c55e',
     fill: 'rgba(34, 197, 94, 0.18)'
@@ -2594,8 +2597,8 @@ function getTimingChannelsForCurrentLab() {
   if (!lab || lab.showS2 || (lab.inputs && lab.inputs.includes('S2'))) {
     channels.push({
       key: 'S2',
-      name: 'S2 (Input)',
-      shortName: 'S2',
+      name: 'S2 (%I0.1)',
+      shortName: 'S2(%I0.1)',
       role: 'INPUT',
       color: '#38bdf8',
       fill: 'rgba(56, 189, 248, 0.18)'
@@ -2606,8 +2609,8 @@ function getTimingChannelsForCurrentLab() {
   if (lab && (lab.requireRelay || lab.showRelays)) {
     channels.push({
       key: 'RELAY',
-      name: 'K1 (Coil)',
-      shortName: 'K1',
+      name: 'K1 (%M0)',
+      shortName: 'K1(%M0)',
       role: 'COIL',
       color: '#a855f7',
       fill: 'rgba(168, 85, 247, 0.20)'
@@ -2617,8 +2620,8 @@ function getTimingChannelsForCurrentLab() {
   // L1 (Output) is always present
   channels.push({
     key: 'L1',
-    name: 'L1 (Output)',
-    shortName: 'L1',
+    name: 'L1 (%Q0.0)',
+    shortName: 'L1(%Q0.0)',
     role: 'OUTPUT',
     color: '#facc15',
     fill: 'rgba(250, 204, 21, 0.20)'
@@ -2628,8 +2631,8 @@ function getTimingChannelsForCurrentLab() {
   if (lab && (lab.showL2 || (lab.outputs && lab.outputs.includes('L2')))) {
     channels.push({
       key: 'L2',
-      name: 'L2 (Output)',
-      shortName: 'L2',
+      name: 'L2 (%Q0.1)',
+      shortName: 'L2(%Q0.1)',
       role: 'OUTPUT',
       color: '#fb923c',
       fill: 'rgba(251, 146, 60, 0.20)'
@@ -2743,7 +2746,7 @@ function renderTimingDiagramCanvas() {
 
   const channels = getTimingChannelsForCurrentLab();
   const numCh = channels.length || 1;
-  const leftPad = 132;
+  const leftPad = 138;
   const rightPad = 16;
   const topPad = 22;
   const botPad = 26;
@@ -3328,6 +3331,10 @@ function loadLab(labId) {
   const scoreBadge = document.getElementById('scoreBadge');
   scoreBadge.className = 'score-badge';
   scoreBadge.textContent = 'รอการตรวจสอบ';
+
+  if (typeof plcState !== 'undefined') {
+    plcState.idealMemoryM0 = false;
+  }
 
   renderTruthTable();
   updateSimulationUI();
@@ -5568,11 +5575,890 @@ function initCustomLabManager() {
   });
 }
 
+// ============================================================================
+// PLC Modicon TM221CE16R & Ladder Diagram Co-Simulation Engine
+// ============================================================================
+
+const plcState = {
+  syncWithActualWiring: true,
+  showIlDrawer: false,
+  idealMemoryM0: false
+};
+
+function getPlcSimulationState() {
+  const lab = (typeof state !== 'undefined' && state.currentLabId) ? LABS[state.currentLabId] : null;
+  const labId = (typeof state !== 'undefined') ? state.currentLabId : 'lab1_1';
+  const s1 = Boolean(state.switches && state.switches.S1 && state.switches.S1.pressed);
+  const s2 = Boolean(state.switches && state.switches.S2 && state.switches.S2.pressed);
+  const pwr = Boolean(state.powerOn);
+
+  // 1. Calculate Ideal PLC scan logic for current lab
+  let idealM0 = false;
+  let idealQ0 = false;
+  let idealQ1 = false;
+
+  if (labId === 'lab1_1') {
+    idealM0 = false;
+    idealQ0 = pwr && s1 && s2;
+    idealQ1 = false;
+  } else if (labId === 'lab1_2') {
+    idealM0 = false;
+    idealQ0 = pwr && (!s1 || !s2);
+    idealQ1 = false;
+  } else if (labId === 'lab1_ex') {
+    idealM0 = false;
+    idealQ0 = pwr && (!s1 && !s2);
+    idealQ1 = false;
+  } else if (labId === 'lab2_1') {
+    idealM0 = pwr && s1;
+    idealQ0 = pwr && idealM0;
+    idealQ1 = false;
+  } else if (labId === 'lab2_2') {
+    idealM0 = pwr && s1;
+    idealQ0 = pwr && idealM0;
+    idealQ1 = pwr && !idealM0;
+  } else if (labId === 'lab2_latch') {
+    if (!pwr) {
+      plcState.idealMemoryM0 = false;
+    } else {
+      if (s2) {
+        plcState.idealMemoryM0 = false; // Stop button pressed
+      } else if (s1) {
+        plcState.idealMemoryM0 = true;  // Start button pressed
+      }
+    }
+    idealM0 = pwr && plcState.idealMemoryM0;
+    idealQ0 = pwr && idealM0;
+    idealQ1 = false;
+  } else if (lab && lab.customSchematic) {
+    if (!pwr) {
+      plcState.idealMemoryM0 = false;
+    }
+    const sim = simulateCustomSchematic(lab.customSchematic, s1 ? 1 : 0, s2 ? 1 : 0, plcState.idealMemoryM0);
+    if (pwr) {
+      plcState.idealMemoryM0 = Boolean(sim.RELAY);
+    }
+    idealM0 = pwr && Boolean(sim.RELAY);
+    idealQ0 = pwr && Boolean(sim.L1);
+    idealQ1 = pwr && Boolean(sim.L2);
+  }
+
+  // 2. Physical Board State (actual wiring)
+  const actualM0 = Boolean(pwr && state.simResult && (state.simResult.K1 || state.simResult.K2));
+  const actualQ0 = Boolean(pwr && state.simResult && state.simResult.L1);
+  const actualQ1 = Boolean(pwr && state.simResult && state.simResult.L2);
+
+  // 3. Determine active display states based on mode
+  const hasWires = Boolean(state.wires && state.wires.length > 0);
+  const isSyncMode = plcState.syncWithActualWiring && hasWires;
+
+  const activeM0 = isSyncMode ? actualM0 : idealM0;
+  const activeQ0 = isSyncMode ? actualQ0 : idealQ0;
+  const activeQ1 = isSyncMode ? actualQ1 : idealQ1;
+
+  // Comparison between actual board and ideal PLC logic
+  const isMatching = (actualM0 === idealM0) && (actualQ0 === idealQ0) && (actualQ1 === idealQ1);
+
+  return {
+    s1,
+    s2,
+    pwr,
+    idealM0,
+    idealQ0,
+    idealQ1,
+    actualM0,
+    actualQ0,
+    actualQ1,
+    activeM0,
+    activeQ0,
+    activeQ1,
+    hasWires,
+    isSyncMode,
+    isMatching,
+    labId,
+    lab
+  };
+}
+
+function drawLadderWire(x1, y1, x2, y2, isHot) {
+  const stroke = isHot ? '#22c55e' : '#475569';
+  const width = isHot ? '2.8' : '2';
+  return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round" />`;
+}
+
+function drawLadderContactNO(cx, cy, address, symbol, closed, isHotIn, swTarget = null) {
+  const isHotOut = isHotIn && closed;
+  const inColor = isHotIn ? '#22c55e' : '#64748b';
+  const outColor = isHotOut ? '#22c55e' : '#64748b';
+  const link = closed
+    ? `<line x1="${cx - 6}" y1="${cy}" x2="${cx + 6}" y2="${cy}" stroke="#22c55e" stroke-width="3.5" /><circle cx="${cx}" cy="${cy}" r="2" fill="#4ade80" />`
+    : '';
+
+  const hitTagOpen = swTarget ? `<g class="ladder-sw-hit" data-sw="${swTarget}" title="คลิกเพื่อสลับสวิตช์ ${swTarget}">` : '<g>';
+  const hitRect = swTarget ? `<rect x="${cx - 18}" y="${cy - 22}" width="36" height="44" fill="transparent" class="hit-area" rx="4" />` : '';
+
+  return `
+    ${hitTagOpen}
+      ${drawLadderWire(cx - 16, cy, cx - 6, cy, isHotIn)}
+      <line x1="${cx - 6}" y1="${cy - 9}" x2="${cx - 6}" y2="${cy + 9}" stroke="${inColor}" stroke-width="2.5" stroke-linecap="round" />
+      <line x1="${cx + 6}" y1="${cy - 9}" x2="${cx + 6}" y2="${cy + 9}" stroke="${outColor}" stroke-width="2.5" stroke-linecap="round" />
+      ${link}
+      ${drawLadderWire(cx + 6, cy, cx + 16, cy, isHotOut)}
+      <text x="${cx}" y="${cy - 12}" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${closed ? '#4ade80' : '#38bdf8'}" text-anchor="middle">${address}</text>
+      <text x="${cx}" y="${cy + 20}" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="600" fill="#cbd5e1" text-anchor="middle">${symbol}</text>
+      ${hitRect}
+    </g>
+  `;
+}
+
+function drawLadderContactNC(cx, cy, address, symbol, closed, isHotIn, swTarget = null) {
+  const isHotOut = isHotIn && closed;
+  const inColor = isHotIn ? '#22c55e' : '#64748b';
+  const outColor = isHotOut ? '#22c55e' : '#64748b';
+  const slashColor = closed ? '#22c55e' : '#ef4444';
+  const link = closed
+    ? `<line x1="${cx - 6}" y1="${cy}" x2="${cx + 6}" y2="${cy}" stroke="#22c55e" stroke-width="3" />`
+    : '';
+
+  const hitTagOpen = swTarget ? `<g class="ladder-sw-hit" data-sw="${swTarget}" title="คลิกเพื่อสลับสวิตช์ ${swTarget}">` : '<g>';
+  const hitRect = swTarget ? `<rect x="${cx - 18}" y="${cy - 22}" width="36" height="44" fill="transparent" class="hit-area" rx="4" />` : '';
+
+  return `
+    ${hitTagOpen}
+      ${drawLadderWire(cx - 16, cy, cx - 6, cy, isHotIn)}
+      <line x1="${cx - 6}" y1="${cy - 9}" x2="${cx - 6}" y2="${cy + 9}" stroke="${inColor}" stroke-width="2.5" stroke-linecap="round" />
+      <line x1="${cx + 6}" y1="${cy - 9}" x2="${cx + 6}" y2="${cy + 9}" stroke="${outColor}" stroke-width="2.5" stroke-linecap="round" />
+      ${link}
+      <line x1="${cx - 8}" y1="${cy + 10}" x2="${cx + 8}" y2="${cy - 10}" stroke="${slashColor}" stroke-width="2.5" stroke-linecap="round" />
+      ${drawLadderWire(cx + 6, cy, cx + 16, cy, isHotOut)}
+      <text x="${cx}" y="${cy - 12}" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${closed ? '#4ade80' : '#38bdf8'}" text-anchor="middle">${address}</text>
+      <text x="${cx}" y="${cy + 20}" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="600" fill="#cbd5e1" text-anchor="middle">${symbol}</text>
+      ${hitRect}
+    </g>
+  `;
+}
+
+function drawLadderCoil(cx, cy, address, symbol, energized, coilType = 'out', isHotIn = false) {
+  let strokeColor = '#475569';
+  let fillColor = 'none';
+  let labelColor = '#94a3b8';
+  let dot = '';
+
+  if (energized) {
+    if (coilType === 'mem') {
+      strokeColor = '#c084fc';
+      fillColor = 'rgba(168, 85, 247, 0.35)';
+      labelColor = '#d8b4fe';
+      dot = `<circle cx="${cx}" cy="${cy}" r="3.2" fill="#c084fc" />`;
+    } else {
+      strokeColor = '#fde047';
+      fillColor = 'rgba(250, 204, 21, 0.35)';
+      labelColor = '#fde047';
+      dot = `<circle cx="${cx}" cy="${cy}" r="3.2" fill="#facc15" />`;
+    }
+  }
+
+  return `
+    <g>
+      ${drawLadderWire(cx - 16, cy, cx - 6, cy, isHotIn)}
+      <path d="M ${cx - 6} ${cy - 11} A 12 12 0 0 0 ${cx - 6} ${cy + 11}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2.6" stroke-linecap="round" />
+      <path d="M ${cx + 6} ${cy - 11} A 12 12 0 0 1 ${cx + 6} ${cy + 11}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2.6" stroke-linecap="round" />
+      ${dot}
+      ${drawLadderWire(cx + 6, cy, cx + 16, cy, false)}
+      <text x="${cx}" y="${cy - 14}" font-family="'JetBrains Mono', monospace" font-size="10.5" font-weight="700" fill="${labelColor}" text-anchor="middle">${address}</text>
+      <text x="${cx}" y="${cy + 21}" font-family="'JetBrains Mono', monospace" font-size="9.5" font-weight="600" fill="#e2e8f0" text-anchor="middle">${symbol}</text>
+    </g>
+  `;
+}
+
+function generateCustomPlcIl(schematic) {
+  const branches = (schematic && schematic.branches) ? schematic.branches : [];
+  let il = '(* Schneider Electric TM221CE16R Instruction List *)\n';
+  let rungIdx = 0;
+
+  branches.forEach((b, idx) => {
+    if (!b || (!b.loadSlot && !b.topSlot && !b.midSlot)) return;
+    il += `(* Rung ${rungIdx}: Branch ${idx + 1} *)\n`;
+    const comps = [];
+    if (b.topSlot) comps.push(b.topSlot);
+    if (b.midSlot) comps.push(b.midSlot);
+
+    comps.forEach((comp, cIdx) => {
+      const opPrefix = (cIdx === 0) ? 'LD' : 'AND';
+      if (comp === 'S1_NO') il += `${opPrefix}   %I0.0    (* S1 NO *)\n`;
+      else if (comp === 'S1_NC') il += `${opPrefix}N  %I0.0    (* S1 NC *)\n`;
+      else if (comp === 'S2_NO') il += `${opPrefix}   %I0.1    (* S2 NO *)\n`;
+      else if (comp === 'S2_NC') il += `${opPrefix}N  %I0.1    (* S2 NC *)\n`;
+      else if (comp === 'K1_NO') il += `${opPrefix}   %M0      (* K1 NO *)\n`;
+      else if (comp === 'K1_NC') il += `${opPrefix}N  %M0      (* K1 NC *)\n`;
+      else if (comp === 'WIRE_V') il += `(* Conductor *)\n`;
+    });
+
+    if (b.loadSlot === 'K1_COIL') il += `ST   %M0      (* K1 Coil *)\n\n`;
+    else if (b.loadSlot === 'L1') il += `ST   %Q0.0    (* Lamp L1 *)\n\n`;
+    else if (b.loadSlot === 'L2') il += `ST   %Q0.1    (* Lamp L2 *)\n\n`;
+    else il += `\n`;
+    rungIdx++;
+  });
+
+  return il.trim();
+}
+
+function updatePlcAddressTable(pState) {
+  const tbody = document.getElementById('plcAddrTableBody');
+  if (!tbody) return;
+
+  const rows = [];
+  const s1Val = pState.s1;
+  const s2Val = pState.s2;
+  const m0Val = pState.activeM0;
+  const q0Val = pState.activeQ0;
+  const q1Val = pState.activeQ1;
+
+  // S1 is always used
+  rows.push({
+    device: 'สวิตช์ S1',
+    address: '%I0.0',
+    type: 'Digital Input (24VDC)',
+    val: s1Val ? '1 (ON / กดติด)' : '0 (OFF / ปล่อย)',
+    isOn: s1Val
+  });
+
+  // S2
+  if (!pState.lab || pState.lab.showS2 || (pState.lab.inputs && pState.lab.inputs.includes('S2'))) {
+    rows.push({
+      device: 'สวิตช์ S2',
+      address: '%I0.1',
+      type: 'Digital Input (24VDC)',
+      val: s2Val ? '1 (ON / กดติด)' : '0 (OFF / ปล่อย)',
+      isOn: s2Val
+    });
+  }
+
+  // K1 (Memory %M0)
+  if (pState.lab && (pState.lab.requireRelay || pState.lab.showRelays || (pState.lab.customSchematic && JSON.stringify(pState.lab.customSchematic).includes('K1')))) {
+    rows.push({
+      device: 'รีเลย์ K1 (Coil & Contacts)',
+      address: '%M0',
+      type: 'Internal Memory Bit (%M)',
+      val: m0Val ? '1 (SET / คอยล์ทำงาน)' : '0 (RESET / คอยล์พัก)',
+      isOn: m0Val
+    });
+  }
+
+  // L1
+  rows.push({
+    device: 'หลอดไฟ L1 (LOAD)',
+    address: '%Q0.0',
+    type: 'Relay Output (NO 2A)',
+    val: q0Val ? '1 (ON / สว่าง)' : '0 (OFF / ดับ)',
+    isOn: q0Val
+  });
+
+  // L2
+  if (pState.lab && (pState.lab.showL2 || (pState.lab.outputs && pState.lab.outputs.includes('L2')) || (pState.lab.customSchematic && JSON.stringify(pState.lab.customSchematic).includes('L2')))) {
+    rows.push({
+      device: 'หลอดไฟ L2',
+      address: '%Q0.1',
+      type: 'Relay Output (NO 2A)',
+      val: q1Val ? '1 (ON / สว่าง)' : '0 (OFF / ดับ)',
+      isOn: q1Val
+    });
+  }
+
+  tbody.innerHTML = rows.map((r) => `
+    <tr>
+      <td><b>${r.device}</b></td>
+      <td><code>${r.address}</code></td>
+      <td>${r.type}</td>
+      <td class="${r.isOn ? 'val-on' : 'val-off'}">${r.val}</td>
+    </tr>
+  `).join('');
+}
+
+function updateTm221HwStrip(pState) {
+  const inRow = document.getElementById('tm221InputsRow');
+  const memRow = document.getElementById('tm221MemRow');
+  const outRow = document.getElementById('tm221OutputsRow');
+  const ledPwr = document.getElementById('plcLedPwr');
+  const ledRun = document.getElementById('plcLedRun');
+  const ledErr = document.getElementById('plcLedErr');
+
+  if (ledPwr) {
+    ledPwr.className = 'plc-led on';
+  }
+  if (ledRun) {
+    ledRun.className = `plc-led ${pState.pwr ? 'on' : ''}`;
+  }
+  if (ledErr) {
+    const isErr = Boolean(state.simResult && state.simResult.shortCircuit);
+    ledErr.className = `plc-led ${isErr ? 'err' : ''}`;
+  }
+
+  const lab = pState.lab;
+  const hasS2 = !lab || lab.showS2 || (lab.inputs && lab.inputs.includes('S2'));
+  const hasK1 = lab && (lab.requireRelay || lab.showRelays || (lab.customSchematic && JSON.stringify(lab.customSchematic).includes('K1')));
+  const hasL2 = lab && (lab.showL2 || (lab.outputs && lab.outputs.includes('L2')) || (lab.customSchematic && JSON.stringify(lab.customSchematic).includes('L2')));
+
+  if (inRow) {
+    let html = `<span class="io-pin-pill clickable ${pState.s1 ? 'active-in' : ''}" data-sw="S1" title="คลิกเพื่อสลับสวิตช์ S1">%I0.0(S1)</span>`;
+    if (hasS2) {
+      html += `<span class="io-pin-pill clickable ${pState.s2 ? 'active-in' : ''}" data-sw="S2" title="คลิกเพื่อสลับสวิตช์ S2">%I0.1(S2)</span>`;
+    } else {
+      html += `<span class="io-pin-pill" style="opacity:0.35;">%I0.1</span>`;
+    }
+    html += `<span class="io-pin-pill" style="opacity:0.35;">%I0.2</span>`;
+    html += `<span class="io-pin-pill" style="opacity:0.35;">%I0.3</span>`;
+    inRow.innerHTML = html;
+  }
+
+  if (memRow) {
+    let html = '';
+    if (hasK1) {
+      html += `<span class="io-pin-pill ${pState.activeM0 ? 'active-mem' : ''}">%M0(K1)</span>`;
+    } else {
+      html += `<span class="io-pin-pill" style="opacity:0.35;">%M0</span>`;
+    }
+    html += `<span class="io-pin-pill" style="opacity:0.35;">%M1</span>`;
+    memRow.innerHTML = html;
+  }
+
+  if (outRow) {
+    let html = `<span class="io-pin-pill ${pState.activeQ0 ? 'active-out' : ''}">%Q0.0(L1)</span>`;
+    if (hasL2) {
+      html += `<span class="io-pin-pill ${pState.activeQ1 ? 'active-out' : ''}">%Q0.1(L2)</span>`;
+    } else {
+      html += `<span class="io-pin-pill" style="opacity:0.35;">%Q0.1</span>`;
+    }
+    html += `<span class="io-pin-pill" style="opacity:0.35;">%Q0.2</span>`;
+    html += `<span class="io-pin-pill" style="opacity:0.35;">%Q0.3</span>`;
+    outRow.innerHTML = html;
+  }
+}
+
+function updatePlcIlCode(pState) {
+  const codeEl = document.getElementById('plcIlCode');
+  if (!codeEl) return;
+
+  const labId = pState.labId;
+  let code = '';
+
+  if (labId === 'lab1_1') {
+    code = `(* EcoStruxure Machine Expert - Basic IL *)
+(* Rung 0: Series AND Logic *)
+LD   %I0.0    (* S1 NO Pushbutton *)
+AND  %I0.1    (* S2 NO Pushbutton *)
+ST   %Q0.0    (* Lamp LOAD L1 *)`;
+  } else if (labId === 'lab1_2') {
+    code = `(* EcoStruxure Machine Expert - Basic IL *)
+(* Rung 0: Parallel NC - NAND Logic *)
+LDN  %I0.0    (* S1 NC Pushbutton *)
+ORN  %I0.1    (* S2 NC Pushbutton *)
+ST   %Q0.0    (* Lamp LOAD L1 *)`;
+  } else if (labId === 'lab1_ex') {
+    code = `(* EcoStruxure Machine Expert - Basic IL *)
+(* Rung 0: Series NC - NOR Logic *)
+LDN  %I0.0    (* S1 NC Pushbutton *)
+ANDN %I0.1    (* S2 NC Pushbutton *)
+ST   %Q0.0    (* Lamp LOAD L1 *)`;
+  } else if (labId === 'lab2_1') {
+    code = `(* EcoStruxure Machine Expert - Basic IL *)
+(* Rung 0: Relay Control Coil *)
+LD   %I0.0    (* S1 NO Pushbutton *)
+ST   %M0      (* K1 Internal Relay *)
+
+(* Rung 1: Load Output *)
+LD   %M0      (* K1 NO Contact *)
+ST   %Q0.0    (* Lamp LOAD L1 *)`;
+  } else if (labId === 'lab2_2') {
+    code = `(* EcoStruxure Machine Expert - Basic IL *)
+(* Rung 0: Relay Control Coil *)
+LD   %I0.0    (* S1 NO Pushbutton *)
+ST   %M0      (* K1 Internal Relay *)
+
+(* Rung 1: Lamp L1 via NO Contact *)
+LD   %M0      (* K1 NO Contact *)
+ST   %Q0.0    (* Lamp L1 *)
+
+(* Rung 2: Lamp L2 via NC Contact *)
+LDN  %M0      (* K1 NC Contact *)
+ST   %Q0.1    (* Lamp L2 *)`;
+  } else if (labId === 'lab2_latch') {
+    code = `(* EcoStruxure Machine Expert - Basic IL *)
+(* Rung 0: Self-Holding Start/Stop Latch *)
+LD   %I0.0    (* S1 Start NO *)
+OR   %M0      (* K1 Seal-in NO *)
+ANDN %I0.1    (* S2 Stop NC *)
+ST   %M0      (* K1 Internal Relay *)
+
+(* Rung 1: Lamp Output *)
+LD   %M0      (* K1 NO Contact *)
+ST   %Q0.0    (* Lamp LOAD L1 *)`;
+  } else if (pState.lab && pState.lab.customSchematic) {
+    code = generateCustomPlcIl(pState.lab.customSchematic);
+  } else {
+    code = `(* Modicon TM221CE16R Instruction List *)
+LD   %I0.0
+ST   %Q0.0`;
+  }
+
+  codeEl.textContent = code;
+}
+
+function updatePlcFooterStatus(pState) {
+  const statusEl = document.getElementById('plcSyncStatusText');
+  if (!statusEl) return;
+
+  if (pState.isSyncMode) {
+    if (pState.isMatching) {
+      statusEl.innerHTML = `⚡ ซิงค์ชุดฝึกจริง: ✅ <strong style="color: #4ade80;">ผลลัพธ์ตรงกับโปรแกรม PLC TM221CE16R</strong> (วงจรที่ต่อทำงานสอดคล้องกับลอจิกโปรแกรม)`;
+    } else {
+      statusEl.innerHTML = `⚡ ซิงค์ชุดฝึกจริง: ⚠️ <strong style="color: #f59e0b;">ผลลัพธ์วงจรจริงยังไม่ตรงกับลอจิก PLC</strong> (โปรดตรวจสอบการต่อสาย หรือสลับเป็นโหมดลอจิก PLC)`;
+    }
+  } else {
+    statusEl.innerHTML = `⚡ <strong style="color: #38bdf8;">โหมดลอจิก PLC อัตโนมัติ (TM221CE16R)</strong>: ทดลองกด S1 (%I0.0) / S2 (%I0.1) บนกระดานหรือคลิกที่หน้าสัมผัสใน Ladder เพื่อดูผลทันที`;
+  }
+}
+
+function renderPlcLadderDiagram() {
+  const container = document.getElementById('ladderViewport');
+  if (!container) return;
+
+  const pState = getPlcSimulationState();
+  const labId = pState.labId;
+  let svgContent = '';
+
+  if (labId === 'lab1_1') {
+    // 1 Rung: S1 NO series with S2 NO -> Q0.0 (L1)
+    const H = 88;
+    const y = 44;
+    svgContent = `
+      <svg viewBox="0 0 380 ${H}" class="plc-ladder-svg">
+        <line x1="22" y1="12" x2="22" y2="${H - 12}" stroke="#38bdf8" stroke-width="2.5" />
+        <text x="22" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#38bdf8" text-anchor="middle">+24V</text>
+        <line x1="358" y1="12" x2="358" y2="${H - 12}" stroke="#64748b" stroke-width="2.5" />
+        <text x="358" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#94a3b8" text-anchor="middle">0V</text>
+
+        <text x="4" y="47" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#64748b">R0</text>
+        ${drawLadderWire(22, y, 90 - 16, y, pState.pwr)}
+        ${drawLadderContactNO(90, y, '%I0.0', 'S1', pState.s1, pState.pwr, 'S1')}
+        ${drawLadderWire(90 + 16, y, 180 - 16, y, pState.pwr && pState.s1)}
+        ${drawLadderContactNO(180, y, '%I0.1', 'S2', pState.s2, pState.pwr && pState.s1, 'S2')}
+        ${drawLadderWire(180 + 16, y, 295 - 16, y, pState.pwr && pState.s1 && pState.s2)}
+        ${drawLadderCoil(295, y, '%Q0.0', 'L1', pState.activeQ0, 'out', pState.pwr && pState.s1 && pState.s2)}
+        ${drawLadderWire(295 + 16, y, 358, y, false)}
+      </svg>
+    `;
+  } else if (labId === 'lab1_2') {
+    // 1 Rung with Parallel NC Branches: S1 NC || S2 NC -> Q0.0 (L1)
+    const H = 136;
+    const y1 = 44;
+    const y2 = 94;
+    const hotTopOut = pState.pwr && !pState.s1;
+    const hotBotOut = pState.pwr && !pState.s2;
+    const hotMid = hotTopOut || hotBotOut;
+
+    svgContent = `
+      <svg viewBox="0 0 380 ${H}" class="plc-ladder-svg">
+        <line x1="22" y1="12" x2="22" y2="${H - 12}" stroke="#38bdf8" stroke-width="2.5" />
+        <text x="22" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#38bdf8" text-anchor="middle">+24V</text>
+        <line x1="358" y1="12" x2="358" y2="${H - 12}" stroke="#64748b" stroke-width="2.5" />
+        <text x="358" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#94a3b8" text-anchor="middle">0V</text>
+
+        <text x="4" y="47" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#64748b">R0</text>
+        ${drawLadderWire(22, y1, 60, y1, pState.pwr)}
+        <circle cx="60" cy="${y1}" r="2.5" fill="${pState.pwr ? '#22c55e' : '#475569'}" />
+        ${drawLadderWire(60, y1, 60, y2, pState.pwr)}
+        <circle cx="60" cy="${y2}" r="2.5" fill="${pState.pwr ? '#22c55e' : '#475569'}" />
+
+        ${drawLadderWire(60, y1, 125 - 16, y1, pState.pwr)}
+        ${drawLadderContactNC(125, y1, '%I0.0', 'S1', !pState.s1, pState.pwr, 'S1')}
+        ${drawLadderWire(125 + 16, y1, 195, y1, hotTopOut)}
+
+        ${drawLadderWire(60, y2, 125 - 16, y2, pState.pwr)}
+        ${drawLadderContactNC(125, y2, '%I0.1', 'S2', !pState.s2, pState.pwr, 'S2')}
+        ${drawLadderWire(125 + 16, y2, 195, y2, hotBotOut)}
+
+        ${drawLadderWire(195, y2, 195, y1, hotBotOut)}
+        <circle cx="195" cy="${y1}" r="2.5" fill="${hotMid ? '#22c55e' : '#475569'}" />
+
+        ${drawLadderWire(195, y1, 295 - 16, y1, hotMid)}
+        ${drawLadderCoil(295, y1, '%Q0.0', 'L1', pState.activeQ0, 'out', hotMid)}
+        ${drawLadderWire(295 + 16, y1, 358, y1, false)}
+      </svg>
+    `;
+  } else if (labId === 'lab1_ex') {
+    // 1 Rung: Series NC Contacts: S1 NC and S2 NC -> Q0.0 (L1)
+    const H = 88;
+    const y = 44;
+    svgContent = `
+      <svg viewBox="0 0 380 ${H}" class="plc-ladder-svg">
+        <line x1="22" y1="12" x2="22" y2="${H - 12}" stroke="#38bdf8" stroke-width="2.5" />
+        <text x="22" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#38bdf8" text-anchor="middle">+24V</text>
+        <line x1="358" y1="12" x2="358" y2="${H - 12}" stroke="#64748b" stroke-width="2.5" />
+        <text x="358" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#94a3b8" text-anchor="middle">0V</text>
+
+        <text x="4" y="47" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#64748b">R0</text>
+        ${drawLadderWire(22, y, 90 - 16, y, pState.pwr)}
+        ${drawLadderContactNC(90, y, '%I0.0', 'S1', !pState.s1, pState.pwr, 'S1')}
+        ${drawLadderWire(90 + 16, y, 180 - 16, y, pState.pwr && !pState.s1)}
+        ${drawLadderContactNC(180, y, '%I0.1', 'S2', !pState.s2, pState.pwr && !pState.s1, 'S2')}
+        ${drawLadderWire(180 + 16, y, 295 - 16, y, pState.pwr && !pState.s1 && !pState.s2)}
+        ${drawLadderCoil(295, y, '%Q0.0', 'L1', pState.activeQ0, 'out', pState.pwr && !pState.s1 && !pState.s2)}
+        ${drawLadderWire(295 + 16, y, 358, y, false)}
+      </svg>
+    `;
+  } else if (labId === 'lab2_1') {
+    // 2 Rungs:
+    // R0: S1 NO -> %M0 (K1)
+    // R1: %M0 NO -> %Q0.0 (L1)
+    const H = 155;
+    const y0 = 42;
+    const y1 = 112;
+    svgContent = `
+      <svg viewBox="0 0 380 ${H}" class="plc-ladder-svg">
+        <line x1="22" y1="12" x2="22" y2="${H - 12}" stroke="#38bdf8" stroke-width="2.5" />
+        <text x="22" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#38bdf8" text-anchor="middle">+24V</text>
+        <line x1="358" y1="12" x2="358" y2="${H - 12}" stroke="#64748b" stroke-width="2.5" />
+        <text x="358" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#94a3b8" text-anchor="middle">0V</text>
+
+        <!-- Rung 0: Control Coil -->
+        <text x="4" y="${y0 + 3}" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#64748b">R0</text>
+        ${drawLadderWire(22, y0, 110 - 16, y0, pState.pwr)}
+        ${drawLadderContactNO(110, y0, '%I0.0', 'S1', pState.s1, pState.pwr, 'S1')}
+        ${drawLadderWire(110 + 16, y0, 295 - 16, y0, pState.pwr && pState.s1)}
+        ${drawLadderCoil(295, y0, '%M0', 'K1', pState.activeM0, 'mem', pState.pwr && pState.s1)}
+        ${drawLadderWire(295 + 16, y0, 358, y0, false)}
+
+        <!-- Rung 1: Output Lamp -->
+        <text x="4" y="${y1 + 3}" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#64748b">R1</text>
+        ${drawLadderWire(22, y1, 110 - 16, y1, pState.pwr)}
+        ${drawLadderContactNO(110, y1, '%M0', 'K1', pState.activeM0, pState.pwr, null)}
+        ${drawLadderWire(110 + 16, y1, 295 - 16, y1, pState.pwr && pState.activeM0)}
+        ${drawLadderCoil(295, y1, '%Q0.0', 'L1', pState.activeQ0, 'out', pState.pwr && pState.activeM0)}
+        ${drawLadderWire(295 + 16, y1, 358, y1, false)}
+      </svg>
+    `;
+  } else if (labId === 'lab2_2') {
+    // 3 Rungs:
+    // R0: S1 NO -> %M0 (K1)
+    // R1: %M0 NO -> %Q0.0 (L1)
+    // R2: %M0 NC -> %Q0.1 (L2)
+    const H = 220;
+    const y0 = 38;
+    const y1 = 104;
+    const y2 = 170;
+    svgContent = `
+      <svg viewBox="0 0 380 ${H}" class="plc-ladder-svg">
+        <line x1="22" y1="12" x2="22" y2="${H - 12}" stroke="#38bdf8" stroke-width="2.5" />
+        <text x="22" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#38bdf8" text-anchor="middle">+24V</text>
+        <line x1="358" y1="12" x2="358" y2="${H - 12}" stroke="#64748b" stroke-width="2.5" />
+        <text x="358" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#94a3b8" text-anchor="middle">0V</text>
+
+        <!-- Rung 0: Control Coil -->
+        <text x="4" y="${y0 + 3}" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#64748b">R0</text>
+        ${drawLadderWire(22, y0, 110 - 16, y0, pState.pwr)}
+        ${drawLadderContactNO(110, y0, '%I0.0', 'S1', pState.s1, pState.pwr, 'S1')}
+        ${drawLadderWire(110 + 16, y0, 295 - 16, y0, pState.pwr && pState.s1)}
+        ${drawLadderCoil(295, y0, '%M0', 'K1', pState.activeM0, 'mem', pState.pwr && pState.s1)}
+        ${drawLadderWire(295 + 16, y0, 358, y0, false)}
+
+        <!-- Rung 1: Lamp L1 via NO -->
+        <text x="4" y="${y1 + 3}" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#64748b">R1</text>
+        ${drawLadderWire(22, y1, 110 - 16, y1, pState.pwr)}
+        ${drawLadderContactNO(110, y1, '%M0', 'K1', pState.activeM0, pState.pwr, null)}
+        ${drawLadderWire(110 + 16, y1, 295 - 16, y1, pState.pwr && pState.activeM0)}
+        ${drawLadderCoil(295, y1, '%Q0.0', 'L1', pState.activeQ0, 'out', pState.pwr && pState.activeM0)}
+        ${drawLadderWire(295 + 16, y1, 358, y1, false)}
+
+        <!-- Rung 2: Lamp L2 via NC -->
+        <text x="4" y="${y2 + 3}" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#64748b">R2</text>
+        ${drawLadderWire(22, y2, 110 - 16, y2, pState.pwr)}
+        ${drawLadderContactNC(110, y2, '%M0', 'K1', !pState.activeM0, pState.pwr, null)}
+        ${drawLadderWire(110 + 16, y2, 295 - 16, y2, pState.pwr && !pState.activeM0)}
+        ${drawLadderCoil(295, y2, '%Q0.1', 'L2', pState.activeQ1, 'out', pState.pwr && !pState.activeM0)}
+        ${drawLadderWire(295 + 16, y2, 358, y2, false)}
+      </svg>
+    `;
+  } else if (labId === 'lab2_latch') {
+    // 2 Rungs:
+    // R0: (%I0.0 Start || %M0 Latch) in series with %I0.1 Stop NC -> %M0 (K1)
+    // R1: %M0 NO -> %Q0.0 (L1)
+    const H = 195;
+    const y0 = 42;
+    const y0b = 88;
+    const y1 = 148;
+    const hotTopOut = pState.pwr && pState.s1;
+    const hotBotOut = pState.pwr && pState.activeM0;
+    const hotConverge = hotTopOut || hotBotOut;
+    const hotStopOut = hotConverge && !pState.s2;
+
+    svgContent = `
+      <svg viewBox="0 0 380 ${H}" class="plc-ladder-svg">
+        <line x1="22" y1="12" x2="22" y2="${H - 12}" stroke="#38bdf8" stroke-width="2.5" />
+        <text x="22" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#38bdf8" text-anchor="middle">+24V</text>
+        <line x1="358" y1="12" x2="358" y2="${H - 12}" stroke="#64748b" stroke-width="2.5" />
+        <text x="358" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#94a3b8" text-anchor="middle">0V</text>
+
+        <!-- Rung 0: Self-Holding Start/Stop -->
+        <text x="4" y="${y0 + 3}" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#64748b">R0</text>
+        ${drawLadderWire(22, y0, 45, y0, pState.pwr)}
+        <circle cx="45" cy="${y0}" r="2.5" fill="${pState.pwr ? '#22c55e' : '#475569'}" />
+        ${drawLadderWire(45, y0, 45, y0b, pState.pwr)}
+        <circle cx="45" cy="${y0b}" r="2.5" fill="${pState.pwr ? '#22c55e' : '#475569'}" />
+
+        <!-- S1 Start NO -->
+        ${drawLadderWire(45, y0, 85 - 16, y0, pState.pwr)}
+        ${drawLadderContactNO(85, y0, '%I0.0', 'Start', pState.s1, pState.pwr, 'S1')}
+        ${drawLadderWire(85 + 16, y0, 132, y0, hotTopOut)}
+
+        <!-- K1 Seal-in NO -->
+        ${drawLadderWire(45, y0b, 85 - 16, y0b, pState.pwr)}
+        ${drawLadderContactNO(85, y0b, '%M0', 'Latch', pState.activeM0, pState.pwr, null)}
+        ${drawLadderWire(85 + 16, y0b, 132, y0b, hotBotOut)}
+
+        ${drawLadderWire(132, y0b, 132, y0, hotBotOut)}
+        <circle cx="132" cy="${y0}" r="2.5" fill="${hotConverge ? '#22c55e' : '#475569'}" />
+
+        <!-- S2 Stop NC -->
+        ${drawLadderWire(132, y0, 192 - 16, y0, hotConverge)}
+        ${drawLadderContactNC(192, y0, '%I0.1', 'Stop', !pState.s2, hotConverge, 'S2')}
+        ${drawLadderWire(192 + 16, y0, 295 - 16, y0, hotStopOut)}
+
+        <!-- K1 Coil -->
+        ${drawLadderCoil(295, y0, '%M0', 'K1', pState.activeM0, 'mem', hotStopOut)}
+        ${drawLadderWire(295 + 16, y0, 358, y0, false)}
+
+        <!-- Rung 1: Output Lamp L1 -->
+        <text x="4" y="${y1 + 3}" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#64748b">R1</text>
+        ${drawLadderWire(22, y1, 110 - 16, y1, pState.pwr)}
+        ${drawLadderContactNO(110, y1, '%M0', 'K1', pState.activeM0, pState.pwr, null)}
+        ${drawLadderWire(110 + 16, y1, 295 - 16, y1, pState.pwr && pState.activeM0)}
+        ${drawLadderCoil(295, y1, '%Q0.0', 'L1', pState.activeQ0, 'out', pState.pwr && pState.activeM0)}
+        ${drawLadderWire(295 + 16, y1, 358, y1, false)}
+      </svg>
+    `;
+  } else if (pState.lab && pState.lab.customSchematic) {
+    // Dynamic Custom Schematic Ladder Diagram
+    const branches = pState.lab.customSchematic.branches || [];
+    const activeBranches = [];
+    branches.forEach((b, idx) => {
+      if (b && (b.topSlot || b.midSlot || b.loadSlot)) {
+        activeBranches.push({ branch: b, index: idx });
+      }
+    });
+
+    const count = Math.max(1, activeBranches.length);
+    const H = count * 66 + 32;
+
+    const compClosed = (comp) => {
+      if (!comp) return false;
+      if (comp === 'WIRE_V') return true;
+      if (comp === 'S1_NO') return Boolean(pState.s1);
+      if (comp === 'S1_NC') return !pState.s1;
+      if (comp === 'S2_NO') return Boolean(pState.s2);
+      if (comp === 'S2_NC') return !pState.s2;
+      if (comp === 'K1_NO') return Boolean(pState.activeM0);
+      if (comp === 'K1_NC') return !pState.activeM0;
+      return false;
+    };
+
+    let rungsSvg = '';
+    activeBranches.forEach((item, rIdx) => {
+      const b = item.branch;
+      const cy = 38 + rIdx * 66;
+
+      const topClosed = compClosed(b.topSlot);
+      const midClosed = compClosed(b.midSlot);
+      const hotTopIn = pState.pwr;
+      const hotTopOut = hotTopIn && (b.topSlot ? topClosed : true);
+      const hotMidIn = hotTopOut;
+      const hotMidOut = hotMidIn && (b.midSlot ? midClosed : true);
+
+      let slot1Svg = '';
+      if (b.topSlot === 'WIRE_V') {
+        slot1Svg = drawLadderWire(90 - 16, cy, 90 + 16, cy, hotTopIn);
+      } else if (b.topSlot === 'S1_NO') {
+        slot1Svg = drawLadderContactNO(90, cy, '%I0.0', 'S1', pState.s1, hotTopIn, 'S1');
+      } else if (b.topSlot === 'S1_NC') {
+        slot1Svg = drawLadderContactNC(90, cy, '%I0.0', 'S1', !pState.s1, hotTopIn, 'S1');
+      } else if (b.topSlot === 'S2_NO') {
+        slot1Svg = drawLadderContactNO(90, cy, '%I0.1', 'S2', pState.s2, hotTopIn, 'S2');
+      } else if (b.topSlot === 'S2_NC') {
+        slot1Svg = drawLadderContactNC(90, cy, '%I0.1', 'S2', !pState.s2, hotTopIn, 'S2');
+      } else if (b.topSlot === 'K1_NO') {
+        slot1Svg = drawLadderContactNO(90, cy, '%M0', 'K1', pState.activeM0, hotTopIn, null);
+      } else if (b.topSlot === 'K1_NC') {
+        slot1Svg = drawLadderContactNC(90, cy, '%M0', 'K1', !pState.activeM0, hotTopIn, null);
+      } else {
+        slot1Svg = drawLadderWire(90 - 16, cy, 90 + 16, cy, hotTopIn);
+      }
+
+      let slot2Svg = '';
+      if (b.midSlot === 'WIRE_V') {
+        slot2Svg = drawLadderWire(180 - 16, cy, 180 + 16, cy, hotMidIn);
+      } else if (b.midSlot === 'S1_NO') {
+        slot2Svg = drawLadderContactNO(180, cy, '%I0.0', 'S1', pState.s1, hotMidIn, 'S1');
+      } else if (b.midSlot === 'S1_NC') {
+        slot2Svg = drawLadderContactNC(180, cy, '%I0.0', 'S1', !pState.s1, hotMidIn, 'S1');
+      } else if (b.midSlot === 'S2_NO') {
+        slot2Svg = drawLadderContactNO(180, cy, '%I0.1', 'S2', pState.s2, hotMidIn, 'S2');
+      } else if (b.midSlot === 'S2_NC') {
+        slot2Svg = drawLadderContactNC(180, cy, '%I0.1', 'S2', !pState.s2, hotMidIn, 'S2');
+      } else if (b.midSlot === 'K1_NO') {
+        slot2Svg = drawLadderContactNO(180, cy, '%M0', 'K1', pState.activeM0, hotMidIn, null);
+      } else if (b.midSlot === 'K1_NC') {
+        slot2Svg = drawLadderContactNC(180, cy, '%M0', 'K1', !pState.activeM0, hotMidIn, null);
+      } else {
+        slot2Svg = drawLadderWire(180 - 16, cy, 180 + 16, cy, hotMidIn);
+      }
+
+      let coilSvg = '';
+      if (b.loadSlot === 'K1_COIL') {
+        coilSvg = drawLadderCoil(295, cy, '%M0', 'K1', pState.activeM0, 'mem', hotMidOut);
+      } else if (b.loadSlot === 'L1') {
+        coilSvg = drawLadderCoil(295, cy, '%Q0.0', 'L1', pState.activeQ0, 'out', hotMidOut);
+      } else if (b.loadSlot === 'L2') {
+        coilSvg = drawLadderCoil(295, cy, '%Q0.1', 'L2', pState.activeQ1, 'out', hotMidOut);
+      } else {
+        coilSvg = drawLadderWire(295 - 16, cy, 295 + 16, cy, hotMidOut);
+      }
+
+      rungsSvg += `
+        <text x="4" y="${cy + 3}" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#64748b">R${rIdx}</text>
+        ${drawLadderWire(22, cy, 90 - 16, cy, hotTopIn)}
+        ${slot1Svg}
+        ${drawLadderWire(90 + 16, cy, 180 - 16, cy, hotTopOut)}
+        ${slot2Svg}
+        ${drawLadderWire(180 + 16, cy, 295 - 16, cy, hotMidOut)}
+        ${coilSvg}
+        ${drawLadderWire(295 + 16, cy, 358, cy, false)}
+      `;
+    });
+
+    svgContent = `
+      <svg viewBox="0 0 380 ${H}" class="plc-ladder-svg">
+        <line x1="22" y1="12" x2="22" y2="${H - 12}" stroke="#38bdf8" stroke-width="2.5" />
+        <text x="22" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#38bdf8" text-anchor="middle">+24V</text>
+        <line x1="358" y1="12" x2="358" y2="${H - 12}" stroke="#64748b" stroke-width="2.5" />
+        <text x="358" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#94a3b8" text-anchor="middle">0V</text>
+        ${rungsSvg}
+      </svg>
+    `;
+  } else {
+    // Default fallback simple rung
+    const H = 88;
+    const y = 44;
+    svgContent = `
+      <svg viewBox="0 0 380 ${H}" class="plc-ladder-svg">
+        <line x1="22" y1="12" x2="22" y2="${H - 12}" stroke="#38bdf8" stroke-width="2.5" />
+        <text x="22" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#38bdf8" text-anchor="middle">+24V</text>
+        <line x1="358" y1="12" x2="358" y2="${H - 12}" stroke="#64748b" stroke-width="2.5" />
+        <text x="358" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#94a3b8" text-anchor="middle">0V</text>
+        <text x="4" y="47" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#64748b">R0</text>
+        ${drawLadderWire(22, y, 110 - 16, y, pState.pwr)}
+        ${drawLadderContactNO(110, y, '%I0.0', 'S1', pState.s1, pState.pwr, 'S1')}
+        ${drawLadderWire(110 + 16, y, 295 - 16, y, pState.pwr && pState.s1)}
+        ${drawLadderCoil(295, y, '%Q0.0', 'L1', pState.activeQ0, 'out', pState.pwr && pState.s1)}
+        ${drawLadderWire(295 + 16, y, 358, y, false)}
+      </svg>
+    `;
+  }
+
+  container.innerHTML = svgContent;
+
+  const fsLadderClone = document.getElementById('fsLadderClone');
+  if (fsLadderClone) {
+    fsLadderClone.innerHTML = svgContent;
+  }
+
+  updatePlcAddressTable(pState);
+  updateTm221HwStrip(pState);
+  updatePlcIlCode(pState);
+  updatePlcFooterStatus(pState);
+}
+
+function initPlcLadderCoSim() {
+  const btnMode = document.getElementById('btnPlcModeToggle');
+  if (btnMode) {
+    btnMode.addEventListener('click', () => {
+      plcState.syncWithActualWiring = !plcState.syncWithActualWiring;
+      if (plcState.syncWithActualWiring) {
+        btnMode.classList.remove('ideal-mode');
+        btnMode.textContent = '🔗 โหมด: ซิงค์ตามชุดฝึกจริง';
+      } else {
+        btnMode.classList.add('ideal-mode');
+        btnMode.textContent = '💡 โหมด: ลอจิก PLC อัตโนมัติ';
+      }
+      renderPlcLadderDiagram();
+    });
+  }
+
+  const btnIl = document.getElementById('btnTogglePlcIl');
+  const drawer = document.getElementById('plcIlDrawer');
+  if (btnIl && drawer) {
+    btnIl.addEventListener('click', () => {
+      plcState.showIlDrawer = !plcState.showIlDrawer;
+      drawer.hidden = !plcState.showIlDrawer;
+      btnIl.classList.toggle('active', plcState.showIlDrawer);
+      btnIl.textContent = plcState.showIlDrawer ? '✕ ซ่อนคำสั่ง IL' : '📋 ดูคำสั่ง IL';
+    });
+  }
+
+  // Handle switch click inside ladder SVG & hardware pills
+  const handleLadderSwitchClick = (e) => {
+    const hit = e.target.closest('[data-sw]');
+    if (!hit) return;
+    const sw = hit.getAttribute('data-sw');
+    if (sw && state.switches && state.switches[sw]) {
+      state.switches[sw].pressed = !state.switches[sw].pressed;
+      updateSimulationUI();
+    }
+  };
+
+  const ladderViewport = document.getElementById('ladderViewport');
+  if (ladderViewport) {
+    ladderViewport.addEventListener('click', handleLadderSwitchClick);
+  }
+
+  const fsLadderClone = document.getElementById('fsLadderClone');
+  if (fsLadderClone) {
+    fsLadderClone.addEventListener('click', handleLadderSwitchClick);
+  }
+
+  const inRow = document.getElementById('tm221InputsRow');
+  if (inRow) {
+    inRow.addEventListener('click', handleLadderSwitchClick);
+  }
+
+  // Mobile Fullscreen tabs (Schematic vs Ladder)
+  const btnFsTabSchem = document.getElementById('btnFsTabSchem');
+  const btnFsTabLadder = document.getElementById('btnFsTabLadder');
+  const fsSchem = document.getElementById('fsSchematicClone');
+  const fsLadder = document.getElementById('fsLadderClone');
+
+  if (btnFsTabSchem && btnFsTabLadder && fsSchem && fsLadder) {
+    btnFsTabSchem.addEventListener('click', () => {
+      btnFsTabSchem.classList.add('active');
+      btnFsTabLadder.classList.remove('active');
+      fsSchem.hidden = false;
+      fsLadder.hidden = true;
+    });
+    btnFsTabLadder.addEventListener('click', () => {
+      btnFsTabLadder.classList.add('active');
+      btnFsTabSchem.classList.remove('active');
+      fsSchem.hidden = true;
+      fsLadder.hidden = false;
+    });
+  }
+}
+
 // Initialize Application
 window.addEventListener('DOMContentLoaded', () => {
   initWorkbenchComponents();
   initInteractions();
   initCustomLabManager();
   initTimingDiagram();
+  initPlcLadderCoSim();
   loadLab('lab1_1');
 });

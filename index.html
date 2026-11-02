@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20261102_1" />
+  <link rel="stylesheet" href="style.css?v=20261102_2" />
 </head>
 <body>
   <header class="app-header">
@@ -104,6 +104,90 @@
           <span class="legend-item"><i class="dot dot-hot"></i> มีไฟ (+12V)</span>
           <span class="legend-item"><i class="dot dot-gnd"></i> ครบวงจร (0V)</span>
           <span class="legend-item"><i class="dot dot-inactive"></i> ไม่มีกระแสไหล</span>
+        </div>
+      </div>
+
+      <!-- PLC TM221CE16R & Ladder Diagram Co-Simulation Card -->
+      <div class="panel-card plc-ladder-card" id="plcLadderCard">
+        <div class="card-header plc-card-header">
+          <div>
+            <div class="plc-badge-row">
+              <span class="badge badge-plc">PLC LADDER DIAGRAM</span>
+              <span class="plc-model-pill">Schneider Modicon TM221CE16R</span>
+            </div>
+            <h2>จำลองวงจร Ladder & อ้างอิง Address (TM221CE16R)</h2>
+          </div>
+          <div class="plc-header-actions">
+            <button type="button" id="btnPlcModeToggle" class="btn-plc-mode" title="สลับระหว่างการจำลองตามสายที่ต่อจริง กับจำลองตามลอจิก PLC อัตโนมัติ">
+              🔗 โหมด: ซิงค์ตามชุดฝึกจริง
+            </button>
+            <button type="button" id="btnTogglePlcIl" class="btn-plc-il" title="แสดง/ซ่อนชุดคำสั่ง Instruction List (IL) และตาราง Address">
+              📋 ดูคำสั่ง IL
+            </button>
+          </div>
+        </div>
+
+        <!-- Mini Hardware Unit Panel: TM221CE16R I/O LEDs -->
+        <div class="tm221-hw-strip" id="tm221HwStrip">
+          <div class="tm221-brand-box">
+            <div class="tm221-model-name">TM221CE16R</div>
+            <div class="tm221-status-leds">
+              <span class="plc-led-item"><i id="plcLedPwr" class="plc-led on"></i> PWR</span>
+              <span class="plc-led-item"><i id="plcLedRun" class="plc-led on"></i> RUN</span>
+              <span class="plc-led-item"><i id="plcLedErr" class="plc-led"></i> ERR</span>
+            </div>
+          </div>
+
+          <div class="tm221-io-groups">
+            <div class="tm221-io-block">
+              <span class="io-block-title">DIGITAL INPUTS (24VDC)</span>
+              <div class="io-pins-row" id="tm221InputsRow">
+                <!-- Populated/updated by JS: %I0.0 (S1), %I0.1 (S2), %I0.2..%I0.3 -->
+              </div>
+            </div>
+
+            <div class="tm221-io-block">
+              <span class="io-block-title">MEMORY (%M)</span>
+              <div class="io-pins-row" id="tm221MemRow">
+                <!-- %M0 (K1) -->
+              </div>
+            </div>
+
+            <div class="tm221-io-block">
+              <span class="io-block-title">RELAY OUTPUTS</span>
+              <div class="io-pins-row" id="tm221OutputsRow">
+                <!-- %Q0.0 (L1), %Q0.1 (L2) -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive SVG Ladder Diagram Viewport -->
+        <div class="ladder-viewport" id="ladderViewport">
+          <!-- Dynamic SVG Ladder Rungs rendered by JS -->
+        </div>
+
+        <!-- Optional Instruction List (IL) & Address Mapping Drawer -->
+        <div id="plcIlDrawer" class="plc-il-drawer" hidden>
+          <div class="plc-il-grid">
+            <div class="plc-addr-box">
+              <h4>📌 ตารางเทียบอุปกรณ์กับ Address (TM221CE16R)</h4>
+              <table class="plc-addr-table">
+                <thead>
+                  <tr><th>อุปกรณ์ชุดฝึก</th><th>TM221CE16R Address</th><th>ชนิด</th><th>สถานะ</th></tr>
+                </thead>
+                <tbody id="plcAddrTableBody"></tbody>
+              </table>
+            </div>
+            <div class="plc-il-box">
+              <h4>💻 ชุดคำสั่ง Instruction List (IL) & Boolean</h4>
+              <pre id="plcIlCode" class="plc-il-code"></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="plc-footer-bar">
+          <span class="plc-sync-status" id="plcSyncStatusText">⚡ กดสวิตช์ S1 (%I0.0) หรือ S2 (%I0.1) บนชุดฝึกหรือคลิกที่หน้าสัมผัสใน Ladder เพื่อดูการทำงานพร้อมกัน</span>
         </div>
       </div>
 
@@ -468,10 +552,14 @@
           <!-- Floating Schematic Mini-Overlay inside Fullscreen Popup -->
           <div id="fsSchematicOverlay" class="fs-schematic-overlay" hidden>
             <div class="fs-schem-header">
-              <span>📐 วงจรสัญลักษณ์อ้างอิง</span>
+              <div class="fs-schem-tabs">
+                <button type="button" id="btnFsTabSchem" class="fs-tab-btn active">📐 Schematic</button>
+                <button type="button" id="btnFsTabLadder" class="fs-tab-btn">🪜 PLC Ladder</button>
+              </div>
               <button type="button" id="btnCloseFsSchem" class="btn-mini btn-mini-danger">✕ ซ่อน</button>
             </div>
             <div id="fsSchematicClone" class="fs-schem-body"></div>
+            <div id="fsLadderClone" class="fs-schem-body fs-ladder-clone" hidden></div>
           </div>
 
           <!-- Floating Verification Result Toast inside Fullscreen Popup -->
@@ -720,6 +808,6 @@
     <strong class="footer-author">designed by Kru-Jirawat TATC .2026</strong>
   </footer>
 
-  <script src="app.js?v=20261102_1"></script>
+  <script src="app.js?v=20261102_2"></script>
 </body>
 </html>

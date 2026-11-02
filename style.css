@@ -2321,5 +2321,372 @@ body.fullscreen-popup-open {
   }
 }
 
+/* ==========================================================================
+   PLC TM221CE16R & Ladder Diagram Co-Simulation
+   ========================================================================== */
+
+.plc-ladder-card {
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.45);
+}
+
+.plc-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.plc-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.badge-plc {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.plc-model-pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: #0f172a;
+  color: #38bdf8;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #1e293b;
+  margin-left: 6px;
+}
+
+.plc-header-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.btn-plc-mode,
+.btn-plc-il {
+  padding: 0.32rem 0.65rem;
+  font-size: 0.74rem;
+  border-radius: 7px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 500;
+  user-select: none;
+}
+
+.btn-plc-mode:hover,
+.btn-plc-il:hover {
+  border-color: #64748b;
+  background: #273549;
+}
+
+.btn-plc-mode.ideal-mode {
+  border-color: #38bdf8;
+  color: #7dd3fc;
+  background: rgba(56, 189, 248, 0.15);
+}
+
+.btn-plc-il.active {
+  border-color: #a855f7;
+  color: #d8b4fe;
+  background: rgba(168, 85, 247, 0.15);
+}
+
+.tm221-hw-strip {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border: 1px solid #334155;
+  border-left: 4px solid #22c55e;
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  margin: 0.55rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.tm221-brand-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tm221-model-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: #4ade80;
+  letter-spacing: 0.5px;
+}
+
+.tm221-status-leds {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.68rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: #cbd5e1;
+}
+
+.plc-led-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.plc-led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #334155;
+  display: inline-block;
+  transition: all 0.2s ease;
+}
+
+.plc-led.on {
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+}
+
+.plc-led.err {
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+}
+
+.tm221-io-groups {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.tm221-io-block {
+  background: #090d16;
+  border: 1px solid #1e293b;
+  border-radius: 7px;
+  padding: 0.3rem 0.5rem;
+}
+
+.io-block-title {
+  display: block;
+  font-size: 0.62rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: #64748b;
+  margin-bottom: 0.2rem;
+}
+
+.io-pins-row {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.io-pin-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.71rem;
+  background: #1e293b;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.io-pin-pill.clickable {
+  cursor: pointer;
+}
+
+.io-pin-pill.clickable:hover {
+  border-color: #64748b;
+  color: #f1f5f9;
+}
+
+.io-pin-pill.active-in {
+  background: rgba(34, 197, 94, 0.22);
+  color: #4ade80;
+  border-color: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.25);
+}
+
+.io-pin-pill.active-mem {
+  background: rgba(168, 85, 247, 0.22);
+  color: #c084fc;
+  border-color: #a855f7;
+  box-shadow: 0 0 6px rgba(168, 85, 247, 0.25);
+}
+
+.io-pin-pill.active-out {
+  background: rgba(250, 204, 21, 0.22);
+  color: #fde047;
+  border-color: #eab308;
+  box-shadow: 0 0 6px rgba(250, 204, 21, 0.25);
+}
+
+.ladder-viewport {
+  background: #090d16;
+  border: 1px solid #1e293b;
+  border-radius: 10px;
+  padding: 0.35rem;
+  overflow-x: auto;
+}
+
+.ladder-viewport svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.ladder-sw-hit {
+  cursor: pointer;
+}
+
+.ladder-sw-hit:hover rect.hit-area {
+  stroke: #38bdf8;
+  stroke-dasharray: 2 2;
+}
+
+.plc-il-drawer {
+  margin-top: 0.55rem;
+  background: #0b1120;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 0.6rem;
+}
+
+.plc-il-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+@media (max-width: 640px) {
+  .plc-il-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.plc-addr-box h4,
+.plc-il-box h4 {
+  font-size: 0.76rem;
+  color: #38bdf8;
+  margin: 0 0 0.35rem 0;
+}
+
+.plc-addr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+
+.plc-addr-table th,
+.plc-addr-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #1e293b;
+  text-align: left;
+}
+
+.plc-addr-table th {
+  color: #94a3b8;
+  font-weight: 600;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.plc-addr-table td {
+  color: #e2e8f0;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.plc-addr-table td.val-on {
+  color: #4ade80;
+  font-weight: 700;
+}
+
+.plc-addr-table td.val-off {
+  color: #64748b;
+}
+
+.plc-il-code {
+  margin: 0;
+  padding: 0.45rem;
+  background: #050811;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: #a7f3d0;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.plc-footer-bar {
+  margin-top: 0.45rem;
+  font-size: 0.74rem;
+  color: #94a3b8;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.fs-schem-tabs {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.fs-tab-btn {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.fs-tab-btn.active {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.fs-ladder-clone {
+  background: #090d16 !important;
+}
+
+.fs-ladder-clone svg {
+  width: 100%;
+  max-height: 200px;
+  height: auto;
+}
+
 
 
