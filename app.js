@@ -1399,7 +1399,7 @@ function initPlcTerminalBoard() {
 
   html += `
     <text x="26" y="594" fill="#64748b" font-size="12" font-weight="600" pointer-events="none">ชุดทดลองการเชื่อมต่ออินพุต-เอาต์พุต PLC ผ่าน TERMINAL กลาง</text>
-    <text x="894" y="594" text-anchor="end" fill="#475569" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">v2.7.0 | Kru-Jirawat</text>
+    <text x="894" y="594" text-anchor="end" fill="#475569" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">v2.8.0 | Kru-Jirawat</text>
   `;
 
   container.innerHTML = html;
@@ -1778,18 +1778,30 @@ function evaluateCircuit(customInputs = null, prevRelayState = { K1: false, K2: 
     const plcOutputs = { Q0: false, Q1: false, Q2: false, Q3: false, Q4: false, Q5: false, Q6: false };
     const currentLabId = (typeof state !== 'undefined' ? state.currentLabId : '');
     if (powerActive && comPowered && detectedInputLogic !== null) {
-      if (currentLabId === 'lab4_1') {
-        plcOutputs.Q0 = plcInputs[0];
-        plcOutputs.Q1 = !plcInputs[0];
-      } else if (currentLabId === 'lab4_2') {
-        plcOutputs.Q0 = plcInputs[0] && plcInputs[1];
-        plcOutputs.Q1 = false;
-      } else if (currentLabId === 'lab5_1') {
-        plcOutputs.Q0 = plcInputs[0];
-        plcOutputs.Q1 = false;
-      } else if (currentLabId === 'lab5_2') {
-        plcOutputs.Q0 = !plcInputs[0];
-        plcOutputs.Q1 = plcInputs[0];
+      if (typeof plcState !== 'undefined' && plcState.ladderPracticeMode && !state.showingHints) {
+        // Practice Ladder Mode is ACTIVE: Evaluate user's constructed Ladder Diagram
+        const ladderRes = evaluateUserLadder(plcInputs[0], plcInputs[1], plcState.userMemoryM0, true);
+        plcOutputs.Q0 = ladderRes.Q0;
+        plcOutputs.Q1 = ladderRes.Q1;
+        plcOutputs.Q2 = ladderRes.Q2;
+        if (!customInputs) {
+          plcState.userMemoryM0 = ladderRes.M0;
+        }
+      } else {
+        // Reference / Hint / Auto-logic mode
+        if (currentLabId === 'lab4_1') {
+          plcOutputs.Q0 = plcInputs[0];
+          plcOutputs.Q1 = !plcInputs[0];
+        } else if (currentLabId === 'lab4_2') {
+          plcOutputs.Q0 = plcInputs[0] && plcInputs[1];
+          plcOutputs.Q1 = false;
+        } else if (currentLabId === 'lab5_1') {
+          plcOutputs.Q0 = plcInputs[0];
+          plcOutputs.Q1 = false;
+        } else if (currentLabId === 'lab5_2') {
+          plcOutputs.Q0 = !plcInputs[0];
+          plcOutputs.Q1 = plcInputs[0];
+        }
       }
     }
 
@@ -4124,6 +4136,29 @@ function runAutomatedVerification() {
     `;
     scoreBadge.className = 'score-badge fail';
     scoreBadge.textContent = 'ลัดวงจร (0/10)';
+  } else if (typeof verifyUserLadderAgainstLab === 'function' && plcState.ladderPracticeMode && !state.showingHints && !verifyUserLadderAgainstLab(state.currentLabId).passed) {
+    const lCheck = verifyUserLadderAgainstLab(state.currentLabId);
+    banner.className = 'verification-banner error';
+    if (lCheck.missingLadder) {
+      banner.innerHTML = `
+        <div class="banner-icon">⚠️</div>
+        <div class="banner-text">
+          <strong>ยังไม่ได้ต่อวงจร Ladder Diagram:</strong> กรุณาคลิกเลือกอุปกรณ์ในแถบเครื่องมือ Ladder ด้านซ้ายเพื่อวางหน้าสัมผัส Input และ Coil Output ให้ครบถ้วน (หรือคลิกปุ่ม <b>💡 เฉลย Ladder</b> ด้านบนผัง Ladder เพื่อดูแนวทาง)
+        </div>
+      `;
+      scoreBadge.className = 'score-badge fail';
+      scoreBadge.textContent = 'Ladder ยังไม่ครบ (0/10)';
+    } else {
+      banner.innerHTML = `
+        <div class="banner-icon">❌</div>
+        <div class="banner-text">
+          <strong>วงจร Ladder Diagram ยังไม่ถูกต้องตามเงื่อนไข:</strong> ${lCheck.reason}<br/>
+          กรุณาแก้ไขการเลือกหน้าสัมผัส Input (NO / NC) หรือ Coil Output ในผัง Ladder ให้ตรงตามการทำงานที่กำหนด
+        </div>
+      `;
+      scoreBadge.className = 'score-badge fail';
+      scoreBadge.textContent = 'Ladder ยังไม่ถูกต้อง';
+    }
   } else if (allPassed) {
     banner.className = 'verification-banner success';
     let logicSuccessNote = '';
@@ -5498,6 +5533,11 @@ function loadLab(labId) {
 
   if (typeof plcState !== 'undefined') {
     plcState.idealMemoryM0 = false;
+    plcState.userMemoryM0 = false;
+    plcState.ladderPracticeMode = Boolean(isPlcLab);
+    if (typeof resetUserLadderForCurrentLab === 'function') {
+      resetUserLadderForCurrentLab(!plcState.ladderPracticeMode);
+    }
   }
 
   renderTruthTable();
@@ -6172,6 +6212,9 @@ function initInteractions() {
 
   document.getElementById('btnHint').addEventListener('click', () => {
     const lab = LABS[state.currentLabId];
+    if (typeof resetUserLadderForCurrentLab === 'function' && plcState && plcState.ladderPracticeMode) {
+      resetUserLadderForCurrentLab(true);
+    }
     if (!state.showingHints) {
       state.showingHints = true;
       updateSimulationUI();
@@ -7772,8 +7815,492 @@ function initCustomLabManager() {
 const plcState = {
   syncWithActualWiring: true,
   showIlDrawer: false,
-  idealMemoryM0: false
+  idealMemoryM0: false,
+  ladderPracticeMode: false,
+  selectedLadderTool: 'I0_NO',
+  userLadderRungs: [
+    { slot1: null, slot2: 'WIRE', parSlot: null, coil: null },
+    { slot1: null, slot2: 'WIRE', parSlot: null, coil: null }
+  ],
+  userMemoryM0: false
 };
+
+function getTargetLadderForLab(labId) {
+  if (labId === 'lab1_1') {
+    return [{ slot1: 'I0_NO', slot2: 'I1_NO', parSlot: null, coil: 'Q0' }];
+  } else if (labId === 'lab1_2') {
+    return [{ slot1: 'I0_NC', slot2: 'WIRE', parSlot: 'I1_NC', coil: 'Q0' }];
+  } else if (labId === 'lab1_ex') {
+    return [{ slot1: 'I0_NC', slot2: 'I1_NC', parSlot: null, coil: 'Q0' }];
+  } else if (labId === 'lab2_1') {
+    return [
+      { slot1: 'I0_NO', slot2: 'WIRE', parSlot: null, coil: 'M0' },
+      { slot1: 'M0_NO', slot2: 'WIRE', parSlot: null, coil: 'Q0' }
+    ];
+  } else if (labId === 'lab2_2') {
+    return [
+      { slot1: 'I0_NO', slot2: 'WIRE', parSlot: null, coil: 'M0' },
+      { slot1: 'M0_NO', slot2: 'WIRE', parSlot: null, coil: 'Q0' },
+      { slot1: 'M0_NC', slot2: 'WIRE', parSlot: null, coil: 'Q1' }
+    ];
+  } else if (labId === 'lab2_latch') {
+    return [
+      { slot1: 'I0_NO', slot2: 'I1_NC', parSlot: 'M0_NO', coil: 'M0' },
+      { slot1: 'M0_NO', slot2: 'WIRE', parSlot: null, coil: 'Q0' }
+    ];
+  } else if (labId === 'lab4_1') {
+    return [
+      { slot1: 'I0_NO', slot2: 'WIRE', parSlot: null, coil: 'Q0' },
+      { slot1: 'I0_NC', slot2: 'WIRE', parSlot: null, coil: 'Q1' }
+    ];
+  } else if (labId === 'lab4_2') {
+    return [{ slot1: 'I0_NO', slot2: 'I1_NO', parSlot: null, coil: 'Q0' }];
+  } else if (labId === 'lab5_1') {
+    return [{ slot1: 'I0_NO', slot2: 'WIRE', parSlot: null, coil: 'Q0' }];
+  } else if (labId === 'lab5_2') {
+    return [
+      { slot1: 'I0_NC', slot2: 'WIRE', parSlot: null, coil: 'Q0' },
+      { slot1: 'I0_NO', slot2: 'WIRE', parSlot: null, coil: 'Q1' }
+    ];
+  }
+  return [
+    { slot1: 'I0_NO', slot2: 'WIRE', parSlot: null, coil: 'Q0' },
+    { slot1: 'I1_NO', slot2: 'WIRE', parSlot: null, coil: 'Q1' }
+  ];
+}
+
+function resetUserLadderForCurrentLab(fillSolution = false) {
+  const labId = (typeof state !== 'undefined' && state.currentLabId) ? state.currentLabId : 'lab4_1';
+  const target = getTargetLadderForLab(labId);
+  if (fillSolution) {
+    plcState.userLadderRungs = JSON.parse(JSON.stringify(target));
+  } else {
+    plcState.userLadderRungs = target.map((tr) => ({
+      slot1: null,
+      slot2: tr.slot2 === 'WIRE' ? 'WIRE' : null,
+      parSlot: null,
+      coil: null
+    }));
+  }
+  plcState.userMemoryM0 = false;
+  updateLadderBuilderUI();
+  if (typeof renderPlcLadderDiagram === 'function') {
+    renderPlcLadderDiagram();
+  }
+}
+
+function evalLadderContact(token, in0, in1, m0) {
+  if (!token) return false;
+  if (token === 'WIRE') return true;
+  if (token === 'I0_NO') return Boolean(in0);
+  if (token === 'I0_NC') return !Boolean(in0);
+  if (token === 'I1_NO') return Boolean(in1);
+  if (token === 'I1_NC') return !Boolean(in1);
+  if (token === 'M0_NO') return Boolean(m0);
+  if (token === 'M0_NC') return !Boolean(m0);
+  return false;
+}
+
+function evaluateUserLadder(in0, in1, prevM0 = false, pwr = true) {
+  const rungs = plcState.userLadderRungs || [];
+  let curM0 = pwr ? Boolean(prevM0) : false;
+  const outputs = { Q0: false, Q1: false, Q2: false, M0: curM0 };
+
+  if (!pwr) return outputs;
+
+  // Two-pass scan to settle internal relay contacts across rungs
+  for (let pass = 0; pass < 2; pass++) {
+    rungs.forEach((r) => {
+      if (!r) return;
+      const top1 = evalLadderContact(r.slot1, in0, in1, curM0);
+      const par1 = r.parSlot ? evalLadderContact(r.parSlot, in0, in1, curM0) : false;
+      const midHot = (top1 || par1);
+
+      let rungHot = false;
+      if (r.slot2 === 'WIRE' || !r.slot2) {
+        rungHot = midHot;
+      } else {
+        const c2 = evalLadderContact(r.slot2, in0, in1, curM0);
+        rungHot = midHot && c2;
+      }
+
+      if (r.coil === 'Q0') outputs.Q0 = rungHot;
+      else if (r.coil === 'Q1') outputs.Q1 = rungHot;
+      else if (r.coil === 'Q2') outputs.Q2 = rungHot;
+      else if (r.coil === 'M0') {
+        curM0 = rungHot;
+        outputs.M0 = curM0;
+      }
+    });
+  }
+  return outputs;
+}
+
+function isUserLadderComplete() {
+  const rungs = plcState.userLadderRungs || [];
+  if (rungs.length === 0) return false;
+  let hasValidRung = false;
+  for (const r of rungs) {
+    if ((r.slot1 || r.parSlot) && r.coil) {
+      hasValidRung = true;
+    }
+  }
+  return hasValidRung;
+}
+
+function verifyUserLadderAgainstLab(labId = state.currentLabId) {
+  const lab = (typeof LABS !== 'undefined') ? LABS[labId] : null;
+  if (!lab) return { passed: true, missingLadder: false, reason: '' };
+
+  const rungs = plcState.userLadderRungs || [];
+  const target = getTargetLadderForLab(labId);
+
+  let anyFilled = false;
+  let allCoilsFilled = true;
+  let allContactsFilled = true;
+
+  target.forEach((tr, i) => {
+    const ur = rungs[i];
+    if (!ur) {
+      allCoilsFilled = false;
+      allContactsFilled = false;
+      return;
+    }
+    if (ur.slot1 || ur.parSlot || ur.coil || (ur.slot2 && ur.slot2 !== 'WIRE')) {
+      anyFilled = true;
+    }
+    if (!ur.coil) allCoilsFilled = false;
+    if (!ur.slot1 && !ur.parSlot) allContactsFilled = false;
+  });
+
+  if (!anyFilled || !allContactsFilled || !allCoilsFilled) {
+    return {
+      passed: false,
+      missingLadder: true,
+      reason: !anyFilled
+        ? 'ยังไม่ได้ต่อวงจร Ladder Diagram'
+        : (!allContactsFilled ? 'ยังวางหน้าสัมผัส Input ไม่ครบถ้วน' : 'ยังวาง Coil เอาต์พุตไม่ครบถ้วน')
+    };
+  }
+
+  // Simulation test against lab truth table
+  if (labId === 'lab2_latch') {
+    let testM0 = false;
+    let res = evaluateUserLadder(0, 0, testM0, true);
+    testM0 = res.M0;
+    if (res.Q0) return { passed: false, missingLadder: false, reason: 'เมื่อยังไม่กดปุ่มเริ่ม วงจรต้องยังไม่ทำงาน (Q0=0)' };
+
+    res = evaluateUserLadder(1, 0, testM0, true);
+    testM0 = res.M0;
+    if (!res.Q0) return { passed: false, missingLadder: false, reason: 'เมื่อกดปุ่มเริ่ม (S1) คอยล์เอาต์พุต Q0 ต้องทำงาน' };
+
+    res = evaluateUserLadder(0, 0, testM0, true);
+    testM0 = res.M0;
+    if (!res.Q0) return { passed: false, missingLadder: false, reason: 'เมื่อปล่อยปุ่มเริ่ม วงจรต้องคงสถานะการทำงาน (Self-Holding)' };
+
+    res = evaluateUserLadder(0, 1, testM0, true);
+    testM0 = res.M0;
+    if (res.Q0) return { passed: false, missingLadder: false, reason: 'เมื่อกดปุ่มหยุด (S2) วงจรต้องหยุดทำงาน (Q0=0)' };
+
+    return { passed: true, missingLadder: false, reason: '' };
+  }
+
+  let passed = true;
+  let reason = '';
+  for (const testCase of lab.truthTable) {
+    const res = evaluateUserLadder(testCase.S1, testCase.S2, false, true);
+    if (lab.outputs.includes('L1')) {
+      const expL1 = Boolean(testCase.expected.L1);
+      if (Boolean(res.Q0) !== expL1) {
+        passed = false;
+        reason = `เงื่อนไข S1=${testCase.S1}, S2=${testCase.S2} เอาต์พุต Q0 ได้ ${res.Q0 ? '1' : '0'} แต่ต้องการ ${expL1 ? '1' : '0'}`;
+        break;
+      }
+    }
+    if (lab.outputs.includes('L2')) {
+      const expL2 = Boolean(testCase.expected.L2);
+      if (Boolean(res.Q1) !== expL2) {
+        passed = false;
+        reason = `เงื่อนไข S1=${testCase.S1}, S2=${testCase.S2} เอาต์พุต Q1 ได้ ${res.Q1 ? '1' : '0'} แต่ต้องการ ${expL2 ? '1' : '0'}`;
+        break;
+      }
+    }
+  }
+
+  return { passed, missingLadder: false, reason };
+}
+
+function updateLadderBuilderUI() {
+  const isPractice = Boolean(plcState.ladderPracticeMode);
+
+  // Update Mode buttons
+  ['btnLadderModeToggle', 'btnPopupLadderModeToggle'].forEach((btnId) => {
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      btn.classList.toggle('mode-view', !isPractice);
+      btn.textContent = isPractice
+        ? '🛠️ โหมด: ฝึกต่อวงจร Ladder'
+        : '👁️ โหมด: ดูวงจรเฉลยอัตโนมัติ';
+    }
+  });
+
+  // Sync active tool buttons across both toolbars
+  document.querySelectorAll('.btn-ladder-tool').forEach((btn) => {
+    const tool = btn.getAttribute('data-ladder-tool');
+    btn.classList.toggle('active', tool === plcState.selectedLadderTool);
+  });
+}
+
+function handleLadderSlotClick(e) {
+  const hit = e.target.closest('.ladder-slot-hit');
+  if (!hit) return;
+  e.stopPropagation();
+  const rungIdx = parseInt(hit.getAttribute('data-rung'), 10);
+  const slotName = hit.getAttribute('data-slot');
+  if (isNaN(rungIdx) || !slotName || !plcState.userLadderRungs[rungIdx]) return;
+
+  const tool = plcState.selectedLadderTool;
+  const currentVal = plcState.userLadderRungs[rungIdx][slotName];
+
+  if (tool === 'EMPTY') {
+    plcState.userLadderRungs[rungIdx][slotName] = null;
+  } else if (slotName === 'coil') {
+    if (tool === 'Q0' || tool === 'Q1' || tool === 'M0') {
+      plcState.userLadderRungs[rungIdx][slotName] = (currentVal === tool) ? null : tool;
+    } else {
+      const coils = ['Q0', 'Q1', 'M0', null];
+      const nextIdx = (coils.indexOf(currentVal) + 1) % coils.length;
+      plcState.userLadderRungs[rungIdx][slotName] = coils[nextIdx];
+    }
+  } else {
+    // Contact or Wire slot
+    if (tool === 'Q0' || tool === 'Q1' || tool === 'M0') {
+      const contacts = ['I0_NO', 'I0_NC', 'I1_NO', 'I1_NC', 'WIRE', null];
+      const nextIdx = (contacts.indexOf(currentVal) + 1) % contacts.length;
+      plcState.userLadderRungs[rungIdx][slotName] = contacts[nextIdx];
+    } else {
+      plcState.userLadderRungs[rungIdx][slotName] = (currentVal === tool) ? null : tool;
+    }
+  }
+
+  updateSimulationUI();
+}
+
+function renderPracticeLadderSVG(pState, spec) {
+  const rungs = plcState.userLadderRungs || [];
+  const in0 = pState.s1;
+  const in1 = pState.s2;
+  const pwr = pState.pwr;
+  let curM0 = plcState.userMemoryM0;
+
+  const rungH = 76;
+  const H = Math.max(90, 36 + rungs.length * rungH);
+
+  let rungsSvg = '';
+  rungs.forEach((r, rIdx) => {
+    const y = 42 + rIdx * rungH;
+    const isHotIn = pwr;
+
+    const c1Closed = evalLadderContact(r.slot1, in0, in1, curM0);
+    const c1HotOut = isHotIn && c1Closed;
+
+    const parClosed = r.parSlot ? evalLadderContact(r.parSlot, in0, in1, curM0) : false;
+    const parHotOut = isHotIn && parClosed;
+
+    const midHot = (c1HotOut || parHotOut);
+
+    let rungHot = false;
+    if (r.slot2 === 'WIRE' || !r.slot2) {
+      rungHot = midHot;
+    } else {
+      const c2Closed = evalLadderContact(r.slot2, in0, in1, curM0);
+      rungHot = midHot && c2Closed;
+    }
+
+    if (r.coil === 'M0') {
+      curM0 = rungHot;
+    }
+
+    const cx1 = 90;
+    const cx2 = 185;
+    const cxC = 295;
+    const cy = y;
+
+    let rungLine = `
+      <text x="4" y="${cy + 3}" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#64748b">R${rIdx}</text>
+      ${drawLadderWire(22, cy, cx1 - 20, cy, isHotIn)}
+    `;
+
+    let slot1Svg = '';
+    if (r.slot1) {
+      const isNC = r.slot1.endsWith('_NC');
+      const isM = r.slot1.startsWith('M0');
+      const isS2 = r.slot1.startsWith('I1');
+      const addr = isM ? (spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0') : (isS2 ? spec.in1 : spec.in0);
+      const sym = isM ? 'K1' : (isS2 ? 'S2' : 'S1');
+
+      const contactContent = isNC
+        ? drawLadderContactNC(cx1, cy, addr, sym, c1Closed, isHotIn, null)
+        : drawLadderContactNO(cx1, cy, addr, sym, c1Closed, isHotIn, null);
+
+      slot1Svg = `
+        <g class="ladder-slot-hit" data-rung="${rIdx}" data-slot="slot1" title="คลิกเพื่อเปลี่ยนหรือลบ Contact 1">
+          ${contactContent}
+          <rect x="${cx1 - 20}" y="${cy - 20}" width="40" height="40" fill="transparent" class="ladder-slot-box" rx="4" />
+        </g>
+      `;
+    } else {
+      slot1Svg = `
+        <g class="ladder-slot-hit" data-rung="${rIdx}" data-slot="slot1" title="คลิกเพื่อวาง Contact 1">
+          <rect class="ladder-slot-box" x="${cx1 - 24}" y="${cy - 16}" width="48" height="32" rx="5" fill="#f8fafc" stroke="#0284c7" stroke-width="1.8" stroke-dasharray="4 3" />
+          <text class="ladder-slot-text" x="${cx1}" y="${cy + 4}" text-anchor="middle" font-family="'Prompt', sans-serif" font-size="8.5" font-weight="700" fill="#0284c7">+ Contact 1</text>
+        </g>
+      `;
+    }
+
+    const targetRungs = getTargetLadderForLab(pState.labId);
+    const targetHasPar = targetRungs[rIdx] && targetRungs[rIdx].parSlot;
+    let parSvg = '';
+    if (r.parSlot || targetHasPar) {
+      const cyP = cy + 24;
+      const wireIn = isHotIn;
+      const wireOut = parHotOut;
+
+      let parNode = '';
+      if (r.parSlot) {
+        const isNC = r.parSlot.endsWith('_NC');
+        const isM = r.parSlot.startsWith('M0');
+        const isS2 = r.parSlot.startsWith('I1');
+        const addr = isM ? (spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0') : (isS2 ? spec.in1 : spec.in0);
+        const sym = isM ? 'K1' : (isS2 ? 'S2' : 'S1');
+
+        const contactContent = isNC
+          ? drawLadderContactNC(cx1, cyP, addr, sym, parClosed, wireIn, null)
+          : drawLadderContactNO(cx1, cyP, addr, sym, parClosed, wireIn, null);
+
+        parNode = `
+          <g class="ladder-slot-hit" data-rung="${rIdx}" data-slot="parSlot" title="คลิกเพื่อเปลี่ยนหรือลบ Contact ขนาน">
+            ${contactContent}
+            <rect x="${cx1 - 18}" y="${cyP - 16}" width="36" height="32" fill="transparent" class="ladder-slot-box" rx="4" />
+          </g>
+        `;
+      } else {
+        parNode = `
+          <g class="ladder-slot-hit" data-rung="${rIdx}" data-slot="parSlot" title="คลิกเพื่อวาง Contact ขนาน (OR)">
+            <rect class="ladder-slot-box" x="${cx1 - 22}" y="${cyP - 11}" width="44" height="22" rx="4" fill="#f8fafc" stroke="#0284c7" stroke-width="1.3" stroke-dasharray="3 3" />
+            <text class="ladder-slot-text" x="${cx1}" y="${cyP + 3.5}" text-anchor="middle" font-family="'Prompt', sans-serif" font-size="7.5" fill="#0284c7">+ ขนาน (OR)</text>
+          </g>
+        `;
+      }
+
+      parSvg = `
+        ${drawLadderWire(cx1 - 28, cy, cx1 - 28, cyP, wireIn)}
+        <circle cx="${cx1 - 28}" cy="${cy}" r="2.5" fill="${wireIn ? '#22c55e' : '#475569'}" />
+        ${drawLadderWire(cx1 - 28, cyP, cx1 - 18, cyP, wireIn)}
+        ${parNode}
+        ${drawLadderWire(cx1 + 18, cyP, cx1 + 28, cyP, wireOut)}
+        ${drawLadderWire(cx1 + 28, cyP, cx1 + 28, cy, wireOut)}
+        <circle cx="${cx1 + 28}" cy="${cy}" r="2.5" fill="${midHot ? '#22c55e' : '#475569'}" />
+      `;
+    }
+
+    const midWireSvg = drawLadderWire(cx1 + 20, cy, cx2 - 20, cy, midHot);
+
+    let slot2Svg = '';
+    if (r.slot2 === 'WIRE') {
+      slot2Svg = `
+        <g class="ladder-slot-hit" data-rung="${rIdx}" data-slot="slot2" title="คลิกเพื่อเปลี่ยนเป็น Contact 2 หรือลบ">
+          ${drawLadderWire(cx2 - 20, cy, cx2 + 20, cy, midHot)}
+          <rect class="ladder-slot-box" x="${cx2 - 20}" y="${cy - 12}" width="40" height="24" rx="4" fill="transparent" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2" opacity="0.4" />
+          <text class="ladder-slot-text" x="${cx2}" y="${cy - 5}" text-anchor="middle" font-family="'Prompt', sans-serif" font-size="7" fill="#64748b">─── เส้นเชื่อม</text>
+        </g>
+      `;
+    } else if (r.slot2) {
+      const isNC = r.slot2.endsWith('_NC');
+      const isM = r.slot2.startsWith('M0');
+      const isS2 = r.slot2.startsWith('I1');
+      const addr = isM ? (spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0') : (isS2 ? spec.in1 : spec.in0);
+      const sym = isM ? 'K1' : (isS2 ? 'S2' : 'S1');
+      const c2Closed = evalLadderContact(r.slot2, in0, in1, curM0);
+
+      const contactContent = isNC
+        ? drawLadderContactNC(cx2, cy, addr, sym, c2Closed, midHot, null)
+        : drawLadderContactNO(cx2, cy, addr, sym, c2Closed, midHot, null);
+
+      slot2Svg = `
+        <g class="ladder-slot-hit" data-rung="${rIdx}" data-slot="slot2" title="คลิกเพื่อเปลี่ยนหรือลบ Contact 2">
+          ${contactContent}
+          <rect x="${cx2 - 20}" y="${cy - 20}" width="40" height="40" fill="transparent" class="ladder-slot-box" rx="4" />
+        </g>
+      `;
+    } else {
+      slot2Svg = `
+        <g class="ladder-slot-hit" data-rung="${rIdx}" data-slot="slot2" title="คลิกเพื่อวาง Contact 2 หรือเส้นเชื่อม">
+          <rect class="ladder-slot-box" x="${cx2 - 24}" y="${cy - 16}" width="48" height="32" rx="5" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3" />
+          <text class="ladder-slot-text" x="${cx2}" y="${cy + 4}" text-anchor="middle" font-family="'Prompt', sans-serif" font-size="8" fill="#64748b">+ Contact 2</text>
+        </g>
+      `;
+    }
+
+    const toCoilWireSvg = drawLadderWire(cx2 + 20, cy, cxC - 18, cy, rungHot);
+
+    let coilSvg = '';
+    if (r.coil) {
+      const isM = r.coil === 'M0';
+      const isQ1 = r.coil === 'Q1';
+      const addr = isM ? (spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0') : (isQ1 ? spec.out1 : spec.out0);
+      const sym = isM ? 'K1' : (isQ1 ? 'PL2' : 'PL1');
+      const coilContent = drawLadderCoil(cxC, cy, addr, sym, rungHot, isM ? 'mem' : 'out', rungHot);
+
+      coilSvg = `
+        <g class="ladder-slot-hit" data-rung="${rIdx}" data-slot="coil" title="คลิกเพื่อเปลี่ยนหรือลบ Coil">
+          ${coilContent}
+          <circle cx="${cxC}" cy="${cy}" r="18" fill="transparent" class="ladder-slot-box" />
+        </g>
+      `;
+    } else {
+      coilSvg = `
+        <g class="ladder-slot-hit" data-rung="${rIdx}" data-slot="coil" title="คลิกเพื่อวาง Coil เอาต์พุต">
+          <circle class="ladder-slot-box" cx="${cxC}" cy="${cy}" r="15" fill="#f8fafc" stroke="#f59e0b" stroke-width="1.8" stroke-dasharray="4 3" />
+          <text class="ladder-slot-text" x="${cxC}" y="${cy + 3.5}" text-anchor="middle" font-family="'Prompt', sans-serif" font-size="8" font-weight="700" fill="#d97706">( ) Coil</text>
+        </g>
+      `;
+    }
+
+    const outWireSvg = drawLadderWire(cxC + 18, cy, 358, cy, false);
+
+    rungsSvg += `
+      ${rungLine}
+      ${slot1Svg}
+      ${parSvg}
+      ${midWireSvg}
+      ${slot2Svg}
+      ${toCoilWireSvg}
+      ${coilSvg}
+      ${outWireSvg}
+    `;
+  });
+
+  const check = verifyUserLadderAgainstLab(pState.labId);
+  let statusBannerSvg = '';
+  if (check.passed) {
+    statusBannerSvg = `<text x="190" y="${H - 5}" text-anchor="middle" font-family="'Prompt', sans-serif" font-size="9" font-weight="700" fill="#16a34a">✅ ต่อวงจร Ladder ถูกต้องสมบูรณ์ตามใบงาน</text>`;
+  } else {
+    statusBannerSvg = `<text x="190" y="${H - 5}" text-anchor="middle" font-family="'Prompt', sans-serif" font-size="8.5" font-weight="600" fill="#0284c7">🛠️ โหมดฝึกต่อ Ladder: คลิกช่องว่างเพื่อวาง Contact / Coil</text>`;
+  }
+
+  return `
+    <svg viewBox="0 0 380 ${H}" class="plc-ladder-svg">
+      <line x1="22" y1="12" x2="22" y2="${H - 14}" stroke="#38bdf8" stroke-width="2.5" />
+      <text x="22" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#38bdf8" text-anchor="middle">+24V</text>
+      <line x1="358" y1="12" x2="358" y2="${H - 14}" stroke="#64748b" stroke-width="2.5" />
+      <text x="358" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#94a3b8" text-anchor="middle">0V</text>
+
+      ${rungsSvg}
+      ${statusBannerSvg}
+    </svg>
+  `;
+}
 
 function getPlcSimulationState() {
   const lab = (typeof state !== 'undefined' && state.currentLabId) ? LABS[state.currentLabId] : null;
@@ -8286,7 +8813,9 @@ function renderPlcLadderDiagram() {
   const labId = pState.labId;
   let svgContent = '';
 
-  if (labId === 'lab1_1') {
+  if (plcState.ladderPracticeMode) {
+    svgContent = renderPracticeLadderSVG(pState, spec);
+  } else if (labId === 'lab1_1') {
     // 1 Rung: S1 NO series with S2 NO -> Q0.0 / Y0 (L1)
     const H = 88;
     const y = 44;
@@ -8786,13 +9315,17 @@ function renderPlcLadderDiagram() {
 
   const footerStatus = document.getElementById('ladderPopupFooterStatus');
   if (footerStatus) {
-    if (plcState.syncWithActualWiring) {
+    if (plcState.ladderPracticeMode) {
+      const check = verifyUserLadderAgainstLab(pState.labId);
+      footerStatus.innerHTML = check.passed
+        ? `สถานะ: <b style="color:#22c55e;">✅ ต่อวงจร Ladder ถูกต้องสมบูรณ์</b>`
+        : `สถานะ: <b style="color:#38bdf8;">🛠️ อยู่ในโหมดฝึกต่อวงจร Ladder</b> (คลิกที่ช่องเพื่อวาง Contact / Coil)`;
+    } else if (plcState.syncWithActualWiring) {
       footerStatus.innerHTML = `สถานะ: <b>ซิงค์ตามสายที่ต่อจริง</b> (${pState.activeIn0 ? 'IN0 Active' : 'IN0 Off'}, ${pState.activeQ0 ? 'OUT0 Active' : 'OUT0 Off'})`;
     } else {
       footerStatus.innerHTML = `สถานะ: <b>จำลองลอจิกอัตโนมัติ</b> (กด PB1/PB2 หรือแตะ Contact ในรูป เพื่อทดสอบ)`;
     }
   }
-
   updatePlcAddressTable(pState);
   updateTm221HwStrip(pState);
   updatePlcIlCode(pState);
@@ -8862,6 +9395,31 @@ function updatePlcModelUI(model = state.plcModel) {
   }
   const hwBadge = document.getElementById('plcHwModelBadge');
   if (hwBadge) hwBadge.textContent = spec.shortName;
+
+  // Update Ladder Builder palette buttons matching PLC model addresses
+  const bindMap = {
+    'in0_no': `${spec.in0} (S1)`,
+    'in0_nc': `${spec.in0} (S1)`,
+    'in1_no': `${spec.in1} (S2)`,
+    'in1_nc': `${spec.in1} (S2)`,
+    'm0_no': `${spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0'} (K1)`,
+    'm0_nc': `${spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0'} (K1)`,
+    'out0_coil': `${spec.out0} (PL1)`,
+    'out1_coil': `${spec.out1} (PL2)`,
+    'm0_coil': `${spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0'} (K1)`
+  };
+  if (typeof document !== 'undefined') {
+    document.querySelectorAll('[data-bind-plc]').forEach((el) => {
+      const key = el.getAttribute('data-bind-plc');
+      if (bindMap[key]) {
+        el.textContent = bindMap[key];
+      }
+    });
+  }
+
+  if (typeof updateLadderBuilderUI === 'function') {
+    updateLadderBuilderUI();
+  }
 
   // Re-render ladder, schematic, truth table, and timing diagram
   renderPlcLadderDiagram();
@@ -8964,6 +9522,65 @@ function initPlcLadderCoSim() {
   if (popupClone) {
     popupClone.addEventListener('click', handleLadderSwitchClick);
   }
+
+  // Handle slot placement clicks in interactive Practice Mode
+  if (ladderViewport) {
+    ladderViewport.addEventListener('click', handleLadderSlotClick);
+  }
+  if (fsLadderClone) {
+    fsLadderClone.addEventListener('click', handleLadderSlotClick);
+  }
+  if (popupClone) {
+    popupClone.addEventListener('click', handleLadderSlotClick);
+  }
+
+  // Mode Toggle Buttons
+  const handleLadderModeToggle = () => {
+    plcState.ladderPracticeMode = !plcState.ladderPracticeMode;
+    if (plcState.ladderPracticeMode && !isUserLadderComplete()) {
+      resetUserLadderForCurrentLab(false);
+    }
+    updateLadderBuilderUI();
+    updateSimulationUI();
+  };
+  const btnModeToggle = document.getElementById('btnLadderModeToggle');
+  if (btnModeToggle) btnModeToggle.addEventListener('click', handleLadderModeToggle);
+  const btnPopupModeToggle = document.getElementById('btnPopupLadderModeToggle');
+  if (btnPopupModeToggle) btnPopupModeToggle.addEventListener('click', handleLadderModeToggle);
+
+  // Fill Solution Buttons
+  const handleLadderFillSolution = () => {
+    resetUserLadderForCurrentLab(true);
+    updateSimulationUI();
+  };
+  const btnFill = document.getElementById('btnLadderFillSolution');
+  if (btnFill) btnFill.addEventListener('click', handleLadderFillSolution);
+  const btnPopupFill = document.getElementById('btnPopupLadderFillSolution');
+  if (btnPopupFill) btnPopupFill.addEventListener('click', handleLadderFillSolution);
+
+  // Reset Empty Buttons
+  const handleLadderResetEmpty = () => {
+    resetUserLadderForCurrentLab(false);
+    updateSimulationUI();
+  };
+  const btnReset = document.getElementById('btnLadderResetEmpty');
+  if (btnReset) btnReset.addEventListener('click', handleLadderResetEmpty);
+  const btnPopupReset = document.getElementById('btnPopupLadderResetEmpty');
+  if (btnPopupReset) btnPopupReset.addEventListener('click', handleLadderResetEmpty);
+
+  // Component Tool Palette Buttons
+  document.querySelectorAll('.btn-ladder-tool').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tool = btn.getAttribute('data-ladder-tool');
+      if (tool) {
+        plcState.selectedLadderTool = tool;
+        updateLadderBuilderUI();
+      }
+    });
+  });
+
+  // Initial Ladder Builder UI update
+  updateLadderBuilderUI();
 
   const inRow = document.getElementById('tm221InputsRow');
   if (inRow) {

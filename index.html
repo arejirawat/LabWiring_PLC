@@ -173,6 +173,72 @@
           </div>
         </div>
 
+        <!-- Interactive PLC Ladder Builder Toolbar & Palette -->
+        <div class="ladder-builder-toolbar" id="ladderBuilderToolbar">
+          <div class="ladder-builder-header">
+            <div class="ladder-builder-title-group">
+              <span class="ladder-builder-title">🛠️ แถบเครื่องมือต่อวงจร Ladder</span>
+              <button type="button" id="btnLadderModeToggle" class="btn-ladder-builder-mode" title="สลับระหว่างโหมดฝึกต่อวงจร Ladder ด้วยตนเอง กับโหมดแสดงเฉลยอัตโนมัติ">
+                🛠️ โหมด: ฝึกต่อวงจร Ladder
+              </button>
+            </div>
+            <div class="ladder-builder-actions">
+              <button type="button" id="btnLadderFillSolution" class="btn-ladder-action btn-fill-sol" title="วางเฉลยวงจร Ladder ของใบงานนี้โดยอัตโนมัติ">
+                💡 เฉลย Ladder
+              </button>
+              <button type="button" id="btnLadderResetEmpty" class="btn-ladder-action btn-clear-ladder" title="ล้างวงจร Ladder ทั้งหมด เพื่อเริ่มฝึกต่อใหม่">
+                🔄 ล้าง Ladder
+              </button>
+            </div>
+          </div>
+          <div class="ladder-palette-row" id="ladderPaletteRow">
+            <span class="palette-group-label">หน้าสัมผัส Input:</span>
+            <button type="button" class="btn-ladder-tool active" data-ladder-tool="I0_NO" title="หน้าสัมผัสปกติเปิด (NO) ของ Input 0 (S1)">
+              <span class="tool-sym">┤ ├</span> <span class="tool-lbl" data-bind-plc="in0_no">%I0.0 (S1)</span>
+            </button>
+            <button type="button" class="btn-ladder-tool" data-ladder-tool="I0_NC" title="หน้าสัมผัสปกติปิด (NC) ของ Input 0 (S1)">
+              <span class="tool-sym">┤/├</span> <span class="tool-lbl" data-bind-plc="in0_nc">%I0.0 (S1)</span>
+            </button>
+            <button type="button" class="btn-ladder-tool" data-ladder-tool="I1_NO" title="หน้าสัมผัสปกติเปิด (NO) ของ Input 1 (S2)">
+              <span class="tool-sym">┤ ├</span> <span class="tool-lbl" data-bind-plc="in1_no">%I0.1 (S2)</span>
+            </button>
+            <button type="button" class="btn-ladder-tool" data-ladder-tool="I1_NC" title="หน้าสัมผัสปกติปิด (NC) ของ Input 1 (S2)">
+              <span class="tool-sym">┤/├</span> <span class="tool-lbl" data-bind-plc="in1_nc">%I0.1 (S2)</span>
+            </button>
+
+            <span class="palette-divider">|</span>
+            <span class="palette-group-label">รีเลย์ภายใน:</span>
+            <button type="button" class="btn-ladder-tool" data-ladder-tool="M0_NO" title="หน้าสัมผัสปกติเปิด (NO) ของ Relay ภายใน M0 (K1)">
+              <span class="tool-sym">┤ ├</span> <span class="tool-lbl" data-bind-plc="m0_no">%M0 (K1)</span>
+            </button>
+            <button type="button" class="btn-ladder-tool" data-ladder-tool="M0_NC" title="หน้าสัมผัสปกติปิด (NC) ของ Relay ภายใน M0 (K1)">
+              <span class="tool-sym">┤/├</span> <span class="tool-lbl" data-bind-plc="m0_nc">%M0 (K1)</span>
+            </button>
+
+            <span class="palette-divider">|</span>
+            <button type="button" class="btn-ladder-tool" data-ladder-tool="WIRE" title="เส้นเชื่อมต่อแนวนอน (Wire Line)">
+              <span class="tool-sym">───</span> <span class="tool-lbl">เส้นเชื่อม</span>
+            </button>
+
+            <span class="palette-divider">|</span>
+            <span class="palette-group-label">Coil เอาต์พุต:</span>
+            <button type="button" class="btn-ladder-tool" data-ladder-tool="Q0" title="คอยล์เอาต์พุต Q0 (PL1)">
+              <span class="tool-sym">( )</span> <span class="tool-lbl" data-bind-plc="out0_coil">%Q0.0 (PL1)</span>
+            </button>
+            <button type="button" class="btn-ladder-tool" data-ladder-tool="Q1" title="คอยล์เอาต์พุต Q1 (PL2)">
+              <span class="tool-sym">( )</span> <span class="tool-lbl" data-bind-plc="out1_coil">%Q0.1 (PL2)</span>
+            </button>
+            <button type="button" class="btn-ladder-tool" data-ladder-tool="M0" title="คอยล์รีเลย์ภายใน M0 (K1)">
+              <span class="tool-sym">( )</span> <span class="tool-lbl" data-bind-plc="m0_coil">%M0 (K1)</span>
+            </button>
+
+            <span class="palette-divider">|</span>
+            <button type="button" class="btn-ladder-tool btn-tool-eraser" data-ladder-tool="EMPTY" title="ยางลบ / ลบอุปกรณ์ในช่อง">
+              <span class="tool-sym">🗑️</span> <span class="tool-lbl">ลบช่อง</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Interactive SVG Ladder Diagram Viewport -->
         <div class="ladder-viewport" id="ladderViewport">
           <!-- Dynamic SVG Ladder Rungs rendered by JS -->
@@ -541,7 +607,7 @@
               <!-- Footer watermark matching original worksheet -->
               <text x="18" y="556" fill="#64748b" font-size="13" font-weight="600" pointer-events="none">ชุดทดลองการเชื่อมต่อวงจรไฟฟ้าควบคุมด้วย RELAY</text>
               <text x="355" y="556" text-anchor="middle" fill="#64748b" opacity="0.65" font-size="11.5" font-weight="700" pointer-events="none">พัฒนาสื่อการสอนโดย Kru-Jirawat (Kru-Jirawat.com)</text>
-              <text x="692" y="556" text-anchor="end" fill="#475569" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">v2.7.0 | Kru-Jirawat</text>
+              <text x="692" y="556" text-anchor="end" fill="#475569" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">v2.8.0 | Kru-Jirawat</text>
             </g>
 
             <!-- PLC Terminal Block Workbench Group (Lab 4 & Lab 5) -->
@@ -610,6 +676,72 @@
               <button type="button" id="btnPopupSwS1" class="btn-popup-sw" data-sw="S1">🔘 PB1 (S1): OFF (0)</button>
               <button type="button" id="btnPopupSwS2" class="btn-popup-sw" data-sw="S2">🔘 PB2 (S2): OFF (0)</button>
               <span id="ladderPopupIoSummary" class="ladder-popup-io-summary"></span>
+            </div>
+
+            <!-- Interactive PLC Ladder Builder Toolbar inside Pop-up -->
+            <div class="ladder-builder-toolbar popup-ladder-toolbar" id="popupLadderBuilderToolbar">
+              <div class="ladder-builder-header">
+                <div class="ladder-builder-title-group">
+                  <span class="ladder-builder-title">🛠️ แถบเครื่องมือต่อวงจร Ladder</span>
+                  <button type="button" id="btnPopupLadderModeToggle" class="btn-ladder-builder-mode" title="สลับระหว่างโหมดฝึกต่อวงจร Ladder ด้วยตนเอง กับโหมดแสดงเฉลยอัตโนมัติ">
+                    🛠️ โหมด: ฝึกต่อวงจร Ladder
+                  </button>
+                </div>
+                <div class="ladder-builder-actions">
+                  <button type="button" id="btnPopupLadderFillSolution" class="btn-ladder-action btn-fill-sol" title="วางเฉลยวงจร Ladder ของใบงานนี้โดยอัตโนมัติ">
+                    💡 เฉลย Ladder
+                  </button>
+                  <button type="button" id="btnPopupLadderResetEmpty" class="btn-ladder-action btn-clear-ladder" title="ล้างวงจร Ladder ทั้งหมด เพื่อเริ่มฝึกต่อใหม่">
+                    🔄 ล้าง Ladder
+                  </button>
+                </div>
+              </div>
+              <div class="ladder-palette-row" id="popupLadderPaletteRow">
+                <span class="palette-group-label">Input:</span>
+                <button type="button" class="btn-ladder-tool active" data-ladder-tool="I0_NO" title="หน้าสัมผัสปกติเปิด (NO) ของ Input 0 (S1)">
+                  <span class="tool-sym">┤ ├</span> <span class="tool-lbl" data-bind-plc="in0_no">%I0.0 (S1)</span>
+                </button>
+                <button type="button" class="btn-ladder-tool" data-ladder-tool="I0_NC" title="หน้าสัมผัสปกติปิด (NC) ของ Input 0 (S1)">
+                  <span class="tool-sym">┤/├</span> <span class="tool-lbl" data-bind-plc="in0_nc">%I0.0 (S1)</span>
+                </button>
+                <button type="button" class="btn-ladder-tool" data-ladder-tool="I1_NO" title="หน้าสัมผัสปกติเปิด (NO) ของ Input 1 (S2)">
+                  <span class="tool-sym">┤ ├</span> <span class="tool-lbl" data-bind-plc="in1_no">%I0.1 (S2)</span>
+                </button>
+                <button type="button" class="btn-ladder-tool" data-ladder-tool="I1_NC" title="หน้าสัมผัสปกติปิด (NC) ของ Input 1 (S2)">
+                  <span class="tool-sym">┤/├</span> <span class="tool-lbl" data-bind-plc="in1_nc">%I0.1 (S2)</span>
+                </button>
+
+                <span class="palette-divider">|</span>
+                <span class="palette-group-label">รีเลย์ภายใน:</span>
+                <button type="button" class="btn-ladder-tool" data-ladder-tool="M0_NO" title="หน้าสัมผัสปกติเปิด (NO) ของ Relay ภายใน M0 (K1)">
+                  <span class="tool-sym">┤ ├</span> <span class="tool-lbl" data-bind-plc="m0_no">%M0 (K1)</span>
+                </button>
+                <button type="button" class="btn-ladder-tool" data-ladder-tool="M0_NC" title="หน้าสัมผัสปกติปิด (NC) ของ Relay ภายใน M0 (K1)">
+                  <span class="tool-sym">┤/├</span> <span class="tool-lbl" data-bind-plc="m0_nc">%M0 (K1)</span>
+                </button>
+
+                <span class="palette-divider">|</span>
+                <button type="button" class="btn-ladder-tool" data-ladder-tool="WIRE" title="เส้นเชื่อมต่อแนวนอน (Wire Line)">
+                  <span class="tool-sym">───</span> <span class="tool-lbl">เส้นเชื่อม</span>
+                </button>
+
+                <span class="palette-divider">|</span>
+                <span class="palette-group-label">Coil:</span>
+                <button type="button" class="btn-ladder-tool" data-ladder-tool="Q0" title="คอยล์เอาต์พุต Q0 (PL1)">
+                  <span class="tool-sym">( )</span> <span class="tool-lbl" data-bind-plc="out0_coil">%Q0.0 (PL1)</span>
+                </button>
+                <button type="button" class="btn-ladder-tool" data-ladder-tool="Q1" title="คอยล์เอาต์พุต Q1 (PL2)">
+                  <span class="tool-sym">( )</span> <span class="tool-lbl" data-bind-plc="out1_coil">%Q0.1 (PL2)</span>
+                </button>
+                <button type="button" class="btn-ladder-tool" data-ladder-tool="M0" title="คอยล์รีเลย์ภายใน M0 (K1)">
+                  <span class="tool-sym">( )</span> <span class="tool-lbl" data-bind-plc="m0_coil">%M0 (K1)</span>
+                </button>
+
+                <span class="palette-divider">|</span>
+                <button type="button" class="btn-ladder-tool btn-tool-eraser" data-ladder-tool="EMPTY" title="ยางลบ / ลบอุปกรณ์ในช่อง">
+                  <span class="tool-sym">🗑️</span> <span class="tool-lbl">ลบช่อง</span>
+                </button>
+              </div>
             </div>
             <div id="ladderPopupBody" class="ladder-popup-body">
               <div id="ladderPopupClone" class="ladder-popup-svg-wrap"></div>
@@ -859,9 +991,9 @@
 
   <footer class="app-version-footer">
     <span>⚡ <strong>Electrical Control &amp; PLC Wiring Simulator</strong> — พัฒนาสื่อการสอนโดย <strong>Kru-Jirawat</strong></span>
-    <span class="version-pill" id="appVersionBadge">Version 2.7.0 (อัปเดตล่าสุด: 09 พ.ย. 2026)</span>
+    <span class="version-pill" id="appVersionBadge">Version 2.8.0 (อัปเดตล่าสุด: 09 พ.ย. 2026)</span>
   </footer>
 
-  <script src="app.js?v=20261102_2"></script>
+  <script src="app.js?v=20261109_280"></script>
 </body>
 </html>
