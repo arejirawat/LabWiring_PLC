@@ -1247,6 +1247,42 @@ body.fullscreen-popup-open {
   letter-spacing: 0.02em;
 }
 
+.app-version-footer {
+  margin-top: auto;
+  padding: 0.75rem 1.25rem;
+  background: #0b1120;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.app-version-footer .version-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  background: #1e293b;
+  border: 1px solid #38bdf8;
+  border-radius: 9999px;
+  color: #38bdf8;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 640px) {
+  .app-version-footer {
+    justify-content: center;
+    text-align: center;
+  }
+}
+
 /* Magnetic Snap-In Target Highlight */
 .terminal-node.snap-target-active .term-screw,
 .terminal-node.snap-target-active .term-outer {
