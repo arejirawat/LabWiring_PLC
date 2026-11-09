@@ -594,25 +594,25 @@ const LABS = {
         from: 'POUT_24V_T',
         to: 'F2_B',
         color: '#ef4444',
-        waypoints: [{ x: 504, y: 280 }, { x: 518, y: 260 }]
+        waypoints: [{ x: 504, y: 206 }, { x: 518, y: 206 }]
       },
       {
         from: 'F2_T',
         to: 'POUT_COM0_T',
         color: '#ef4444',
-        waypoints: [{ x: 546, y: 139 }, { x: 546, y: 350 }, { x: 577, y: 370 }]
+        waypoints: [{ x: 577, y: 92 }]
       },
       {
-        from: 'POUT_Q0_T',
+        from: 'POUT_Q0_B',
         to: 'L1_A',
         color: '#ef4444',
-        waypoints: [{ x: 614, y: 330 }, { x: 618, y: 300 }]
+        waypoints: [{ x: 614, y: 392 }, { x: 593, y: 392 }]
       },
       {
         from: 'L1_B',
-        to: 'POUT_0V_T',
+        to: 'POUT_0V_B',
         color: '#3b82f6',
-        waypoints: [{ x: 678, y: 350 }, { x: 541, y: 350 }]
+        waypoints: [{ x: 653, y: 398 }, { x: 541, y: 398 }]
       }
     ]
   },
@@ -661,37 +661,37 @@ const LABS = {
         from: 'POUT_24V_T',
         to: 'F2_B',
         color: '#ef4444',
-        waypoints: [{ x: 504, y: 280 }, { x: 518, y: 260 }]
+        waypoints: [{ x: 504, y: 206 }, { x: 518, y: 206 }]
       },
       {
         from: 'F2_T',
         to: 'POUT_COM0_T',
         color: '#ef4444',
-        waypoints: [{ x: 546, y: 139 }, { x: 546, y: 350 }, { x: 577, y: 370 }]
+        waypoints: [{ x: 577, y: 92 }]
       },
       {
-        from: 'POUT_Q0_T',
+        from: 'POUT_Q0_B',
         to: 'L1_A',
         color: '#ef4444',
-        waypoints: [{ x: 614, y: 330 }, { x: 618, y: 300 }]
+        waypoints: [{ x: 614, y: 392 }, { x: 593, y: 392 }]
       },
       {
-        from: 'POUT_Q1_T',
+        from: 'POUT_Q1_B',
         to: 'L2_A',
         color: '#22c55e',
-        waypoints: [{ x: 650, y: 330 }, { x: 773, y: 330 }]
+        waypoints: [{ x: 650, y: 384 }, { x: 753, y: 384 }]
       },
       {
         from: 'L1_B',
         to: 'L2_B',
         color: '#3b82f6',
-        waypoints: [{ x: 678, y: 265 }, { x: 833, y: 265 }]
+        waypoints: [{ x: 653, y: 400 }, { x: 813, y: 400 }]
       },
       {
         from: 'L1_B',
-        to: 'POUT_0V_T',
+        to: 'POUT_0V_B',
         color: '#3b82f6',
-        waypoints: [{ x: 678, y: 360 }, { x: 541, y: 360 }]
+        waypoints: [{ x: 653, y: 400 }, { x: 541, y: 400 }]
       }
     ]
   }
@@ -957,14 +957,9 @@ function initPlcTerminalBoard() {
     }
 
     if (c > 0) {
-      html += `<line x1="${xCol}" y1="0" x2="${xCol}" y2="132" stroke="#cbd5e1" stroke-width="1.5" />`;
+      html += `<line x1="${xCol}" y1="0" x2="${xCol}" y2="152" stroke="#cbd5e1" stroke-width="1.5" />`;
     }
     html += `<line x1="${xCenter}" y1="36" x2="${xCenter}" y2="60" stroke="#64748b" stroke-width="2.2" stroke-dasharray="3 2" />`;
-
-    if (c >= 3) {
-      const k = c - 3;
-      html += `<circle id="plcInLed_${k}" cx="${xCenter}" cy="-8" r="4.5" fill="#334155" stroke="#1e293b" stroke-width="1.5" />`;
-    }
 
     html += `
       <g class="terminal-node" data-terminal="${colId}_T" data-label="${desc} (บน)" transform="translate(${xCenter}, 24)">
@@ -979,7 +974,13 @@ function initPlcTerminalBoard() {
       </g>
       <rect x="${xCol}" y="96" width="35" height="36" fill="${bgFill}" stroke="#334155" stroke-width="1" />
       <text id="plcInLbl_${c}" class="plc-dyn-label" x="${xCenter}" y="119" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10.5" font-weight="800" fill="${textFill}">${defLbl}</text>
+      <rect x="${xCol}" y="132" width="35" height="20" fill="#f1f5f9" stroke="#334155" stroke-width="1" />
     `;
+
+    if (c >= 3) {
+      const k = c - 3;
+      html += `<circle id="plcInLed_${k}" cx="${xCenter}" cy="142" r="5" fill="#334155" stroke="#1e293b" stroke-width="1.5" />`;
+    }
   }
   html += `</g></g>`;
 
@@ -990,84 +991,34 @@ function initPlcTerminalBoard() {
       <rect x="470" y="18" width="432" height="32" rx="8" fill="#1e293b" />
       <text x="686" y="39" text-anchor="middle" fill="#f8fafc" font-size="12.5" font-weight="700">ชุดเชื่อมต่อโหลดเอาต์พุตจาก TERMINAL กลาง (PLC OUTPUTS)</text>
 
-      <!-- FUSE F2 (translate 492, 115) -->
-      <g id="plcFuse2Group" transform="translate(492, 115)">
-        <text x="26" y="-12" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="700">FUSE</text>
-        <rect x="0" y="0" width="52" height="150" rx="6" fill="#38bdf8" stroke="#0284c7" stroke-width="2.5" />
-        <rect x="10" y="44" width="32" height="62" rx="3" fill="#f0f9ff" stroke="#0369a1" stroke-width="1.5" />
-        <line x1="26" y1="48" x2="26" y2="102" stroke="#ef4444" stroke-width="2" stroke-dasharray="3 2" />
-        <text x="26" y="78" text-anchor="middle" fill="#0369a1" font-size="18" font-weight="900">F</text>
-        <text x="26" y="96" text-anchor="middle" fill="#0284c7" font-size="10" font-weight="700">0.1A</text>
+      <!-- FUSE F2 (translate 492, 72) -->
+      <g id="plcFuse2Group" transform="translate(492, 72)">
+        <text x="26" y="-10" text-anchor="middle" fill="#0f172a" font-size="13.5" font-weight="700">FUSE</text>
+        <rect x="0" y="0" width="52" height="132" rx="6" fill="#38bdf8" stroke="#0284c7" stroke-width="2.5" />
+        <rect x="10" y="38" width="32" height="56" rx="3" fill="#f0f9ff" stroke="#0369a1" stroke-width="1.5" />
+        <line x1="26" y1="42" x2="26" y2="90" stroke="#ef4444" stroke-width="2" stroke-dasharray="3 2" />
+        <text x="26" y="69" text-anchor="middle" fill="#0369a1" font-size="17" font-weight="900">F</text>
+        <text x="26" y="86" text-anchor="middle" fill="#0284c7" font-size="10" font-weight="700">0.1A</text>
 
-        <!-- Top Screw F2_T (rel: 26, 24 -> global: 518, 139) -->
-        <g class="terminal-node" data-terminal="F2_T" data-label="ฟิวส์ F (ฝั่งเอาต์พุต - ขั้วบน)" transform="translate(26, 24)">
+        <!-- Top Screw F2_T (rel: 26, 20 -> global: 518, 92) -->
+        <g class="terminal-node" data-terminal="F2_T" data-label="ฟิวส์ F (ฝั่งเอาต์พุต - ขั้วบน)" transform="translate(26, 20)">
           <circle class="term-hit" r="22" fill="transparent" />
           <circle class="term-screw" r="14" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
           <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
         </g>
 
-        <!-- Bottom Screw F2_B (rel: 26, 126 -> global: 518, 241) -->
-        <g class="terminal-node" data-terminal="F2_B" data-label="ฟิวส์ F (ฝั่งเอาต์พุต - ขั้วล่าง)" transform="translate(26, 126)">
+        <!-- Bottom Screw F2_B (rel: 26, 112 -> global: 518, 184) -->
+        <g class="terminal-node" data-terminal="F2_B" data-label="ฟิวส์ F (ฝั่งเอาต์พุต - ขั้วล่าง)" transform="translate(26, 112)">
           <circle class="term-hit" r="22" fill="transparent" />
           <circle class="term-screw" r="14" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
           <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
         </g>
       </g>
 
-      <!-- PILOT LAMP PL1 (RED) at (590, 95) -->
-      <g id="plcLamp1Group" transform="translate(590, 95)">
-        <text x="58" y="-12" text-anchor="middle" fill="#0f172a" font-size="16" font-weight="700">PL1 (หลอดสีแดง)</text>
-        <rect x="0" y="10" width="116" height="155" rx="6" fill="#f8fafc" stroke="#64748b" stroke-width="2" />
-
-        <circle id="plcLamp1Halo" cx="58" cy="62" r="38" fill="#ef4444" opacity="0" filter="url(#glow-yellow)" />
-        <circle id="plcLamp1Body" cx="58" cy="62" r="32" fill="#7f1d1d" stroke="#1e293b" stroke-width="2.5" />
-        <text id="plcLamp1Icon" x="58" y="67" text-anchor="middle" fill="#fca5a5" font-size="15" font-weight="800">RED</text>
-
-        <!-- Terminals X1 (L1_A) and X2 (L1_B) -->
-        <rect x="12" y="112" width="92" height="44" rx="4" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5" />
-        <text x="28" y="127" text-anchor="middle" fill="#991b1b" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="800">X1</text>
-        <text x="88" y="127" text-anchor="middle" fill="#991b1b" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="800">X2</text>
-        <g class="terminal-node" data-terminal="L1_A" data-label="หลอดไฟแดง PL1 ขั้ว X1" transform="translate(28, 134)">
-          <circle class="term-hit" r="20" fill="transparent" />
-          <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
-          <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
-        </g>
-        <g class="terminal-node" data-terminal="L1_B" data-label="หลอดไฟแดง PL1 ขั้ว X2" transform="translate(88, 134)">
-          <circle class="term-hit" r="20" fill="transparent" />
-          <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
-          <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
-        </g>
-      </g>
-
-      <!-- PILOT LAMP PL2 (GREEN) at (745, 95) -->
-      <g id="plcLamp2Group" transform="translate(745, 95)">
-        <text x="58" y="-12" text-anchor="middle" fill="#0f172a" font-size="16" font-weight="700">PL2 (หลอดสีเขียว)</text>
-        <rect x="0" y="10" width="116" height="155" rx="6" fill="#f8fafc" stroke="#64748b" stroke-width="2" />
-
-        <circle id="plcLamp2Halo" cx="58" cy="62" r="38" fill="#22c55e" opacity="0" filter="url(#glow-green)" />
-        <circle id="plcLamp2Body" cx="58" cy="62" r="32" fill="#064e3b" stroke="#1e293b" stroke-width="2.5" />
-        <text id="plcLamp2Icon" x="58" y="67" text-anchor="middle" fill="#86efac" font-size="15" font-weight="800">GRN</text>
-
-        <!-- Terminals X1 (L2_A) and X2 (L2_B) -->
-        <rect x="12" y="112" width="92" height="44" rx="4" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5" />
-        <text x="28" y="127" text-anchor="middle" fill="#14532d" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="800">X1</text>
-        <text x="88" y="127" text-anchor="middle" fill="#14532d" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="800">X2</text>
-        <g class="terminal-node" data-terminal="L2_A" data-label="หลอดไฟเขียว PL2 ขั้ว X1" transform="translate(28, 134)">
-          <circle class="term-hit" r="20" fill="transparent" />
-          <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
-          <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
-        </g>
-        <g class="terminal-node" data-terminal="L2_B" data-label="หลอดไฟเขียว PL2 ขั้ว X2" transform="translate(88, 134)">
-          <circle class="term-hit" r="20" fill="transparent" />
-          <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
-          <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
-        </g>
-      </g>
-
-      <!-- MIDDLE TERMINAL BLOCK - OUTPUT STRIP (11 COLUMNS) at (486, 395) -->
-      <g id="plcOutTerminalStrip" transform="translate(486, 395)">
-        <text x="200" y="-14" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">TERMINAL กลาง (เชื่อมต่อมาจากพอร์ต Relay Output ของ PLC)</text>
-        <rect x="0" y="0" width="401.5" height="96" rx="4" fill="#f8fafc" stroke="#334155" stroke-width="2.5" />
+      <!-- MIDDLE TERMINAL BLOCK - OUTPUT STRIP (11 COLUMNS) at (486, 228) -->
+      <g id="plcOutTerminalStrip" transform="translate(486, 228)">
+        <text x="200" y="-10" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">TERMINAL กลาง (เชื่อมต่อมาจากพอร์ต Relay Output ของ PLC)</text>
+        <rect x="0" y="0" width="401.5" height="148" rx="4" fill="#f8fafc" stroke="#334155" stroke-width="2.5" />
   `;
 
   const outColDefs = [
@@ -1089,13 +1040,10 @@ function initPlcTerminalBoard() {
     const xCenter = xCol + 18.25;
 
     if (c > 0) {
-      html += `<line x1="${xCol}" y1="0" x2="${xCol}" y2="132" stroke="#cbd5e1" stroke-width="1.5" />`;
+      html += `<line x1="${xCol}" y1="0" x2="${xCol}" y2="148" stroke="#cbd5e1" stroke-width="1.5" />`;
     }
-    html += `<line x1="${xCenter}" y1="36" x2="${xCenter}" y2="60" stroke="#64748b" stroke-width="2.2" stroke-dasharray="3 2" />`;
-
-    if (col.led !== null) {
-      html += `<circle id="plcOutLed_${col.led}" cx="${xCenter}" cy="-8" r="4.5" fill="#334155" stroke="#1e293b" stroke-width="1.5" />`;
-    }
+    html += `<line x1="${xCenter}" y1="36" x2="${xCenter}" y2="48" stroke="#64748b" stroke-width="2" stroke-dasharray="2 2" />`;
+    html += `<line x1="${xCenter}" y1="100" x2="${xCenter}" y2="112" stroke="#64748b" stroke-width="2" stroke-dasharray="2 2" />`;
 
     html += `
       <g class="terminal-node" data-terminal="${col.id}_T" data-label="${col.desc} (บน)" transform="translate(${xCenter}, 24)">
@@ -1103,16 +1051,80 @@ function initPlcTerminalBoard() {
         <circle class="term-screw" r="12" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
         <path d="M-6,0 H6 M0,-6 V6" stroke="#1e293b" stroke-width="2" />
       </g>
-      <g class="terminal-node" data-terminal="${col.id}_B" data-label="${col.desc} (ล่าง)" transform="translate(${xCenter}, 72)">
+      <rect x="${xCol}" y="48" width="36.5" height="32" fill="${col.bg}" stroke="#334155" stroke-width="1" />
+      <text id="plcOutLbl_${c}" class="plc-dyn-label" x="${xCenter}" y="68" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10.5" font-weight="800" fill="${col.fg}">${col.lbl}</text>
+      <rect x="${xCol}" y="80" width="36.5" height="20" fill="#f1f5f9" stroke="#334155" stroke-width="1" />
+    `;
+
+    if (col.led !== null) {
+      html += `<circle id="plcOutLed_${col.led}" cx="${xCenter}" cy="90" r="5" fill="#334155" stroke="#1e293b" stroke-width="1.5" />`;
+    }
+
+    html += `
+      <g class="terminal-node" data-terminal="${col.id}_B" data-label="${col.desc} (ล่าง)" transform="translate(${xCenter}, 124)">
         <circle class="term-hit" r="18" fill="transparent" />
         <circle class="term-screw" r="12" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
         <path d="M-6,0 H6 M0,-6 V6" stroke="#1e293b" stroke-width="2" />
       </g>
-      <rect x="${xCol}" y="96" width="36.5" height="36" fill="${col.bg}" stroke="#334155" stroke-width="1" />
-      <text id="plcOutLbl_${c}" class="plc-dyn-label" x="${xCenter}" y="119" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10.5" font-weight="800" fill="${col.fg}">${col.lbl}</text>
     `;
   });
-  html += `</g></g>`;
+  html += `</g>`;
+
+  // PILOT LAMP PL1 (RED) at (565, 412) - Terminals on Top, Indicator Lamp on Bottom
+  html += `
+    <g id="plcLamp1Group" transform="translate(565, 412)">
+      <rect x="0" y="0" width="116" height="154" rx="6" fill="#f8fafc" stroke="#64748b" stroke-width="2" />
+
+      <!-- Terminals X1 (L1_A) and X2 (L1_B) at Top -->
+      <rect x="12" y="8" width="92" height="44" rx="4" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5" />
+      <text x="28" y="21" text-anchor="middle" fill="#991b1b" font-family="'JetBrains Mono', monospace" font-size="11.5" font-weight="800">X1</text>
+      <text x="88" y="21" text-anchor="middle" fill="#991b1b" font-family="'JetBrains Mono', monospace" font-size="11.5" font-weight="800">X2</text>
+      <g class="terminal-node" data-terminal="L1_A" data-label="หลอดไฟแดง PL1 ขั้ว X1" transform="translate(28, 34)">
+        <circle class="term-hit" r="20" fill="transparent" />
+        <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
+        <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
+      </g>
+      <g class="terminal-node" data-terminal="L1_B" data-label="หลอดไฟแดง PL1 ขั้ว X2" transform="translate(88, 34)">
+        <circle class="term-hit" r="20" fill="transparent" />
+        <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
+        <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
+      </g>
+
+      <!-- Bottom Indicator Lamp lens (cy=96) -->
+      <circle id="plcLamp1Halo" cx="58" cy="96" r="36" fill="#ef4444" opacity="0" filter="url(#glow-yellow)" />
+      <circle id="plcLamp1Body" cx="58" cy="96" r="30" fill="#7f1d1d" stroke="#1e293b" stroke-width="2.5" />
+      <text id="plcLamp1Icon" x="58" y="101" text-anchor="middle" fill="#fca5a5" font-size="14" font-weight="800">RED</text>
+
+      <text x="58" y="146" text-anchor="middle" fill="#0f172a" font-size="13.5" font-weight="700">PL1 (หลอดสีแดง)</text>
+    </g>
+
+    <!-- PILOT LAMP PL2 (GREEN) at (725, 412) - Terminals on Top, Indicator Lamp on Bottom -->
+    <g id="plcLamp2Group" transform="translate(725, 412)">
+      <rect x="0" y="0" width="116" height="154" rx="6" fill="#f8fafc" stroke="#64748b" stroke-width="2" />
+
+      <!-- Terminals X1 (L2_A) and X2 (L2_B) at Top -->
+      <rect x="12" y="8" width="92" height="44" rx="4" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5" />
+      <text x="28" y="21" text-anchor="middle" fill="#14532d" font-family="'JetBrains Mono', monospace" font-size="11.5" font-weight="800">X1</text>
+      <text x="88" y="21" text-anchor="middle" fill="#14532d" font-family="'JetBrains Mono', monospace" font-size="11.5" font-weight="800">X2</text>
+      <g class="terminal-node" data-terminal="L2_A" data-label="หลอดไฟเขียว PL2 ขั้ว X1" transform="translate(28, 34)">
+        <circle class="term-hit" r="20" fill="transparent" />
+        <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
+        <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
+      </g>
+      <g class="terminal-node" data-terminal="L2_B" data-label="หลอดไฟเขียว PL2 ขั้ว X2" transform="translate(88, 34)">
+        <circle class="term-hit" r="20" fill="transparent" />
+        <circle class="term-screw" r="13" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
+        <path d="M-7,0 H7 M0,-7 V7" stroke="#1e293b" stroke-width="2.2" />
+      </g>
+
+      <!-- Bottom Indicator Lamp lens (cy=96) -->
+      <circle id="plcLamp2Halo" cx="58" cy="96" r="36" fill="#22c55e" opacity="0" filter="url(#glow-green)" />
+      <circle id="plcLamp2Body" cx="58" cy="96" r="30" fill="#064e3b" stroke="#1e293b" stroke-width="2.5" />
+      <text id="plcLamp2Icon" x="58" y="101" text-anchor="middle" fill="#86efac" font-size="14" font-weight="800">GRN</text>
+
+      <text x="58" y="146" text-anchor="middle" fill="#0f172a" font-size="13.5" font-weight="700">PL2 (หลอดสีเขียว)</text>
+    </g>
+  </g>`;
 
   html += `
     <text x="26" y="594" fill="#64748b" font-size="12" font-weight="600" pointer-events="none">ชุดทดลองการเชื่อมต่ออินพุต-เอาต์พุต PLC ผ่าน TERMINAL กลาง</text>
@@ -3527,10 +3539,12 @@ function autoRouteWire(fromTerm, toTerm) {
     }
   });
 
-  // Switch plunger green actuator boxes to avoid covering PRESS buttons
+  // Switch plunger green actuator boxes and indicator lamp bodies to avoid covering interactive buttons/lenses
   const switchBoxes = [
     { xMin: 214, xMax: 272, yMin: 235, yMax: 365 },
-    { xMin: 214, xMax: 272, yMin: 430, yMax: 560 }
+    { xMin: 214, xMax: 272, yMin: 430, yMax: 560 },
+    { xMin: 565, xMax: 681, yMin: 465, yMax: 565 }, // PL1 (Red indicator lamp)
+    { xMin: 725, xMax: 841, yMin: 465, yMax: 565 }  // PL2 (Green indicator lamp)
   ];
 
   const scoreCandidate = (rawWps, extraPenalty = 0) => {
