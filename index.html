@@ -37,6 +37,10 @@
             <option value="lab2_1">ใบงานที่ 2.1: การต่อวงจรรีเลย์เบื้องต้น (ควบคุมหลอดไฟ 1 หลอด)</option>
             <option value="lab2_2">ใบงานที่ 2.2: การต่อวงจรรีเลย์สลับหน้าสัมผัส NO/NC (หลอดไฟ L1, L2)</option>
             <option value="lab2_latch">โจทย์เสริม: วงจรรีเลย์ค้างสถานะ (Self-Holding / Latching Circuit)</option>
+            <option value="lab4_1">ใบงานที่ 4.1: การเชื่อมต่อสวิตช์อินพุต PLC (S1 ➔ I0.0 / X0 แบบ Negative Logic)</option>
+            <option value="lab4_2">ใบงานที่ 4.2 (มอบหมายงาน): เชื่อมต่ออินพุต S1, S2 ควบคุมเอาต์พุต (AND Logic)</option>
+            <option value="lab5_1">ใบงานที่ 5.1: การเชื่อมต่ออินพุตและเอาต์พุต PLC (PB1 ควบคุมหลอดไฟ PL1)</option>
+            <option value="lab5_2">ใบงานที่ 5.2 (มอบหมายงาน): เชื่อมต่อ PB1 ควบคุมหลอดไฟ PL1 (แดง) และ PL2 (เขียว) สลับกัน</option>
           </select>
           <button type="button" id="btnOpenLabBuilder" class="btn btn-builder-menu" title="สร้างและจัดการโจทย์ใบงานเพิ่มเติม (สำหรับผู้สอน)">
             🛠️ สร้างโจทย์เพิ่มเติม
@@ -113,11 +117,15 @@
           <div>
             <div class="plc-badge-row">
               <span class="badge badge-plc">PLC LADDER DIAGRAM</span>
-              <span class="plc-model-pill">Schneider Modicon TM221CE16R</span>
+              <span class="plc-model-pill" id="plcModelPill">Schneider Modicon TM221CE16R</span>
             </div>
-            <h2>จำลองวงจร Ladder & อ้างอิง Address (TM221CE16R)</h2>
+            <h2 id="plcCardTitle">จำลองวงจร Ladder & อ้างอิง Address (TM221CE16R)</h2>
           </div>
           <div class="plc-header-actions">
+            <select id="plcModelSelect" class="plc-model-select" title="เลือกรุ่น PLC ที่ใช้อ้างอิง">
+              <option value="TM221CE16R">PLC: Schneider TM221CE16R (COM / I0.0 / Q0.0)</option>
+              <option value="FX5U-32MR">PLC: Mitsubishi FX5U-32MR (S/S / X0 / Y0)</option>
+            </select>
             <button type="button" id="btnPlcModeToggle" class="btn-plc-mode" title="สลับระหว่างการจำลองตามสายที่ต่อจริง กับจำลองตามลอจิก PLC อัตโนมัติ">
               🔗 โหมด: ซิงค์ตามชุดฝึกจริง
             </button>
@@ -130,7 +138,7 @@
         <!-- Mini Hardware Unit Panel: TM221CE16R I/O LEDs -->
         <div class="tm221-hw-strip" id="tm221HwStrip">
           <div class="tm221-brand-box">
-            <div class="tm221-model-name">TM221CE16R</div>
+            <div class="tm221-model-name" id="plcHwModelName">TM221CE16R</div>
             <div class="tm221-status-leds">
               <span class="plc-led-item"><i id="plcLedPwr" class="plc-led on"></i> PWR</span>
               <span class="plc-led-item"><i id="plcLedRun" class="plc-led on"></i> RUN</span>
@@ -171,10 +179,10 @@
         <div id="plcIlDrawer" class="plc-il-drawer" hidden>
           <div class="plc-il-grid">
             <div class="plc-addr-box">
-              <h4>📌 ตารางเทียบอุปกรณ์กับ Address (TM221CE16R)</h4>
+              <h4 id="plcAddrTableTitle">📌 ตารางเทียบอุปกรณ์กับ Address (TM221CE16R)</h4>
               <table class="plc-addr-table">
                 <thead>
-                  <tr><th>อุปกรณ์ชุดฝึก</th><th>TM221CE16R Address</th><th>ชนิด</th><th>สถานะ</th></tr>
+                  <tr><th>อุปกรณ์ชุดฝึก</th><th id="plcAddrColHeader">TM221CE16R Address</th><th>ชนิด</th><th>สถานะ</th></tr>
                 </thead>
                 <tbody id="plcAddrTableBody"></tbody>
               </table>
@@ -236,7 +244,11 @@
       <div class="panel-card workbench-card" id="workbenchCard">
         <div class="workbench-toolbar">
           <div class="toolbar-left">
-            <span class="badge badge-board">ชุดทดลองการเชื่อมต่อวงจรไฟฟ้าควบคุมด้วย RELAY</span>
+            <span class="badge badge-board" id="workbenchBoardBadge">ชุดทดลองการเชื่อมต่อวงจรไฟฟ้าควบคุมด้วย RELAY</span>
+            <select id="wbPlcModelSelect" class="wb-plc-model-select" title="เลือกรุ่น PLC บนชุดฝึก (TM221CE16R / FX5U-32MR)" style="display: none;">
+              <option value="TM221CE16R">PLC: Schneider TM221CE16R</option>
+              <option value="FX5U-32MR">PLC: Mitsubishi FX5U-32MR</option>
+            </select>
             <span class="board-status" id="wireCountText">สายไฟที่ต่อ: 0 เส้น</span>
           </div>
 
@@ -255,7 +267,7 @@
               </button>
             </div>
             <div class="power-switch-wrap">
-              <span class="power-label">แหล่งจ่ายไฟ 12VDC:</span>
+              <span class="power-label" id="powerSupplyLabel">แหล่งจ่ายไฟ 12VDC:</span>
               <button type="button" id="btnPowerToggle" class="power-toggle on" aria-pressed="true">
                 <span class="power-indicator"></span>
                 <span class="power-state-text">ON (จ่ายไฟ)</span>
@@ -516,6 +528,9 @@
               <text x="18" y="556" fill="#64748b" font-size="13" font-weight="600" pointer-events="none">ชุดทดลองการเชื่อมต่อวงจรไฟฟ้าควบคุมด้วย RELAY</text>
               <text x="692" y="556" text-anchor="end" fill="#475569" font-size="12.5" font-weight="700" font-family="JetBrains Mono, monospace" pointer-events="none">designed by Kru-Jirawat TATC .2026</text>
             </g>
+
+            <!-- PLC Terminal Block Workbench Group (Lab 4 & Lab 5) -->
+            <g id="plcTerminalBoard" style="display: none;"></g>
 
             <!-- Wires Layer -->
             <g id="wiresLayer"></g>

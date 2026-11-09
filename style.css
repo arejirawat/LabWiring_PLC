@@ -2688,5 +2688,63 @@ body.fullscreen-popup-open {
   height: auto;
 }
 
+/* ==========================================================================
+   PLC Model Selectors & PLC Terminal Board (Lab 4 & Lab 5)
+   ========================================================================== */
+.plc-model-select {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.74rem;
+  border-radius: 7px;
+  border: 1px solid #0284c7;
+  background: #0f172a;
+  color: #38bdf8;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.plc-model-select:hover,
+.plc-model-select:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+}
+
+.wb-plc-model-select {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.72rem;
+  border-radius: 6px;
+  border: 1px solid #3b82f6;
+  background: #1e293b;
+  color: #60a5fa;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  margin-left: 0.4rem;
+  transition: all 0.15s ease;
+}
+
+.wb-plc-model-select:hover,
+.wb-plc-model-select:focus {
+  background: #1e3a8a;
+  border-color: #60a5fa;
+  color: #ffffff;
+}
+
+#plcTerminalBoard .switch-actuator:hover rect {
+  filter: brightness(1.15);
+}
+
+#plcTerminalBoard .switch-actuator:active rect {
+  transform: translateY(2px);
+}
+
+#plcTerminalBoard .plc-dyn-label {
+  transition: fill 0.2s ease;
+}
+
+
 
 
