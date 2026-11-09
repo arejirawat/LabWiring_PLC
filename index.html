@@ -249,6 +249,13 @@
               <option value="TM221CE16R">PLC: Schneider TM221CE16R</option>
               <option value="FX5U-32MR">PLC: Mitsubishi FX5U-32MR</option>
             </select>
+            <select id="wbPlcLogicSelect" class="plc-model-select" style="display: none;" title="เลือกรูปแบบลอจิกการต่อวงจร PLC (Negative Logic / Positive Logic)">
+              <option value="negative">ลอจิก: Negative Logic (COM = +24V)</option>
+              <option value="positive">ลอจิก: Positive Logic (COM = 0V)</option>
+            </select>
+            <button type="button" id="btnResetFuse" class="btn-reset-fuse" style="display: none;" title="คลิกเพื่อเปลี่ยน/รีเซตฟิวส์ที่ขาดใหม่">
+              💥 ฟิวส์ขาด! คลิกเพื่อรีเซตฟิวส์
+            </button>
             <span class="board-status" id="wireCountText">สายไฟที่ต่อ: 0 เส้น</span>
           </div>
 

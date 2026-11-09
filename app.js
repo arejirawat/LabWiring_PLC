@@ -31,6 +31,8 @@ const state = {
   viewBox: { x: 0, y: 0, w: 920, h: 620 },
   panMode: false,
   plcModel: 'TM221CE16R', // 'TM221CE16R' (Schneider) or 'FX5U-32MR' (Mitsubishi)
+  plcWiringLogic: 'negative', // 'negative' or 'positive'
+  fuseBlown: { F1: false, F2: false, MAIN: false },
   isPlcBoardActive: false,
   switches: {
     // Default locked: true so clicking S1 or S2 holds its state (ON/OFF) by default for easy multi-switch testing
@@ -80,6 +82,15 @@ function getPlcModelSpec(model = (typeof state !== 'undefined' ? state.plcModel 
     ilOrn: isFx ? 'ORI' : 'ORN',
     ilOut: isFx ? 'OUT' : 'ST'
   };
+}
+
+// Helper to return the active hint / solution wires based on current wiring logic (Negative vs Positive)
+function getActiveHintWires(lab) {
+  if (!lab) return [];
+  if (lab.isPlcTerminalLab && typeof state !== 'undefined' && state.plcWiringLogic === 'positive' && lab.hintWiresPositive) {
+    return lab.hintWiresPositive;
+  }
+  return lab.hintWires || [];
 }
 
 // Lab Curriculum Definitions (Based on Doc1 & Doc2) with clean non-overlapping hint waypoints
@@ -490,6 +501,32 @@ const LABS = {
         color: '#ef4444',
         waypoints: [{ x: 161, y: 340 }, { x: 153, y: 360 }]
       }
+    ],
+    hintWiresPositive: [
+      {
+        from: 'PIN_0V_T',
+        to: 'PIN_COM_T',
+        color: '#3b82f6',
+        waypoints: [{ x: 83, y: 365 }, { x: 118, y: 365 }]
+      },
+      {
+        from: 'PIN_24V_T',
+        to: 'F1_B',
+        color: '#ef4444',
+        waypoints: [{ x: 48, y: 280 }, { x: 68, y: 260 }]
+      },
+      {
+        from: 'F1_T',
+        to: 'S1_NO_2',
+        color: '#ef4444',
+        waypoints: [{ x: 92, y: 139 }, { x: 92, y: 330 }, { x: 225, y: 330 }]
+      },
+      {
+        from: 'S1_NO_1',
+        to: 'PIN_I0_T',
+        color: '#ef4444',
+        waypoints: [{ x: 161, y: 340 }, { x: 153, y: 360 }]
+      }
     ]
   },
   lab4_2: {
@@ -533,6 +570,44 @@ const LABS = {
         from: 'S1_NO_2',
         to: 'S2_NO_2',
         color: '#3b82f6',
+        waypoints: [{ x: 225, y: 265 }, { x: 385, y: 265 }]
+      },
+      {
+        from: 'S1_NO_1',
+        to: 'PIN_I0_T',
+        color: '#ef4444',
+        waypoints: [{ x: 161, y: 340 }, { x: 153, y: 360 }]
+      },
+      {
+        from: 'S2_NO_1',
+        to: 'PIN_I1_T',
+        color: '#ef4444',
+        waypoints: [{ x: 321, y: 340 }, { x: 188, y: 360 }]
+      }
+    ],
+    hintWiresPositive: [
+      {
+        from: 'PIN_0V_T',
+        to: 'PIN_COM_T',
+        color: '#3b82f6',
+        waypoints: [{ x: 83, y: 365 }, { x: 118, y: 365 }]
+      },
+      {
+        from: 'PIN_24V_T',
+        to: 'F1_B',
+        color: '#ef4444',
+        waypoints: [{ x: 48, y: 280 }, { x: 68, y: 260 }]
+      },
+      {
+        from: 'F1_T',
+        to: 'S1_NO_2',
+        color: '#ef4444',
+        waypoints: [{ x: 92, y: 139 }, { x: 92, y: 330 }, { x: 225, y: 330 }]
+      },
+      {
+        from: 'S1_NO_2',
+        to: 'S2_NO_2',
+        color: '#ef4444',
         waypoints: [{ x: 225, y: 265 }, { x: 385, y: 265 }]
       },
       {
@@ -614,6 +689,56 @@ const LABS = {
         color: '#3b82f6',
         waypoints: [{ x: 653, y: 398 }, { x: 541, y: 398 }]
       }
+    ],
+    hintWiresPositive: [
+      {
+        from: 'PIN_0V_T',
+        to: 'PIN_COM_T',
+        color: '#3b82f6',
+        waypoints: [{ x: 83, y: 365 }, { x: 118, y: 365 }]
+      },
+      {
+        from: 'PIN_24V_T',
+        to: 'F1_B',
+        color: '#ef4444',
+        waypoints: [{ x: 48, y: 280 }, { x: 68, y: 260 }]
+      },
+      {
+        from: 'F1_T',
+        to: 'S1_NO_2',
+        color: '#ef4444',
+        waypoints: [{ x: 92, y: 139 }, { x: 92, y: 330 }, { x: 225, y: 330 }]
+      },
+      {
+        from: 'S1_NO_1',
+        to: 'PIN_I0_T',
+        color: '#ef4444',
+        waypoints: [{ x: 161, y: 340 }, { x: 153, y: 360 }]
+      },
+      {
+        from: 'POUT_24V_T',
+        to: 'F2_B',
+        color: '#ef4444',
+        waypoints: [{ x: 504, y: 206 }, { x: 518, y: 206 }]
+      },
+      {
+        from: 'F2_T',
+        to: 'POUT_COM0_T',
+        color: '#ef4444',
+        waypoints: [{ x: 577, y: 92 }]
+      },
+      {
+        from: 'POUT_Q0_B',
+        to: 'L1_A',
+        color: '#ef4444',
+        waypoints: [{ x: 614, y: 392 }, { x: 593, y: 392 }]
+      },
+      {
+        from: 'L1_B',
+        to: 'POUT_0V_B',
+        color: '#3b82f6',
+        waypoints: [{ x: 653, y: 398 }, { x: 541, y: 398 }]
+      }
     ]
   },
   lab5_2: {
@@ -650,6 +775,68 @@ const LABS = {
         to: 'S1_NO_2',
         color: '#3b82f6',
         waypoints: [{ x: 83, y: 330 }, { x: 225, y: 330 }]
+      },
+      {
+        from: 'S1_NO_1',
+        to: 'PIN_I0_T',
+        color: '#ef4444',
+        waypoints: [{ x: 161, y: 340 }, { x: 153, y: 360 }]
+      },
+      {
+        from: 'POUT_24V_T',
+        to: 'F2_B',
+        color: '#ef4444',
+        waypoints: [{ x: 504, y: 206 }, { x: 518, y: 206 }]
+      },
+      {
+        from: 'F2_T',
+        to: 'POUT_COM0_T',
+        color: '#ef4444',
+        waypoints: [{ x: 577, y: 92 }]
+      },
+      {
+        from: 'POUT_Q0_B',
+        to: 'L1_A',
+        color: '#ef4444',
+        waypoints: [{ x: 614, y: 392 }, { x: 593, y: 392 }]
+      },
+      {
+        from: 'POUT_Q1_B',
+        to: 'L2_A',
+        color: '#22c55e',
+        waypoints: [{ x: 650, y: 384 }, { x: 753, y: 384 }]
+      },
+      {
+        from: 'L1_B',
+        to: 'L2_B',
+        color: '#3b82f6',
+        waypoints: [{ x: 653, y: 400 }, { x: 813, y: 400 }]
+      },
+      {
+        from: 'L1_B',
+        to: 'POUT_0V_B',
+        color: '#3b82f6',
+        waypoints: [{ x: 653, y: 400 }, { x: 541, y: 400 }]
+      }
+    ],
+    hintWiresPositive: [
+      {
+        from: 'PIN_0V_T',
+        to: 'PIN_COM_T',
+        color: '#3b82f6',
+        waypoints: [{ x: 83, y: 365 }, { x: 118, y: 365 }]
+      },
+      {
+        from: 'PIN_24V_T',
+        to: 'F1_B',
+        color: '#ef4444',
+        waypoints: [{ x: 48, y: 280 }, { x: 68, y: 260 }]
+      },
+      {
+        from: 'F1_T',
+        to: 'S1_NO_2',
+        color: '#ef4444',
+        waypoints: [{ x: 92, y: 139 }, { x: 92, y: 330 }, { x: 225, y: 330 }]
       },
       {
         from: 'S1_NO_1',
@@ -780,11 +967,19 @@ function initPlcTerminalBoard() {
       <!-- FUSE F1 (translate 42, 115) -->
       <g id="plcFuse1Group" transform="translate(42, 115)">
         <text x="26" y="-12" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="700">FUSE</text>
-        <rect x="0" y="0" width="52" height="150" rx="6" fill="#38bdf8" stroke="#0284c7" stroke-width="2.5" />
-        <rect x="10" y="44" width="32" height="62" rx="3" fill="#f0f9ff" stroke="#0369a1" stroke-width="1.5" />
-        <line x1="26" y1="48" x2="26" y2="102" stroke="#ef4444" stroke-width="2" stroke-dasharray="3 2" />
-        <text x="26" y="78" text-anchor="middle" fill="#0369a1" font-size="18" font-weight="900">F</text>
-        <text x="26" y="96" text-anchor="middle" fill="#0284c7" font-size="10" font-weight="700">0.1A</text>
+        <rect id="plcFuse1Body" x="0" y="0" width="52" height="150" rx="6" fill="#38bdf8" stroke="#0284c7" stroke-width="2.5" />
+        <rect id="plcFuse1Win" x="10" y="44" width="32" height="62" rx="3" fill="#f0f9ff" stroke="#0369a1" stroke-width="1.5" />
+        <line id="plcFuse1Wire" x1="26" y1="48" x2="26" y2="102" stroke="#ef4444" stroke-width="2" stroke-dasharray="3 2" />
+        <g id="plcFuse1BlownGroup" opacity="0" style="cursor: pointer;" title="ฟิวส์ F1 ขาด! คลิกเพื่อเปลี่ยน/รีเซตฟิวส์">
+          <circle cx="26" cy="75" r="18" fill="#ef4444" opacity="0.35" filter="url(#glow-yellow)" />
+          <line x1="26" y1="46" x2="21" y2="64" stroke="#fca5a5" stroke-width="2.2" stroke-linecap="round" />
+          <line x1="26" y1="104" x2="31" y2="86" stroke="#fca5a5" stroke-width="2.2" stroke-linecap="round" />
+          <text x="26" y="79" text-anchor="middle" font-size="14">💥</text>
+          <rect x="-14" y="154" width="80" height="22" rx="11" fill="#dc2626" stroke="#fca5a5" stroke-width="1.5" />
+          <text x="26" y="169" text-anchor="middle" fill="#ffffff" font-size="10" font-weight="800">🔄 รีเซตฟิวส์</text>
+        </g>
+        <text id="plcFuse1Label" x="26" y="78" text-anchor="middle" fill="#0369a1" font-size="18" font-weight="900" pointer-events="none">F</text>
+        <text id="plcFuse1Amp" x="26" y="96" text-anchor="middle" fill="#0284c7" font-size="10" font-weight="700" pointer-events="none">0.1A</text>
 
         <!-- Top Screw F1_T (rel: 26, 24 -> global: 68, 139) -->
         <g class="terminal-node" data-terminal="F1_T" data-label="ฟิวส์ F (ฝั่งอินพุต - ขั้วบน)" transform="translate(26, 24)">
@@ -994,11 +1189,19 @@ function initPlcTerminalBoard() {
       <!-- FUSE F2 (translate 492, 72) -->
       <g id="plcFuse2Group" transform="translate(492, 72)">
         <text x="26" y="-10" text-anchor="middle" fill="#0f172a" font-size="13.5" font-weight="700">FUSE</text>
-        <rect x="0" y="0" width="52" height="132" rx="6" fill="#38bdf8" stroke="#0284c7" stroke-width="2.5" />
-        <rect x="10" y="38" width="32" height="56" rx="3" fill="#f0f9ff" stroke="#0369a1" stroke-width="1.5" />
-        <line x1="26" y1="42" x2="26" y2="90" stroke="#ef4444" stroke-width="2" stroke-dasharray="3 2" />
-        <text x="26" y="69" text-anchor="middle" fill="#0369a1" font-size="17" font-weight="900">F</text>
-        <text x="26" y="86" text-anchor="middle" fill="#0284c7" font-size="10" font-weight="700">0.1A</text>
+        <rect id="plcFuse2Body" x="0" y="0" width="52" height="132" rx="6" fill="#38bdf8" stroke="#0284c7" stroke-width="2.5" />
+        <rect id="plcFuse2Win" x="10" y="38" width="32" height="56" rx="3" fill="#f0f9ff" stroke="#0369a1" stroke-width="1.5" />
+        <line id="plcFuse2Wire" x1="26" y1="42" x2="26" y2="90" stroke="#ef4444" stroke-width="2" stroke-dasharray="3 2" />
+        <g id="plcFuse2BlownGroup" opacity="0" style="cursor: pointer;" title="ฟิวส์ F2 ขาด! คลิกเพื่อเปลี่ยน/รีเซตฟิวส์">
+          <circle cx="26" cy="66" r="16" fill="#ef4444" opacity="0.35" filter="url(#glow-yellow)" />
+          <line x1="26" y1="40" x2="21" y2="56" stroke="#fca5a5" stroke-width="2.2" stroke-linecap="round" />
+          <line x1="26" y1="92" x2="31" y2="76" stroke="#fca5a5" stroke-width="2.2" stroke-linecap="round" />
+          <text x="26" y="70" text-anchor="middle" font-size="13">💥</text>
+          <rect x="-14" y="135" width="80" height="20" rx="10" fill="#dc2626" stroke="#fca5a5" stroke-width="1.5" />
+          <text x="26" y="149" text-anchor="middle" fill="#ffffff" font-size="9.5" font-weight="800">🔄 รีเซตฟิวส์</text>
+        </g>
+        <text id="plcFuse2Label" x="26" y="69" text-anchor="middle" fill="#0369a1" font-size="17" font-weight="900" pointer-events="none">F</text>
+        <text id="plcFuse2Amp" x="26" y="86" text-anchor="middle" fill="#0284c7" font-size="10" font-weight="700" pointer-events="none">0.1A</text>
 
         <!-- Top Screw F2_T (rel: 26, 20 -> global: 518, 92) -->
         <g class="terminal-node" data-terminal="F2_T" data-label="ฟิวส์ F (ฝั่งเอาต์พุต - ขั้วบน)" transform="translate(26, 20)">
@@ -1358,51 +1561,67 @@ function evaluateCircuit(customInputs = null, prevRelayState = { K1: false, K2: 
 
   // --- PLC Terminal Board Circuit Physics (Lab 4 & Lab 5) ---
   if (isPlcLab) {
-    const adj = new Map();
-    const addEdge = (a, b) => {
-      if (!adj.has(a)) adj.set(a, []);
-      if (!adj.has(b)) adj.set(b, []);
-      adj.get(a).push(b);
-      adj.get(b).push(a);
+    let f1Blown = (customInputs !== null) ? false : Boolean(state.fuseBlown && state.fuseBlown.F1);
+    let f2Blown = (customInputs !== null) ? false : Boolean(state.fuseBlown && state.fuseBlown.F2);
+
+    const inCols = ['PIN_24V', 'PIN_0V', 'PIN_COM', 'PIN_I0', 'PIN_I1', 'PIN_I2', 'PIN_I3', 'PIN_I4', 'PIN_I5', 'PIN_I6', 'PIN_I7', 'PIN_I8'];
+    const outCols = ['POUT_24V', 'POUT_0V', 'POUT_COM0', 'POUT_Q0', 'POUT_Q1', 'POUT_Q2', 'POUT_Q3', 'POUT_COM1', 'POUT_Q4', 'POUT_Q5', 'POUT_Q6'];
+
+    const buildGraph = (includeF1, includeF2, closedOutputs = {}) => {
+      const adj = new Map();
+      const addEdge = (a, b) => {
+        if (!adj.has(a)) adj.set(a, []);
+        if (!adj.has(b)) adj.set(b, []);
+        adj.get(a).push(b);
+        adj.get(b).push(a);
+      };
+
+      // 1. User wires
+      for (const w of state.wires) {
+        addEdge(w.from, w.to);
+      }
+
+      // 2. Fuses F1 and F2
+      if (includeF1) addEdge('F1_T', 'F1_B');
+      if (includeF2) addEdge('F2_T', 'F2_B');
+
+      // 3. Internal vertical edges for Input Terminal strip (12 cols)
+      inCols.forEach((c) => addEdge(`${c}_T`, `${c}_B`));
+
+      // 4. Internal vertical edges for Output Terminal strip (11 cols)
+      outCols.forEach((c) => addEdge(`${c}_T`, `${c}_B`));
+
+      // 5. Switches S1 & S2 internal contacts
+      if (s1Pressed) {
+        addEdge('S1_NO_1', 'S1_NO_2');
+      } else {
+        addEdge('S1_NC_1', 'S1_NC_2');
+      }
+      if (s2Pressed) {
+        addEdge('S2_NO_1', 'S2_NO_2');
+      } else {
+        addEdge('S2_NC_1', 'S2_NC_2');
+      }
+
+      // 6. Power rails
+      addEdge('PWR_POS', 'PIN_24V_T');
+      addEdge('PWR_POS', 'POUT_24V_T');
+      addEdge('PWR_NEG', 'PIN_0V_T');
+      addEdge('PWR_NEG', 'POUT_0V_T');
+
+      // 7. Closed PLC output relay contacts
+      if (closedOutputs.Q0) addEdge('POUT_COM0_T', 'POUT_Q0_T');
+      if (closedOutputs.Q1) addEdge('POUT_COM0_T', 'POUT_Q1_T');
+      if (closedOutputs.Q2) addEdge('POUT_COM0_T', 'POUT_Q2_T');
+      if (closedOutputs.Q3) addEdge('POUT_COM0_T', 'POUT_Q3_T');
+      if (closedOutputs.Q4) addEdge('POUT_COM1_T', 'POUT_Q4_T');
+      if (closedOutputs.Q5) addEdge('POUT_COM1_T', 'POUT_Q5_T');
+      if (closedOutputs.Q6) addEdge('POUT_COM1_T', 'POUT_Q6_T');
+
+      return adj;
     };
 
-    // 1. User wires
-    for (const w of state.wires) {
-      addEdge(w.from, w.to);
-    }
-
-    // 2. Internal edges for Fuses F1 and F2
-    addEdge('F1_T', 'F1_B');
-    addEdge('F2_T', 'F2_B');
-
-    // 3. Internal vertical edges for Input Terminal strip (12 cols)
-    const inCols = ['PIN_24V', 'PIN_0V', 'PIN_COM', 'PIN_I0', 'PIN_I1', 'PIN_I2', 'PIN_I3', 'PIN_I4', 'PIN_I5', 'PIN_I6', 'PIN_I7', 'PIN_I8'];
-    inCols.forEach((c) => addEdge(`${c}_T`, `${c}_B`));
-
-    // 4. Internal vertical edges for Output Terminal strip (11 cols)
-    const outCols = ['POUT_24V', 'POUT_0V', 'POUT_COM0', 'POUT_Q0', 'POUT_Q1', 'POUT_Q2', 'POUT_Q3', 'POUT_COM1', 'POUT_Q4', 'POUT_Q5', 'POUT_Q6'];
-    outCols.forEach((c) => addEdge(`${c}_T`, `${c}_B`));
-
-    // 5. Switches S1 & S2 internal contacts
-    if (s1Pressed) {
-      addEdge('S1_NO_1', 'S1_NO_2');
-    } else {
-      addEdge('S1_NC_1', 'S1_NC_2');
-    }
-    if (s2Pressed) {
-      addEdge('S2_NO_1', 'S2_NO_2');
-    } else {
-      addEdge('S2_NC_1', 'S2_NC_2');
-    }
-
-    // 6. Connect 24V power rails to 24V and 0V terminal columns
-    addEdge('PWR_POS', 'PIN_24V_T');
-    addEdge('PWR_POS', 'POUT_24V_T');
-    addEdge('PWR_NEG', 'PIN_0V_T');
-    addEdge('PWR_NEG', 'POUT_0V_T');
-
-    // BFS helper
-    const runBfs = () => {
+    const runBfsOn = (adjMap) => {
       const pSet = new Set();
       const nSet = new Set();
       if (powerActive) {
@@ -1410,7 +1629,7 @@ function evaluateCircuit(customInputs = null, prevRelayState = { K1: false, K2: 
         pSet.add('PWR_POS');
         while (qPos.length > 0) {
           const curr = qPos.shift();
-          for (const nxt of adj.get(curr) || []) {
+          for (const nxt of adjMap.get(curr) || []) {
             if (!pSet.has(nxt)) {
               pSet.add(nxt);
               qPos.push(nxt);
@@ -1421,7 +1640,7 @@ function evaluateCircuit(customInputs = null, prevRelayState = { K1: false, K2: 
         nSet.add('PWR_NEG');
         while (qNeg.length > 0) {
           const curr = qNeg.shift();
-          for (const nxt of adj.get(curr) || []) {
+          for (const nxt of adjMap.get(curr) || []) {
             if (!nSet.has(nxt)) {
               nSet.add(nxt);
               qNeg.push(nxt);
@@ -1432,38 +1651,65 @@ function evaluateCircuit(customInputs = null, prevRelayState = { K1: false, K2: 
       return { pSet, nSet };
     };
 
-    let { pSet: posSet, nSet: negSet } = runBfs();
-
-    // Check for short circuit
-    if (powerActive && posSet.has('PWR_NEG')) {
-      return {
-        shortCircuit: true,
-        L1: false,
-        L2: false,
-        K1: false,
-        K2: false,
-        plcInputs: [false, false, false, false, false, false, false, false, false],
-        plcOutputs: { Q0: false, Q1: false, Q2: false, Q3: false, Q4: false, Q5: false, Q6: false },
-        comPowered: false,
-        posTerminals: posSet,
-        negTerminals: negSet
-      };
+    // Step 1: Check initial short circuits (before PLC outputs close)
+    const { pSet: p0, nSet: n0 } = runBfsOn(buildGraph(!f1Blown, !f2Blown));
+    if (powerActive && p0.has('PWR_NEG')) {
+      const gNoF1 = runBfsOn(buildGraph(false, !f2Blown));
+      if ((gNoF1.pSet.has('F1_T') && gNoF1.nSet.has('F1_B')) || (gNoF1.pSet.has('F1_B') && gNoF1.nSet.has('F1_T'))) {
+        f1Blown = true;
+      }
+      const gNoF2 = runBfsOn(buildGraph(!f1Blown, false));
+      if ((gNoF2.pSet.has('F2_T') && gNoF2.nSet.has('F2_B')) || (gNoF2.pSet.has('F2_B') && gNoF2.nSet.has('F2_T'))) {
+        f2Blown = true;
+      }
+      if (!f1Blown && !f2Blown) {
+        f1Blown = true;
+      }
+      if (!customInputs && powerActive) {
+        if (f1Blown) state.fuseBlown.F1 = true;
+        if (f2Blown) state.fuseBlown.F2 = true;
+      }
     }
 
-    // Check PLC Input energization (channels 0..8)
+    // Step 2: Re-evaluate with updated (!f1Blown, !f2Blown) for PLC Inputs
+    const { pSet: pos1, nSet: neg1 } = runBfsOn(buildGraph(!f1Blown, !f2Blown));
+    const { pSet: posNoF1, nSet: negNoF1 } = runBfsOn(buildGraph(false, !f2Blown));
+
     const plcInputs = [];
-    const comPowered = powerActive && (posSet.has('PIN_COM_T') || negSet.has('PIN_COM_T'));
+    let detectedInputLogic = null;
+    if (pos1.has('PIN_COM_T') && !neg1.has('PIN_COM_T')) {
+      detectedInputLogic = 'negative';
+    } else if (neg1.has('PIN_COM_T') && !pos1.has('PIN_COM_T')) {
+      detectedInputLogic = 'positive';
+    }
+
+    let bypassedF1 = false;
     for (let k = 0; k <= 8; k++) {
       const pin = `PIN_I${k}_T`;
-      const isNegLogic = posSet.has('PIN_COM_T') && negSet.has(pin);
-      const isPosLogic = negSet.has('PIN_COM_T') && posSet.has(pin);
-      plcInputs[k] = powerActive && (isNegLogic || isPosLogic);
+      const rawNeg = pos1.has('PIN_COM_T') && neg1.has(pin);
+      const rawPos = neg1.has('PIN_COM_T') && pos1.has(pin);
+      const noF1Neg = posNoF1.has('PIN_COM_T') && negNoF1.has(pin);
+      const noF1Pos = negNoF1.has('PIN_COM_T') && posNoF1.has(pin);
+
+      const validNeg = rawNeg && !noF1Neg;
+      const validPos = rawPos && !noF1Pos;
+      plcInputs[k] = powerActive && (validNeg || validPos);
+
+      if (powerActive && ((rawNeg && noF1Neg) || (rawPos && noF1Pos))) {
+        bypassedF1 = true;
+      }
     }
 
-    // Evaluate PLC Ladder Outputs based on current lab
+    if (powerActive && posNoF1.has('PIN_COM_T') && !posNoF1.has('PWR_NEG')) {
+      bypassedF1 = true;
+    }
+
+    const comPowered = powerActive && !f1Blown && (pos1.has('PIN_COM_T') || neg1.has('PIN_COM_T')) && !(posNoF1.has('PIN_COM_T') && pos1.has('PIN_COM_T') && !pos1.has('F1_T') && !pos1.has('F1_B'));
+
+    // Step 3: Compute plcOutputs (Q0..Q6)
     const plcOutputs = { Q0: false, Q1: false, Q2: false, Q3: false, Q4: false, Q5: false, Q6: false };
     const currentLabId = (typeof state !== 'undefined' ? state.currentLabId : '');
-    if (powerActive && comPowered) {
+    if (powerActive && comPowered && detectedInputLogic !== null) {
       if (currentLabId === 'lab4_1') {
         plcOutputs.Q0 = plcInputs[0];
         plcOutputs.Q1 = !plcInputs[0];
@@ -1479,40 +1725,48 @@ function evaluateCircuit(customInputs = null, prevRelayState = { K1: false, K2: 
       }
     }
 
-    // Close PLC Output Relay contacts
-    if (plcOutputs.Q0) addEdge('POUT_COM0_T', 'POUT_Q0_T');
-    if (plcOutputs.Q1) addEdge('POUT_COM0_T', 'POUT_Q1_T');
-    if (plcOutputs.Q2) addEdge('POUT_COM0_T', 'POUT_Q2_T');
-    if (plcOutputs.Q3) addEdge('POUT_COM0_T', 'POUT_Q3_T');
-    if (plcOutputs.Q4) addEdge('POUT_COM1_T', 'POUT_Q4_T');
-    if (plcOutputs.Q5) addEdge('POUT_COM1_T', 'POUT_Q5_T');
-    if (plcOutputs.Q6) addEdge('POUT_COM1_T', 'POUT_Q6_T');
-
-    // Re-run BFS to propagate power through closed PLC output relay contacts
-    const secondBfs = runBfs();
-    posSet = secondBfs.pSet;
-    negSet = secondBfs.nSet;
-
-    if (powerActive && posSet.has('PWR_NEG')) {
-      return {
-        shortCircuit: true,
-        L1: false,
-        L2: false,
-        K1: false,
-        K2: false,
-        plcInputs,
-        plcOutputs,
-        comPowered,
-        posTerminals: posSet,
-        negTerminals: negSet
-      };
+    // Step 4: Close PLC Output Relay contacts and check for Output-side short circuits
+    const { pSet: pos2, nSet: neg2 } = runBfsOn(buildGraph(!f1Blown, !f2Blown, plcOutputs));
+    if (powerActive && pos2.has('PWR_NEG')) {
+      const g2NoF2 = runBfsOn(buildGraph(!f1Blown, false, plcOutputs));
+      if ((g2NoF2.pSet.has('F2_T') && g2NoF2.nSet.has('F2_B')) || (g2NoF2.pSet.has('F2_B') && g2NoF2.nSet.has('F2_T'))) {
+        f2Blown = true;
+      }
+      const g2NoF1 = runBfsOn(buildGraph(false, !f2Blown, plcOutputs));
+      if ((g2NoF1.pSet.has('F1_T') && g2NoF1.nSet.has('F1_B')) || (g2NoF1.pSet.has('F1_B') && g2NoF1.nSet.has('F1_T'))) {
+        f1Blown = true;
+      }
+      if (!f1Blown && !f2Blown) {
+        f2Blown = true;
+      }
+      if (!customInputs && powerActive) {
+        if (f1Blown) state.fuseBlown.F1 = true;
+        if (f2Blown) state.fuseBlown.F2 = true;
+      }
     }
 
-    const isEnergized = (pinA, pinB) =>
-      (posSet.has(pinA) && negSet.has(pinB)) || (posSet.has(pinB) && negSet.has(pinA));
+    // Step 5: Final BFS with any newly blown fuses opened
+    const finalBfs = runBfsOn(buildGraph(!f1Blown, !f2Blown, plcOutputs));
+    const noF2Bfs = runBfsOn(buildGraph(!f1Blown, false, plcOutputs));
 
-    const physicalL1 = isEnergized('L1_A', 'L1_B');
-    const physicalL2 = isEnergized('L2_A', 'L2_B');
+    const isEnergizedWithF2 = (pinA, pinB) => {
+      const onWithF2 = (finalBfs.pSet.has(pinA) && finalBfs.nSet.has(pinB)) || (finalBfs.pSet.has(pinB) && finalBfs.nSet.has(pinA));
+      const onWithoutF2 = (noF2Bfs.pSet.has(pinA) && noF2Bfs.nSet.has(pinB)) || (noF2Bfs.pSet.has(pinB) && noF2Bfs.nSet.has(pinA));
+      return !f2Blown && onWithF2 && !onWithoutF2;
+    };
+
+    const bypassedF2 = powerActive && (
+      ((noF2Bfs.pSet.has('L1_A') && noF2Bfs.nSet.has('L1_B')) || (noF2Bfs.pSet.has('L1_B') && noF2Bfs.nSet.has('L1_A'))) ||
+      ((noF2Bfs.pSet.has('L2_A') && noF2Bfs.nSet.has('L2_B')) || (noF2Bfs.pSet.has('L2_B') && noF2Bfs.nSet.has('L2_A')))
+    );
+
+    if (f1Blown) {
+      plcInputs.fill(false);
+      Object.keys(plcOutputs).forEach((k) => plcOutputs[k] = false);
+    }
+
+    const physicalL1 = isEnergizedWithF2('L1_A', 'L1_B');
+    const physicalL2 = isEnergizedWithF2('L2_A', 'L2_B');
 
     let L1 = false;
     let L2 = false;
@@ -1527,7 +1781,11 @@ function evaluateCircuit(customInputs = null, prevRelayState = { K1: false, K2: 
     }
 
     return {
-      shortCircuit: false,
+      shortCircuit: finalBfs.pSet.has('PWR_NEG') || f1Blown || f2Blown,
+      fuseBlown: { F1: f1Blown, F2: f2Blown, MAIN: false },
+      bypassedF1,
+      bypassedF2,
+      detectedInputLogic,
       L1,
       L2,
       K1: false,
@@ -1535,8 +1793,8 @@ function evaluateCircuit(customInputs = null, prevRelayState = { K1: false, K2: 
       plcInputs,
       plcOutputs,
       comPowered,
-      posTerminals: posSet,
-      negTerminals: negSet
+      posTerminals: finalBfs.pSet,
+      negTerminals: finalBfs.nSet
     };
   }
 
@@ -1627,9 +1885,14 @@ function evaluateCircuit(customInputs = null, prevRelayState = { K1: false, K2: 
     }
 
     const short = powerActive && posSet.has('PWR_NEG');
-    if (short) {
+    if (short && !customInputs && powerActive) {
+      if (state.fuseBlown) state.fuseBlown.MAIN = true;
+    }
+    const isMainBlown = !customInputs && Boolean(state.fuseBlown && state.fuseBlown.MAIN);
+    if (short || isMainBlown) {
       return {
         shortCircuit: true,
+        fuseBlown: { F1: false, F2: false, MAIN: true },
         L1: false,
         L2: false,
         K1: false,
@@ -1657,6 +1920,7 @@ function evaluateCircuit(customInputs = null, prevRelayState = { K1: false, K2: 
 
   return {
     shortCircuit: false,
+    fuseBlown: { F1: false, F2: false, MAIN: false },
     L1: isEnergized('L1_A', 'L1_B'),
     L2: isEnergized('L2_A', 'L2_B'),
     K1: k1Active,
@@ -1664,6 +1928,70 @@ function evaluateCircuit(customInputs = null, prevRelayState = { K1: false, K2: 
     posTerminals: posSet,
     negTerminals: negSet
   };
+}
+
+function resetFuses() {
+  state.fuseBlown = { F1: false, F2: false, MAIN: false };
+  state.liveTestedRows = {};
+  state.lastVerificationResults = null;
+  updateSimulationUI();
+}
+window.resetFuses = resetFuses;
+
+function updatePlcLogicModeUI() {
+  const lab = (typeof state !== 'undefined' && state.currentLabId) ? LABS[state.currentLabId] : null;
+  if (!lab || !lab.isPlcTerminalLab) return;
+
+  const isPos = state.plcWiringLogic === 'positive';
+  const labTitleEl = document.getElementById('labTitle');
+  const labObjEl = document.getElementById('labObjective');
+
+  if (state.currentLabId === 'lab4_1') {
+    if (labTitleEl) {
+      labTitleEl.textContent = isPos
+        ? 'ใบงานที่ 4.1: การเชื่อมต่อสวิตช์อินพุต PLC (S1 ➔ I0.0 / X0 แบบ Positive Logic)'
+        : 'ใบงานที่ 4.1: การเชื่อมต่อสวิตช์อินพุต PLC (S1 ➔ I0.0 / X0 แบบ Negative Logic)';
+    }
+    if (labObjEl) {
+      labObjEl.textContent = isPos
+        ? 'ฝึกปฏิบัติการต่อสายปุ่มกด S1 เข้าสู่ PLC Input Module แบบ Positive Logic (Sink Input: ขั้ว COM ต่อ 0V และสวิตช์จ่ายไฟ +24VDC ผ่านฟิวส์ F เข้า I0.0 / X0) และสังเกตสถานะหลอดไฟ LED ที่อินพุต'
+        : 'ฝึกปฏิบัติการต่อสายปุ่มกด S1 เข้าสู่ PLC Input Module แบบ Negative Logic (Source Input: ขั้ว COM ต่อไฟ +24VDC ผ่านฟิวส์ F และสวิตช์ดึงลง 0V เข้า I0.0 / X0) และสังเกตสถานะหลอดไฟ LED ที่อินพุต';
+    }
+  } else if (state.currentLabId === 'lab4_2') {
+    if (labTitleEl) {
+      labTitleEl.textContent = isPos
+        ? 'ใบงานที่ 4.2 (มอบหมายงาน): เชื่อมต่ออินพุต S1, S2 ควบคุมเอาต์พุต (AND Logic แบบ Positive Logic)'
+        : 'ใบงานที่ 4.2 (มอบหมายงาน): เชื่อมต่ออินพุต S1, S2 ควบคุมเอาต์พุต (AND Logic แบบ Negative Logic)';
+    }
+    if (labObjEl) {
+      labObjEl.textContent = isPos
+        ? 'ฝึกปฏิบัติการต่อสวิตช์ S1 (I0.0/X0) และ S2 (I0.1/X1) แบบ Positive Logic (COM = 0V, สวิตช์จ่ายไฟ +24VDC ผ่านฟิวส์ F) เพื่อควบคุมให้เอาต์พุต Q0.0 / Y0 ทำงานเมื่อกดสวิตช์พร้อมกันทั้งสองตัว (AND Logic)'
+        : 'ฝึกปฏิบัติการต่อสวิตช์ S1 (I0.0/X0) และ S2 (I0.1/X1) แบบ Negative Logic (COM = +24VDC ผ่านฟิวส์ F, สวิตช์ดึงลง 0V) เพื่อควบคุมให้เอาต์พุต Q0.0 / Y0 ทำงานเมื่อกดสวิตช์พร้อมกันทั้งสองตัว (AND Logic)';
+    }
+  } else if (state.currentLabId === 'lab5_1') {
+    if (labTitleEl) {
+      labTitleEl.textContent = isPos
+        ? 'ใบงานที่ 5.1: การเชื่อมต่ออินพุตและเอาต์พุต PLC (PB1 ควบคุมหลอดไฟ PL1 แบบ Positive Logic)'
+        : 'ใบงานที่ 5.1: การเชื่อมต่ออินพุตและเอาต์พุต PLC (PB1 ควบคุมหลอดไฟ PL1 แบบ Negative Logic)';
+    }
+    if (labObjEl) {
+      labObjEl.textContent = isPos
+        ? 'ฝึกปฏิบัติการต่อสายอินพุต PB1 แบบ Positive Logic (COM = 0V, PB1 จ่ายไฟ +24V เข้า I0.0) และเชื่อมต่อเอาต์พุต Q0.0 / Y0 ผ่านฟิวส์ F2 ไปขับโหลดหลอดไฟสัญญาณ PL1 (สีแดง) 24VDC'
+        : 'ฝึกปฏิบัติการต่อสายอินพุต PB1 แบบ Negative Logic (COM = +24V, PB1 ดึงลง 0V เข้า I0.0) และเชื่อมต่อเอาต์พุต Q0.0 / Y0 ผ่านฟิวส์ F2 ไปขับโหลดหลอดไฟสัญญาณ PL1 (สีแดง) 24VDC';
+    }
+  } else if (state.currentLabId === 'lab5_2') {
+    if (labTitleEl) {
+      labTitleEl.textContent = isPos
+        ? 'ใบงานที่ 5.2 (มอบหมายงาน): เชื่อมต่อ PB1 ควบคุมหลอดไฟ PL1 (แดง) และ PL2 (เขียว) สลับกัน (Positive Logic)'
+        : 'ใบงานที่ 5.2 (มอบหมายงาน): เชื่อมต่อ PB1 ควบคุมหลอดไฟ PL1 (แดง) และ PL2 (เขียว) สลับกัน (Negative Logic)';
+    }
+    if (labObjEl) {
+      labObjEl.textContent = isPos
+        ? 'เชื่อมต่ออินพุต PB1 แบบ Positive Logic และเชื่อมต่อเอาต์พุต Q0.0 ควบคุมหลอดไฟ PL1 (แดง) และ Q0.1 ควบคุมหลอดไฟ PL2 (เขียว) ผ่านฟิวส์ F2 ให้ทำงานสลับกันตาม Ladder Diagram'
+        : 'เชื่อมต่ออินพุต PB1 แบบ Negative Logic และเชื่อมต่อเอาต์พุต Q0.0 ควบคุมหลอดไฟ PL1 (แดง) และ Q0.1 ควบคุมหลอดไฟ PL2 (เขียว) ผ่านฟิวส์ F2 ให้ทำงานสลับกันตาม Ladder Diagram';
+    }
+  }
+  renderSchematic();
 }
 
 // Update visual state of workbench, wires, lamps, relays, and schematic
@@ -1676,6 +2004,68 @@ function updateSimulationUI() {
   const shortAlert = document.getElementById('shortCircuitAlert');
   if (shortAlert) {
     shortAlert.setAttribute('opacity', res.shortCircuit ? '1' : '0');
+  }
+
+  // Update Fuses F1 & F2 visual state and Reset Fuse button
+  const f1Blown = Boolean(state.fuseBlown && state.fuseBlown.F1);
+  const f2Blown = Boolean(state.fuseBlown && state.fuseBlown.F2);
+  const mainBlown = Boolean(state.fuseBlown && state.fuseBlown.MAIN);
+
+  const f1Body = document.getElementById('plcFuse1Body');
+  const f1Win = document.getElementById('plcFuse1Win');
+  const f1Wire = document.getElementById('plcFuse1Wire');
+  const f1BlownGroup = document.getElementById('plcFuse1BlownGroup');
+  const f1Label = document.getElementById('plcFuse1Label');
+  const f1Amp = document.getElementById('plcFuse1Amp');
+
+  if (f1Body) {
+    f1Body.setAttribute('fill', f1Blown ? '#450a0a' : '#38bdf8');
+    f1Body.setAttribute('stroke', f1Blown ? '#ef4444' : '#0284c7');
+  }
+  if (f1Win) {
+    f1Win.setAttribute('fill', f1Blown ? '#1e293b' : '#f0f9ff');
+    f1Win.setAttribute('stroke', f1Blown ? '#ef4444' : '#0369a1');
+  }
+  if (f1Wire) f1Wire.setAttribute('opacity', f1Blown ? '0' : '1');
+  if (f1BlownGroup) {
+    f1BlownGroup.setAttribute('opacity', f1Blown ? '1' : '0');
+    f1BlownGroup.style.pointerEvents = f1Blown ? 'auto' : 'none';
+  }
+  if (f1Label) f1Label.setAttribute('opacity', f1Blown ? '0' : '1');
+  if (f1Amp) {
+    f1Amp.textContent = f1Blown ? 'BLOWN' : '0.1A';
+    f1Amp.setAttribute('fill', f1Blown ? '#fca5a5' : '#0284c7');
+  }
+
+  const f2Body = document.getElementById('plcFuse2Body');
+  const f2Win = document.getElementById('plcFuse2Win');
+  const f2Wire = document.getElementById('plcFuse2Wire');
+  const f2BlownGroup = document.getElementById('plcFuse2BlownGroup');
+  const f2Label = document.getElementById('plcFuse2Label');
+  const f2Amp = document.getElementById('plcFuse2Amp');
+
+  if (f2Body) {
+    f2Body.setAttribute('fill', f2Blown ? '#450a0a' : '#38bdf8');
+    f2Body.setAttribute('stroke', f2Blown ? '#ef4444' : '#0284c7');
+  }
+  if (f2Win) {
+    f2Win.setAttribute('fill', f2Blown ? '#1e293b' : '#f0f9ff');
+    f2Win.setAttribute('stroke', f2Blown ? '#ef4444' : '#0369a1');
+  }
+  if (f2Wire) f2Wire.setAttribute('opacity', f2Blown ? '0' : '1');
+  if (f2BlownGroup) {
+    f2BlownGroup.setAttribute('opacity', f2Blown ? '1' : '0');
+    f2BlownGroup.style.pointerEvents = f2Blown ? 'auto' : 'none';
+  }
+  if (f2Label) f2Label.setAttribute('opacity', f2Blown ? '0' : '1');
+  if (f2Amp) {
+    f2Amp.textContent = f2Blown ? 'BLOWN' : '0.1A';
+    f2Amp.setAttribute('fill', f2Blown ? '#fca5a5' : '#0284c7');
+  }
+
+  const btnResetFuse = document.getElementById('btnResetFuse');
+  if (btnResetFuse) {
+    btnResetFuse.style.display = (f1Blown || f2Blown || mainBlown) ? 'inline-flex' : 'none';
   }
 
   // Update Lamp L1 & L2 on Relay Board
@@ -1842,8 +2232,9 @@ function renderWires() {
   layer.innerHTML = '';
 
   const lab = LABS[state.currentLabId];
-  if (state.showingHints && lab && lab.hintWires) {
-    lab.hintWires.forEach((hw) => {
+  const activeHints = getActiveHintWires(lab);
+  if (state.showingHints && activeHints.length > 0) {
+    activeHints.forEach((hw) => {
       const p1 = getTerminalPosition(hw.from);
       const p2 = getTerminalPosition(hw.to);
       const d = computeWirePath(p1, p2, hw.waypoints || []);
@@ -2360,8 +2751,9 @@ function renderSchematic() {
   const l2 = state.simResult.L2;
   const relayOn = state.simResult.K1 || state.simResult.K2;
 
-  const hotStroke = '#ef4444';
-  const gndStroke = '#3b82f6';
+  const pwr = Boolean(state.powerOn && !state.simResult.shortCircuit);
+  const hotStroke = pwr ? '#ef4444' : '#475569';
+  const gndStroke = pwr ? '#3b82f6' : '#475569';
   const idleStroke = '#475569';
 
   let svgContent = '';
@@ -2663,171 +3055,361 @@ function renderSchematic() {
     `;
   } else if (state.currentLabId === 'lab4_1') {
     const spec = getPlcModelSpec();
-    const in0Hot = s1;
-    svgContent = `
-      <svg viewBox="0 0 360 270">
-        <!-- Power Rails -->
-        <text x="25" y="24" font-size="13" font-weight="700" fill="#dc2626">+24VDC</text>
-        <circle cx="45" cy="38" r="6" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
-        <text x="25" y="254" font-size="13" font-weight="700" fill="#0f172a">0V</text>
-        <circle cx="45" cy="242" r="6" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
+    const hasWires = state.wires.length > 0;
+    const f1Blown = Boolean(state.fuseBlown && state.fuseBlown.F1);
+    const logicMode = (hasWires && state.simResult && state.simResult.detectedInputLogic)
+      ? state.simResult.detectedInputLogic
+      : (state.plcWiringLogic || 'negative');
+    const isPos = logicMode === 'positive';
 
-        <!-- +24V line to Fuse F -->
-        <path d="M51 38 H100 V64" fill="none" stroke="${hotStroke}" stroke-width="3"/>
-        <rect x="88" y="64" width="24" height="42" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="2"/>
-        <line x1="100" y1="68" x2="100" y2="102" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2"/>
-        <text x="100" y="89" text-anchor="middle" font-size="11" font-weight="800" fill="#0369a1">F</text>
-        <path d="M100 106 V135 H155" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+    const in0Active = hasWires ? Boolean(state.simResult.plcInputs && state.simResult.plcInputs[0]) : (pwr && !f1Blown && s1);
+    const fuse1Stroke = (!f1Blown && pwr) ? hotStroke : idleStroke;
 
-        <!-- 0V line to Switch S1 NO -->
-        <path d="M51 242 H100 V210" fill="none" stroke="${gndStroke}" stroke-width="3"/>
-        ${drawIECSwitchNO({
-          id: 'S1',
-          label: 'S1 (3-4)',
-          x: 100,
-          yTop: 168,
-          pressed: s1,
-          topEnergized: in0Hot,
-          bottomEnergized: true
-        })}
-        <path d="M100 168 V155 H155" fill="none" stroke="${in0Hot ? hotStroke : idleStroke}" stroke-width="3"/>
+    const fuse1Svg = f1Blown
+      ? `<rect x="88" y="60" width="24" height="42" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="2"/>
+         <text x="100" y="85" text-anchor="middle" font-size="9" font-weight="800" fill="#fca5a5">💥ขาด</text>`
+      : `<rect x="88" y="60" width="24" height="42" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="2"/>
+         <line x1="100" y1="64" x2="100" y2="98" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2"/>
+         <text x="100" y="85" text-anchor="middle" font-size="11" font-weight="800" fill="#0369a1">F1</text>`;
 
-        <!-- PLC Block (Inputs Section) -->
-        <rect x="155" y="45" width="185" height="190" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
-        <rect x="155" y="45" width="185" height="28" rx="8" fill="#1e293b"/>
-        <text x="247" y="64" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName} INPUTS</text>
-
-        <!-- Terminal COM / S/S -->
-        <circle cx="155" cy="135" r="5" fill="#ef4444"/>
-        <text x="166" y="139" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="#f8fafc">${spec.inCom}</text>
-        <text x="210" y="139" font-size="9.5" fill="#94a3b8">(+24V Source)</text>
-
-        <!-- Terminal I0.0 / X0 -->
-        <circle cx="155" cy="155" r="5" fill="${s1 ? '#22c55e' : '#475569'}"/>
-        <text x="166" y="159" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="${s1 ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(0)}</text>
-        <circle cx="218" cy="155" r="4" fill="${s1 ? '#22c55e' : '#334155'}"/>
-        <text x="228" y="159" font-size="10" font-weight="600" fill="${s1 ? '#4ade80' : '#64748b'}">${s1 ? 'ACTIVE (1)' : 'OFF (0)'}</text>
-
-        <!-- PLC Outputs Indicator Summary inside block -->
-        <rect x="168" y="178" width="160" height="46" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
-        <text x="248" y="193" text-anchor="middle" font-size="9" font-weight="700" fill="#94a3b8">LADDER CO-SIM OUTPUTS</text>
-        <text x="180" y="212" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${l1 ? '#4ade80' : '#64748b'}">${spec.termOutShort(0)}: ${l1 ? 'ON' : 'OFF'}</text>
-        <text x="250" y="212" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${l2 ? '#4ade80' : '#64748b'}">${spec.termOutShort(1)}: ${l2 ? 'ON' : 'OFF'}</text>
-      </svg>
+    const badgeSvg = `
+      <rect x="75" y="8" width="210" height="20" rx="10" fill="${isPos ? '#064e3b' : '#1e3a8a'}" stroke="${isPos ? '#10b981' : '#3b82f6'}" stroke-width="1.2"/>
+      <text x="180" y="22" text-anchor="middle" font-size="9.5" font-weight="700" fill="#ffffff">${isPos ? 'Positive Logic (COM = 0V Sink)' : 'Negative Logic (COM = +24V Source)'}</text>
     `;
+
+    if (!isPos) {
+      // Negative Logic (Source Input: COM = +24V, S1 pulls to 0V)
+      svgContent = `
+        <svg viewBox="0 0 360 270">
+          ${badgeSvg}
+          <text x="25" y="44" font-size="13" font-weight="700" fill="#dc2626">+24VDC</text>
+          <circle cx="45" cy="56" r="6" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
+          <text x="25" y="254" font-size="13" font-weight="700" fill="#0f172a">0V</text>
+          <circle cx="45" cy="242" r="6" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
+
+          <!-- +24V to Fuse F1 to COM -->
+          <path d="M51 56 H100 V60" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+          ${fuse1Svg}
+          <path d="M100 102 V130 H155" fill="none" stroke="${fuse1Stroke}" stroke-width="3"/>
+
+          <!-- 0V line to Switch S1 NO to I0.0 / X0 -->
+          <path d="M51 242 H100 V205" fill="none" stroke="${gndStroke}" stroke-width="3"/>
+          ${drawIECSwitchNO({
+            id: 'S1',
+            label: 'S1 (3-4)',
+            x: 100,
+            yTop: 165,
+            pressed: s1,
+            topEnergized: in0Active,
+            bottomEnergized: pwr
+          })}
+          <path d="M100 165 V155 H155" fill="none" stroke="${in0Active ? gndStroke : idleStroke}" stroke-width="3"/>
+
+          <!-- PLC Block -->
+          <rect x="155" y="42" width="185" height="195" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
+          <rect x="155" y="42" width="185" height="26" rx="8" fill="#1e293b"/>
+          <text x="247" y="60" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName} INPUTS</text>
+
+          <circle cx="155" cy="130" r="5" fill="${fuse1Stroke === hotStroke ? '#ef4444' : '#475569'}"/>
+          <text x="166" y="134" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="#f8fafc">${spec.inCom}</text>
+          <text x="210" y="134" font-size="9" fill="#94a3b8">(+24V Source)</text>
+
+          <circle cx="155" cy="155" r="5" fill="${in0Active ? '#22c55e' : '#475569'}"/>
+          <text x="166" y="159" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="${in0Active ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(0)}</text>
+          <circle cx="218" cy="155" r="4" fill="${in0Active ? '#22c55e' : '#334155'}"/>
+          <text x="228" y="159" font-size="9.5" font-weight="600" fill="${in0Active ? '#4ade80' : '#64748b'}">${in0Active ? 'ACTIVE (1)' : 'OFF (0)'}</text>
+
+          <rect x="168" y="178" width="160" height="46" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+          <text x="248" y="193" text-anchor="middle" font-size="9" font-weight="700" fill="#94a3b8">LADDER CO-SIM OUTPUTS</text>
+          <text x="180" y="212" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${l1 ? '#4ade80' : '#64748b'}">${spec.termOutShort(0)}: ${l1 ? 'ON' : 'OFF'}</text>
+          <text x="250" y="212" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${l2 ? '#4ade80' : '#64748b'}">${spec.termOutShort(1)}: ${l2 ? 'ON' : 'OFF'}</text>
+        </svg>
+      `;
+    } else {
+      // Positive Logic (Sink Input: COM = 0V, S1 sends +24V through F1)
+      svgContent = `
+        <svg viewBox="0 0 360 270">
+          ${badgeSvg}
+          <text x="25" y="44" font-size="13" font-weight="700" fill="#dc2626">+24VDC</text>
+          <circle cx="45" cy="56" r="6" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
+          <text x="25" y="254" font-size="13" font-weight="700" fill="#0f172a">0V</text>
+          <circle cx="45" cy="242" r="6" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
+
+          <!-- +24V to Fuse F1 to S1 NO to I0.0 / X0 -->
+          <path d="M51 56 H100 V60" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+          ${fuse1Svg}
+          <path d="M100 102 V118" fill="none" stroke="${fuse1Stroke}" stroke-width="3"/>
+          ${drawIECSwitchNO({
+            id: 'S1',
+            label: 'S1 (3-4)',
+            x: 100,
+            yTop: 118,
+            pressed: s1,
+            topEnergized: fuse1Stroke === hotStroke,
+            bottomEnergized: in0Active
+          })}
+          <path d="M100 152 V155 H155" fill="none" stroke="${in0Active ? hotStroke : idleStroke}" stroke-width="3"/>
+
+          <!-- 0V line to COM (0V Sink) -->
+          <path d="M51 242 H130 V130 H155" fill="none" stroke="${gndStroke}" stroke-width="3"/>
+
+          <!-- PLC Block -->
+          <rect x="155" y="42" width="185" height="195" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
+          <rect x="155" y="42" width="185" height="26" rx="8" fill="#1e293b"/>
+          <text x="247" y="60" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName} INPUTS</text>
+
+          <circle cx="155" cy="130" r="5" fill="#3b82f6"/>
+          <text x="166" y="134" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="#f8fafc">${spec.inCom}</text>
+          <text x="210" y="134" font-size="9" fill="#94a3b8">(0V Sink)</text>
+
+          <circle cx="155" cy="155" r="5" fill="${in0Active ? '#22c55e' : '#475569'}"/>
+          <text x="166" y="159" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="${in0Active ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(0)}</text>
+          <circle cx="218" cy="155" r="4" fill="${in0Active ? '#22c55e' : '#334155'}"/>
+          <text x="228" y="159" font-size="9.5" font-weight="600" fill="${in0Active ? '#4ade80' : '#64748b'}">${in0Active ? 'ACTIVE (1)' : 'OFF (0)'}</text>
+
+          <rect x="168" y="178" width="160" height="46" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+          <text x="248" y="193" text-anchor="middle" font-size="9" font-weight="700" fill="#94a3b8">LADDER CO-SIM OUTPUTS</text>
+          <text x="180" y="212" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${l1 ? '#4ade80' : '#64748b'}">${spec.termOutShort(0)}: ${l1 ? 'ON' : 'OFF'}</text>
+          <text x="250" y="212" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${l2 ? '#4ade80' : '#64748b'}">${spec.termOutShort(1)}: ${l2 ? 'ON' : 'OFF'}</text>
+        </svg>
+      `;
+    }
   } else if (state.currentLabId === 'lab4_2') {
     const spec = getPlcModelSpec();
-    const in0Hot = s1;
-    const in1Hot = s2;
-    svgContent = `
-      <svg viewBox="0 0 360 270">
-        <!-- Power Rails -->
-        <text x="20" y="22" font-size="13" font-weight="700" fill="#dc2626">+24VDC</text>
-        <circle cx="40" cy="34" r="6" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
-        <text x="20" y="258" font-size="13" font-weight="700" fill="#0f172a">0V</text>
-        <circle cx="40" cy="246" r="6" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
+    const hasWires = state.wires.length > 0;
+    const f1Blown = Boolean(state.fuseBlown && state.fuseBlown.F1);
+    const logicMode = (hasWires && state.simResult && state.simResult.detectedInputLogic)
+      ? state.simResult.detectedInputLogic
+      : (state.plcWiringLogic || 'negative');
+    const isPos = logicMode === 'positive';
 
-        <!-- +24V to Fuse F -->
-        <path d="M46 34 H85 V55" fill="none" stroke="${hotStroke}" stroke-width="3"/>
-        <rect x="73" y="55" width="24" height="38" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="2"/>
-        <line x1="85" y1="59" x2="85" y2="89" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2"/>
-        <text x="85" y="78" text-anchor="middle" font-size="11" font-weight="800" fill="#0369a1">F</text>
-        <path d="M85 93 V118 H155" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+    const in0Active = hasWires ? Boolean(state.simResult.plcInputs && state.simResult.plcInputs[0]) : (pwr && !f1Blown && s1);
+    const in1Active = hasWires ? Boolean(state.simResult.plcInputs && state.simResult.plcInputs[1]) : (pwr && !f1Blown && s2);
+    const fuse1Stroke = (!f1Blown && pwr) ? hotStroke : idleStroke;
 
-        <!-- 0V to S1 & S2 -->
-        <path d="M46 246 H115 V215 M70 246 V215" fill="none" stroke="${gndStroke}" stroke-width="3"/>
-        ${drawIECSwitchNO({
-          id: 'S1',
-          label: 'S1',
-          x: 70,
-          yTop: 175,
-          pressed: s1,
-          topEnergized: in0Hot,
-          bottomEnergized: true
-        })}
-        <path d="M70 175 V145 H155" fill="none" stroke="${in0Hot ? hotStroke : idleStroke}" stroke-width="3"/>
+    const fuse1Svg = f1Blown
+      ? `<rect x="73" y="55" width="24" height="38" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="2"/>
+         <text x="85" y="78" text-anchor="middle" font-size="9" font-weight="800" fill="#fca5a5">💥ขาด</text>`
+      : `<rect x="73" y="55" width="24" height="38" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="2"/>
+         <line x1="85" y1="59" x2="85" y2="89" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2"/>
+         <text x="85" y="78" text-anchor="middle" font-size="11" font-weight="800" fill="#0369a1">F1</text>`;
 
-        ${drawIECSwitchNO({
-          id: 'S2',
-          label: 'S2',
-          x: 115,
-          yTop: 175,
-          pressed: s2,
-          topEnergized: in1Hot,
-          bottomEnergized: true
-        })}
-        <path d="M115 175 V168 H155" fill="none" stroke="${in1Hot ? hotStroke : idleStroke}" stroke-width="3"/>
-
-        <!-- PLC Block -->
-        <rect x="155" y="35" width="185" height="205" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
-        <rect x="155" y="35" width="185" height="28" rx="8" fill="#1e293b"/>
-        <text x="247" y="54" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName} AND LOGIC</text>
-
-        <circle cx="155" cy="118" r="5" fill="#ef4444"/>
-        <text x="166" y="122" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="#f8fafc">${spec.inCom}</text>
-
-        <circle cx="155" cy="145" r="5" fill="${s1 ? '#22c55e' : '#475569'}"/>
-        <text x="166" y="149" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="${s1 ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(0)} (S1)</text>
-
-        <circle cx="155" cy="168" r="5" fill="${s2 ? '#22c55e' : '#475569'}"/>
-        <text x="166" y="172" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="${s2 ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(1)} (S2)</text>
-
-        <rect x="168" y="188" width="160" height="40" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
-        <text x="248" y="203" text-anchor="middle" font-size="9" font-weight="700" fill="#94a3b8">AND OUTPUT: S1 ∧ S2</text>
-        <text x="248" y="220" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="800" fill="${l1 ? '#4ade80' : '#64748b'}">${spec.termOutShort(0)}: ${l1 ? 'ON (1)' : 'OFF (0)'}</text>
-      </svg>
+    const badgeSvg = `
+      <rect x="75" y="8" width="210" height="20" rx="10" fill="${isPos ? '#064e3b' : '#1e3a8a'}" stroke="${isPos ? '#10b981' : '#3b82f6'}" stroke-width="1.2"/>
+      <text x="180" y="22" text-anchor="middle" font-size="9.5" font-weight="700" fill="#ffffff">${isPos ? 'Positive Logic (COM = 0V Sink)' : 'Negative Logic (COM = +24V Source)'}</text>
     `;
+
+    if (!isPos) {
+      // Negative Logic (COM = +24V via F1, S1/S2 pull to 0V)
+      svgContent = `
+        <svg viewBox="0 0 360 270">
+          ${badgeSvg}
+          <text x="20" y="38" font-size="13" font-weight="700" fill="#dc2626">+24VDC</text>
+          <circle cx="40" cy="50" r="6" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
+          <text x="20" y="258" font-size="13" font-weight="700" fill="#0f172a">0V</text>
+          <circle cx="40" cy="246" r="6" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
+
+          <!-- +24V to Fuse F1 to COM -->
+          <path d="M46 50 H85 V55" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+          ${fuse1Svg}
+          <path d="M85 93 V118 H155" fill="none" stroke="${fuse1Stroke}" stroke-width="3"/>
+
+          <!-- 0V to S1 & S2 -->
+          <path d="M46 246 H115 V215 M70 246 V215" fill="none" stroke="${gndStroke}" stroke-width="3"/>
+          ${drawIECSwitchNO({
+            id: 'S1',
+            label: 'S1',
+            x: 70,
+            yTop: 175,
+            pressed: s1,
+            topEnergized: in0Active,
+            bottomEnergized: pwr
+          })}
+          <path d="M70 175 V145 H155" fill="none" stroke="${in0Active ? gndStroke : idleStroke}" stroke-width="3"/>
+
+          ${drawIECSwitchNO({
+            id: 'S2',
+            label: 'S2',
+            x: 115,
+            yTop: 175,
+            pressed: s2,
+            topEnergized: in1Active,
+            bottomEnergized: pwr
+          })}
+          <path d="M115 175 V168 H155" fill="none" stroke="${in1Active ? gndStroke : idleStroke}" stroke-width="3"/>
+
+          <!-- PLC Block -->
+          <rect x="155" y="38" width="185" height="202" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
+          <rect x="155" y="38" width="185" height="26" rx="8" fill="#1e293b"/>
+          <text x="247" y="56" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName} AND LOGIC</text>
+
+          <circle cx="155" cy="118" r="5" fill="${fuse1Stroke === hotStroke ? '#ef4444' : '#475569'}"/>
+          <text x="166" y="122" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="#f8fafc">${spec.inCom}</text>
+
+          <circle cx="155" cy="145" r="5" fill="${in0Active ? '#22c55e' : '#475569'}"/>
+          <text x="166" y="149" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="${in0Active ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(0)} (S1)</text>
+
+          <circle cx="155" cy="168" r="5" fill="${in1Active ? '#22c55e' : '#475569'}"/>
+          <text x="166" y="172" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="${in1Active ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(1)} (S2)</text>
+
+          <rect x="168" y="188" width="160" height="40" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+          <text x="248" y="203" text-anchor="middle" font-size="9" font-weight="700" fill="#94a3b8">AND OUTPUT: S1 ∧ S2</text>
+          <text x="248" y="220" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="800" fill="${l1 ? '#4ade80' : '#64748b'}">${spec.termOutShort(0)}: ${l1 ? 'ON (1)' : 'OFF (0)'}</text>
+        </svg>
+      `;
+    } else {
+      // Positive Logic (COM = 0V, S1 & S2 fed +24V through F1)
+      svgContent = `
+        <svg viewBox="0 0 360 270">
+          ${badgeSvg}
+          <text x="20" y="38" font-size="13" font-weight="700" fill="#dc2626">+24VDC</text>
+          <circle cx="40" cy="50" r="6" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
+          <text x="20" y="258" font-size="13" font-weight="700" fill="#0f172a">0V</text>
+          <circle cx="40" cy="246" r="6" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
+
+          <!-- +24V to Fuse F1 to S1 & S2 NO contacts -->
+          <path d="M46 50 H85 V55" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+          ${fuse1Svg}
+          <path d="M85 93 V105 H65 V115 M85 105 H110 V115" fill="none" stroke="${fuse1Stroke}" stroke-width="3"/>
+          ${drawIECSwitchNO({
+            id: 'S1',
+            label: 'S1',
+            x: 65,
+            yTop: 115,
+            pressed: s1,
+            topEnergized: fuse1Stroke === hotStroke,
+            bottomEnergized: in0Active
+          })}
+          <path d="M65 149 V145 H155" fill="none" stroke="${in0Active ? hotStroke : idleStroke}" stroke-width="3"/>
+
+          ${drawIECSwitchNO({
+            id: 'S2',
+            label: 'S2',
+            x: 110,
+            yTop: 115,
+            pressed: s2,
+            topEnergized: fuse1Stroke === hotStroke,
+            bottomEnergized: in1Active
+          })}
+          <path d="M110 149 V168 H155" fill="none" stroke="${in1Active ? hotStroke : idleStroke}" stroke-width="3"/>
+
+          <!-- 0V to COM (0V Sink) -->
+          <path d="M46 246 H135 V118 H155" fill="none" stroke="${gndStroke}" stroke-width="3"/>
+
+          <!-- PLC Block -->
+          <rect x="155" y="38" width="185" height="202" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
+          <rect x="155" y="38" width="185" height="26" rx="8" fill="#1e293b"/>
+          <text x="247" y="56" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName} AND LOGIC</text>
+
+          <circle cx="155" cy="118" r="5" fill="#3b82f6"/>
+          <text x="166" y="122" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="#f8fafc">${spec.inCom}</text>
+          <text x="210" y="122" font-size="9" fill="#94a3b8">(0V Sink)</text>
+
+          <circle cx="155" cy="145" r="5" fill="${in0Active ? '#22c55e' : '#475569'}"/>
+          <text x="166" y="149" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="${in0Active ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(0)} (S1)</text>
+
+          <circle cx="155" cy="168" r="5" fill="${in1Active ? '#22c55e' : '#475569'}"/>
+          <text x="166" y="172" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="${in1Active ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(1)} (S2)</text>
+
+          <rect x="168" y="188" width="160" height="40" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+          <text x="248" y="203" text-anchor="middle" font-size="9" font-weight="700" fill="#94a3b8">AND OUTPUT: S1 ∧ S2</text>
+          <text x="248" y="220" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="800" fill="${l1 ? '#4ade80' : '#64748b'}">${spec.termOutShort(0)}: ${l1 ? 'ON (1)' : 'OFF (0)'}</text>
+        </svg>
+      `;
+    }
   } else if (state.currentLabId === 'lab5_1') {
     const spec = getPlcModelSpec();
+    const hasWires = state.wires.length > 0;
+    const f1Blown = Boolean(state.fuseBlown && state.fuseBlown.F1);
+    const f2Blown = Boolean(state.fuseBlown && state.fuseBlown.F2);
+    const logicMode = (hasWires && state.simResult && state.simResult.detectedInputLogic)
+      ? state.simResult.detectedInputLogic
+      : (state.plcWiringLogic || 'negative');
+    const isPos = logicMode === 'positive';
+
+    const in0Active = hasWires ? Boolean(state.simResult.plcInputs && state.simResult.plcInputs[0]) : (pwr && !f1Blown && s1);
+    const fuse1Stroke = (!f1Blown && pwr) ? hotStroke : idleStroke;
+    const fuse2Stroke = (!f2Blown && pwr) ? hotStroke : idleStroke;
+
+    const fuse1Svg = f1Blown
+      ? `<rect x="68" y="55" width="24" height="36" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="1.8"/>
+         <text x="80" y="77" text-anchor="middle" font-size="9" font-weight="800" fill="#fca5a5">💥ขาด</text>`
+      : `<rect x="68" y="55" width="24" height="36" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.8"/>
+         <line x1="80" y1="59" x2="80" y2="87" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2"/>
+         <text x="80" y="77" text-anchor="middle" font-size="10.5" font-weight="800" fill="#0369a1">F1</text>`;
+
+    const fuse2Svg = f2Blown
+      ? `<rect x="298" y="55" width="24" height="36" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="1.8"/>
+         <text x="310" y="77" text-anchor="middle" font-size="9" font-weight="800" fill="#fca5a5">💥ขาด</text>`
+      : `<rect x="298" y="55" width="24" height="36" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.8"/>
+         <line x1="310" y1="59" x2="310" y2="87" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2"/>
+         <text x="310" y="77" text-anchor="middle" font-size="10.5" font-weight="800" fill="#0369a1">F2</text>`;
+
+    const badgeSvg = `
+      <rect x="75" y="8" width="210" height="20" rx="10" fill="${isPos ? '#064e3b' : '#1e3a8a'}" stroke="${isPos ? '#10b981' : '#3b82f6'}" stroke-width="1.2"/>
+      <text x="180" y="22" text-anchor="middle" font-size="9.5" font-weight="700" fill="#ffffff">${isPos ? 'Positive Logic (COM = 0V Sink)' : 'Negative Logic (COM = +24V Source)'}</text>
+    `;
+
     svgContent = `
       <svg viewBox="0 0 360 270">
-        <!-- Power Rails -->
-        <text x="20" y="22" font-size="13" font-weight="700" fill="#dc2626">+24VDC</text>
-        <circle cx="38" cy="34" r="6" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
+        ${badgeSvg}
+        <text x="20" y="36" font-size="13" font-weight="700" fill="#dc2626">+24VDC</text>
+        <circle cx="38" cy="48" r="6" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
         <text x="20" y="258" font-size="13" font-weight="700" fill="#0f172a">0V</text>
         <circle cx="38" cy="246" r="6" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
 
-        <!-- Input wiring to F1 & COM -->
-        <path d="M44 34 H80 V55" fill="none" stroke="${hotStroke}" stroke-width="3"/>
-        <rect x="68" y="55" width="24" height="36" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.8"/>
-        <line x1="80" y1="59" x2="80" y2="87" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2"/>
-        <text x="80" y="77" text-anchor="middle" font-size="10.5" font-weight="800" fill="#0369a1">F</text>
-        <path d="M80 91 V110 H135" fill="none" stroke="${hotStroke}" stroke-width="3"/>
-
-        <!-- 0V to PB1 (S1) NO -->
-        <path d="M44 246 H80 V210" fill="none" stroke="${gndStroke}" stroke-width="3"/>
-        ${drawIECSwitchNO({
-          id: 'S1',
-          label: 'PB1',
-          x: 80,
-          yTop: 168,
-          pressed: s1,
-          topEnergized: s1,
-          bottomEnergized: true
-        })}
-        <path d="M80 168 V140 H135" fill="none" stroke="${s1 ? hotStroke : idleStroke}" stroke-width="3"/>
+        <!-- Input wiring -->
+        ${!isPos ? `
+          <path d="M44 48 H80 V55" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+          ${fuse1Svg}
+          <path d="M80 91 V110 H135" fill="none" stroke="${fuse1Stroke}" stroke-width="3"/>
+          <path d="M44 246 H80 V210" fill="none" stroke="${gndStroke}" stroke-width="3"/>
+          ${drawIECSwitchNO({
+            id: 'S1',
+            label: 'PB1',
+            x: 80,
+            yTop: 168,
+            pressed: s1,
+            topEnergized: in0Active,
+            bottomEnergized: pwr
+          })}
+          <path d="M80 168 V140 H135" fill="none" stroke="${in0Active ? gndStroke : idleStroke}" stroke-width="3"/>
+        ` : `
+          <path d="M44 48 H80 V55" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+          ${fuse1Svg}
+          <path d="M80 91 V118" fill="none" stroke="${fuse1Stroke}" stroke-width="3"/>
+          ${drawIECSwitchNO({
+            id: 'S1',
+            label: 'PB1',
+            x: 80,
+            yTop: 118,
+            pressed: s1,
+            topEnergized: fuse1Stroke === hotStroke,
+            bottomEnergized: in0Active
+          })}
+          <path d="M80 152 V140 H135" fill="none" stroke="${in0Active ? hotStroke : idleStroke}" stroke-width="3"/>
+          <path d="M44 246 H110 V110 H135" fill="none" stroke="${gndStroke}" stroke-width="3"/>
+        `}
 
         <!-- PLC Block -->
-        <rect x="135" y="35" width="125" height="195" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
-        <text x="197" y="54" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName}</text>
+        <rect x="135" y="38" width="125" height="192" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
+        <text x="197" y="56" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName}</text>
         <text x="145" y="80" font-size="9" fill="#94a3b8">INPUTS</text>
-        <circle cx="135" cy="110" r="5" fill="#ef4444"/>
+        <circle cx="135" cy="110" r="5" fill="${!isPos ? (fuse1Stroke === hotStroke ? '#ef4444' : '#475569') : '#3b82f6'}"/>
         <text x="145" y="114" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#fff">${spec.inCom}</text>
-        <circle cx="135" cy="140" r="5" fill="${s1 ? '#22c55e' : '#475569'}"/>
-        <text x="145" y="144" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${s1 ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(0)}</text>
+        <circle cx="135" cy="140" r="5" fill="${in0Active ? '#22c55e' : '#475569'}"/>
+        <text x="145" y="144" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${in0Active ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(0)}</text>
 
         <text x="215" y="80" font-size="9" fill="#94a3b8">OUTPUTS</text>
-        <circle cx="260" cy="110" r="5" fill="#ef4444"/>
+        <circle cx="260" cy="110" r="5" fill="${fuse2Stroke === hotStroke ? '#ef4444' : '#475569'}"/>
         <text x="220" y="114" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#fff">COM0</text>
         <circle cx="260" cy="140" r="5" fill="${l1 ? '#facc15' : '#475569'}"/>
         <text x="232" y="144" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${l1 ? '#fde047' : '#cbd5e1'}">${spec.termOutShort(0)}</text>
 
         <!-- Output side wiring: +24V -> F2 -> COM0 -->
-        <path d="M44 34 H310 V55" fill="none" stroke="${hotStroke}" stroke-width="3"/>
-        <rect x="298" y="55" width="24" height="36" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.8"/>
-        <line x1="310" y1="59" x2="310" y2="87" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2"/>
-        <text x="310" y="77" text-anchor="middle" font-size="10.5" font-weight="800" fill="#0369a1">F</text>
-        <path d="M310 91 V110 H260" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+        <path d="M44 48 H310 V55" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+        ${fuse2Svg}
+        <path d="M310 91 V110 H260" fill="none" stroke="${fuse2Stroke}" stroke-width="3"/>
 
         <!-- Q0 -> PL1 (Red) -> 0V -->
         <path d="M260 140 H310 V165" fill="none" stroke="${l1 ? hotStroke : idleStroke}" stroke-width="3"/>
@@ -2839,42 +3421,87 @@ function renderSchematic() {
     `;
   } else if (state.currentLabId === 'lab5_2') {
     const spec = getPlcModelSpec();
+    const hasWires = state.wires.length > 0;
+    const f1Blown = Boolean(state.fuseBlown && state.fuseBlown.F1);
+    const f2Blown = Boolean(state.fuseBlown && state.fuseBlown.F2);
+    const logicMode = (hasWires && state.simResult && state.simResult.detectedInputLogic)
+      ? state.simResult.detectedInputLogic
+      : (state.plcWiringLogic || 'negative');
+    const isPos = logicMode === 'positive';
+
+    const in0Active = hasWires ? Boolean(state.simResult.plcInputs && state.simResult.plcInputs[0]) : (pwr && !f1Blown && s1);
+    const fuse1Stroke = (!f1Blown && pwr) ? hotStroke : idleStroke;
+    const fuse2Stroke = (!f2Blown && pwr) ? hotStroke : idleStroke;
+
+    const fuse1Svg = f1Blown
+      ? `<rect x="64" y="48" width="22" height="34" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="1.8"/>
+         <text x="75" y="70" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fca5a5">💥ขาด</text>`
+      : `<rect x="64" y="48" width="22" height="34" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.8"/>
+         <line x1="75" y1="52" x2="75" y2="78" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2"/>
+         <text x="75" y="70" text-anchor="middle" font-size="10" font-weight="800" fill="#0369a1">F1</text>`;
+
+    const fuse2Svg = f2Blown
+      ? `<rect x="284" y="48" width="22" height="34" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="1.8"/>
+         <text x="295" y="70" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fca5a5">💥ขาด</text>`
+      : `<rect x="284" y="48" width="22" height="34" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.8"/>
+         <line x1="295" y1="52" x2="295" y2="78" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2"/>
+         <text x="295" y="70" text-anchor="middle" font-size="10" font-weight="800" fill="#0369a1">F2</text>`;
+
+    const badgeSvg = `
+      <rect x="75" y="8" width="210" height="20" rx="10" fill="${isPos ? '#064e3b' : '#1e3a8a'}" stroke="${isPos ? '#10b981' : '#3b82f6'}" stroke-width="1.2"/>
+      <text x="180" y="22" text-anchor="middle" font-size="9.5" font-weight="700" fill="#ffffff">${isPos ? 'Positive Logic (COM = 0V Sink)' : 'Negative Logic (COM = +24V Source)'}</text>
+    `;
+
     svgContent = `
       <svg viewBox="0 0 360 270">
-        <!-- Power Rails -->
-        <text x="15" y="20" font-size="12" font-weight="700" fill="#dc2626">+24VDC</text>
-        <circle cx="35" cy="30" r="5" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
+        ${badgeSvg}
+        <text x="15" y="34" font-size="12" font-weight="700" fill="#dc2626">+24VDC</text>
+        <circle cx="35" cy="46" r="5" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
         <text x="15" y="260" font-size="12" font-weight="700" fill="#0f172a">0V</text>
         <circle cx="35" cy="248" r="5" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
 
-        <!-- F1 to COM -->
-        <path d="M40 30 H75 V48" fill="none" stroke="${hotStroke}" stroke-width="2.5"/>
-        <rect x="64" y="48" width="22" height="34" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.8"/>
-        <text x="75" y="70" text-anchor="middle" font-size="10" font-weight="800" fill="#0369a1">F</text>
-        <path d="M75 82 V108 H125" fill="none" stroke="${hotStroke}" stroke-width="2.5"/>
-
-        <!-- 0V to PB1 NO -->
-        <path d="M40 248 H75 V200" fill="none" stroke="${gndStroke}" stroke-width="2.5"/>
-        ${drawIECSwitchNO({
-          id: 'S1',
-          label: 'PB1',
-          x: 75,
-          yTop: 160,
-          pressed: s1,
-          topEnergized: s1,
-          bottomEnergized: true
-        })}
-        <path d="M75 160 V136 H125" fill="none" stroke="${s1 ? hotStroke : idleStroke}" stroke-width="2.5"/>
+        <!-- Input side wiring -->
+        ${!isPos ? `
+          <path d="M40 46 H75 V48" fill="none" stroke="${hotStroke}" stroke-width="2.5"/>
+          ${fuse1Svg}
+          <path d="M75 82 V108 H125" fill="none" stroke="${fuse1Stroke}" stroke-width="2.5"/>
+          <path d="M40 248 H75 V200" fill="none" stroke="${gndStroke}" stroke-width="2.5"/>
+          ${drawIECSwitchNO({
+            id: 'S1',
+            label: 'PB1',
+            x: 75,
+            yTop: 160,
+            pressed: s1,
+            topEnergized: in0Active,
+            bottomEnergized: pwr
+          })}
+          <path d="M75 160 V136 H125" fill="none" stroke="${in0Active ? gndStroke : idleStroke}" stroke-width="2.5"/>
+        ` : `
+          <path d="M40 46 H75 V48" fill="none" stroke="${hotStroke}" stroke-width="2.5"/>
+          ${fuse1Svg}
+          <path d="M75 82 V115" fill="none" stroke="${fuse1Stroke}" stroke-width="2.5"/>
+          ${drawIECSwitchNO({
+            id: 'S1',
+            label: 'PB1',
+            x: 75,
+            yTop: 115,
+            pressed: s1,
+            topEnergized: fuse1Stroke === hotStroke,
+            bottomEnergized: in0Active
+          })}
+          <path d="M75 149 V136 H125" fill="none" stroke="${in0Active ? hotStroke : idleStroke}" stroke-width="2.5"/>
+          <path d="M40 248 H105 V108 H125" fill="none" stroke="${gndStroke}" stroke-width="2.5"/>
+        `}
 
         <!-- PLC Block -->
-        <rect x="125" y="30" width="130" height="205" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
-        <text x="190" y="48" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName}</text>
-        <circle cx="125" cy="108" r="5" fill="#ef4444"/>
+        <rect x="125" y="32" width="130" height="203" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
+        <text x="190" y="50" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName}</text>
+        <circle cx="125" cy="108" r="5" fill="${!isPos ? (fuse1Stroke === hotStroke ? '#ef4444' : '#475569') : '#3b82f6'}"/>
         <text x="135" y="112" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#fff">${spec.inCom}</text>
-        <circle cx="125" cy="136" r="5" fill="${s1 ? '#22c55e' : '#475569'}"/>
-        <text x="135" y="140" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${s1 ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(0)}</text>
+        <circle cx="125" cy="136" r="5" fill="${in0Active ? '#22c55e' : '#475569'}"/>
+        <text x="135" y="140" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${in0Active ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(0)}</text>
 
-        <circle cx="255" cy="108" r="5" fill="#ef4444"/>
+        <circle cx="255" cy="108" r="5" fill="${fuse2Stroke === hotStroke ? '#ef4444' : '#475569'}"/>
         <text x="215" y="112" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#fff">COM0</text>
         <circle cx="255" cy="136" r="5" fill="${l1 ? '#facc15' : '#475569'}"/>
         <text x="225" y="140" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${l1 ? '#fde047' : '#cbd5e1'}">${spec.termOutShort(0)}</text>
@@ -2882,10 +3509,9 @@ function renderSchematic() {
         <text x="225" y="168" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${l2 ? '#4ade80' : '#cbd5e1'}">${spec.termOutShort(1)}</text>
 
         <!-- F2 to COM0 -->
-        <path d="M40 30 H295 V48" fill="none" stroke="${hotStroke}" stroke-width="2.5"/>
-        <rect x="284" y="48" width="22" height="34" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.8"/>
-        <text x="295" y="70" text-anchor="middle" font-size="10" font-weight="800" fill="#0369a1">F</text>
-        <path d="M295 82 V108 H255" fill="none" stroke="${hotStroke}" stroke-width="2.5"/>
+        <path d="M40 46 H295 V48" fill="none" stroke="${hotStroke}" stroke-width="2.5"/>
+        ${fuse2Svg}
+        <path d="M295 82 V108 H255" fill="none" stroke="${fuse2Stroke}" stroke-width="2.5"/>
 
         <!-- Q0 -> PL1 (Red) -->
         <path d="M255 136 H295 V155" fill="none" stroke="${l1 ? hotStroke : idleStroke}" stroke-width="2.5"/>
@@ -3165,6 +3791,7 @@ function runAutomatedVerification() {
   const lab = LABS[state.currentLabId];
   const banner = document.getElementById('verificationMessage');
   const scoreBadge = document.getElementById('scoreBadge');
+  const isPlcLab = Boolean(lab && lab.isPlcTerminalLab);
 
   if (state.wires.length === 0) {
     banner.className = 'verification-banner error';
@@ -3182,6 +3809,11 @@ function runAutomatedVerification() {
   const rowResults = [];
   let allPassed = true;
   let hasShortCircuit = false;
+  let f1BlownDetected = false;
+  let f2BlownDetected = false;
+  let hasBypassedF1 = false;
+  let hasBypassedF2 = false;
+  let detectedLogic = null;
   let relayState = { K1: false, K2: false };
 
   lab.truthTable.forEach((testCase) => {
@@ -3191,6 +3823,22 @@ function runAutomatedVerification() {
     if (sim.shortCircuit) {
       hasShortCircuit = true;
     }
+    if (sim.fuseBlown) {
+      if (sim.fuseBlown.F1) {
+        f1BlownDetected = true;
+        if (state.fuseBlown) state.fuseBlown.F1 = true;
+      }
+      if (sim.fuseBlown.F2) {
+        f2BlownDetected = true;
+        if (state.fuseBlown) state.fuseBlown.F2 = true;
+      }
+      if (sim.fuseBlown.MAIN) {
+        if (state.fuseBlown) state.fuseBlown.MAIN = true;
+      }
+    }
+    if (sim.bypassedF1) hasBypassedF1 = true;
+    if (sim.bypassedF2) hasBypassedF2 = true;
+    if (sim.detectedInputLogic) detectedLogic = sim.detectedInputLogic;
 
     const actualRelay = sim.K1 || sim.K2;
     let rowPass = !sim.shortCircuit;
@@ -3218,6 +3866,10 @@ function runAutomatedVerification() {
     });
   });
 
+  if (hasShortCircuit || f1BlownDetected || f2BlownDetected) {
+    updateSimulationUI();
+  }
+
   renderTruthTable({ rows: rowResults });
 
   const passedCount = rowResults.filter((r) => r.passed).length;
@@ -3226,28 +3878,53 @@ function runAutomatedVerification() {
 
   if (hasShortCircuit) {
     banner.className = 'verification-banner error';
+    let blownMsg = 'ตรวจพบการลัดวงจร (Short Circuit)!';
+    if (isPlcLab) {
+      const blownNames = [];
+      if (f1BlownDetected) blownNames.push('F1 (ฝั่งอินพุต)');
+      if (f2BlownDetected) blownNames.push('F2 (ฝั่งเอาต์พุต)');
+      if (blownNames.length === 0) blownNames.push('F1 / F2');
+      blownMsg = `💥 ฟิวส์ ${blownNames.join(' และ ')} ขาดเนื่องจากลัดวงจร! ตรวจพบสายไฟต่อตรงระหว่าง <b>+24V</b> และ <b>0V</b>`;
+    } else {
+      blownMsg = '💥 ฟิวส์หลักขาดเนื่องจากลัดวงจร! มีสายไฟต่อตรงระหว่าง <b>+12V</b> และ <b>0V (-)</b> โดยไม่ผ่านโหลดหรือคอยล์รีเลย์';
+    }
     banner.innerHTML = `
       <div class="banner-icon">🚨</div>
       <div class="banner-text">
-        <strong>ตรวจพบการลัดวงจร (Short Circuit)!</strong> มีสายไฟต่อตรงระหว่างขั้ว <b>+12V</b> และ <b>0V (-)</b> โดยไม่ผ่านโหลดหรือคอยล์รีเลย์ กรุณาตรวจสอบจุดต่อสายใหม่
+        <strong>${blownMsg}</strong><br/>
+        <button type="button" onclick="resetFuses()" class="btn-reset-fuse" style="margin-top:6px;">🔄 คลิกเพื่อเปลี่ยน/รีเซตฟิวส์ใหม่</button>
       </div>
     `;
     scoreBadge.className = 'score-badge fail';
     scoreBadge.textContent = 'ลัดวงจร (0/10)';
   } else if (allPassed) {
     banner.className = 'verification-banner success';
+    let logicSuccessNote = '';
+    if (isPlcLab) {
+      const modeText = (detectedLogic === 'positive')
+        ? 'Positive Logic (Sink Input: COM = 0V)'
+        : 'Negative Logic (Source Input: COM = +24V)';
+      logicSuccessNote = `<br/>🌟 <b>รูปแบบวงจร:</b> ต่อวงจรแบบ ${modeText} ถูกต้องสมบูรณ์ตามมาตรฐาน`;
+    }
     banner.innerHTML = `
       <div class="banner-icon">✅</div>
       <div class="banner-text">
         <strong>ยอดเยี่ยม! วงจรทำงานถูกต้องสมบูรณ์ 100%</strong><br/>
         ผ่านการทดสอบครบทุกเงื่อนไขของตารางความจริง (${passedCount}/${totalCount} เงื่อนไข) — เปรียบเทียบการทำงาน: <b>${lab.logicComparison}</b>
+        ${logicSuccessNote}
       </div>
     `;
     scoreBadge.className = 'score-badge pass';
     scoreBadge.textContent = `ผ่าน (${score}/10 คะแนน)`;
   } else {
     let diagHint = 'ตรวจสอบการเลือกขั้ว NO / NC ของสวิตช์ และการต่อครบวงจรกลับไปยังขั้ว 0V (-)';
-    if (lab.requireRelay) {
+    if (hasBypassedF1 || hasBypassedF2) {
+      diagHint = '⚠️ ตรวจพบการต่อสายข้ามฟิวส์ (FUSE): กรุณาต่อสายไฟเลี้ยงผ่านฟิวส์ F ตามวงจรสัญลักษณ์เพื่อความปลอดภัย';
+    } else if (isPlcLab) {
+      diagHint = (state.plcWiringLogic === 'positive')
+        ? 'โหมด Positive Logic: ขั้ว COM ต้องต่อ 0V และสวิตช์ต้องรับไฟ +24V ผ่านฟิวส์ F1 เข้าสู่ Terminal I0.0 / I0.1'
+        : 'โหมด Negative Logic: ขั้ว COM ต้องรับไฟ +24V ผ่านฟิวส์ F1 และสวิตช์ต้องต่อลง 0V เข้าสู่ Terminal I0.0 / I0.1';
+    } else if (lab.requireRelay) {
       diagHint = 'ตรวจสอบว่าต่อไฟเข้าคอยล์รีเลย์ (ขา 13-14) ผ่านสวิตช์ และนำไฟ +12V เข้าขา COM (ขา 9 หรือ 12) ออกขา NO (5 หรือ 8) / NC (1 หรือ 4) ไปยังหลอดไฟถูกต้องหรือไม่';
     }
     banner.className = 'verification-banner error';
@@ -4483,6 +5160,7 @@ function loadLab(labId) {
   state.activeWaypoints = [];
   state.liveTestedRows = {};
   state.lastVerificationResults = null;
+  state.fuseBlown = { F1: false, F2: false, MAIN: false };
   state.switches.S1.pressed = false;
   state.switches.S2.pressed = false;
   // For Latching Start-Stop lab, momentary mode is natural; for other labs, locked hold mode is default
@@ -4533,7 +5211,14 @@ function loadLab(labId) {
     if (wbPlcModelSelect) wbPlcModelSelect.style.display = 'none';
   }
 
+  const wbPlcLogicSelect = document.getElementById('wbPlcLogicSelect');
+  if (wbPlcLogicSelect) {
+    wbPlcLogicSelect.style.display = isPlcLab ? '' : 'none';
+    wbPlcLogicSelect.value = state.plcWiringLogic || 'negative';
+  }
+
   updatePlcModelUI(state.plcModel);
+  updatePlcLogicModeUI();
 
   const banner = document.getElementById('verificationMessage');
   banner.className = 'verification-banner neutral';
@@ -4633,6 +5318,14 @@ function initInteractions() {
     }
 
     if (e.button !== 0) return;
+
+    // Click on blown fuse overlay or short circuit alert -> reset fuses
+    if (e.target.closest('#plcFuse1BlownGroup, #plcFuse2BlownGroup, #shortCircuitAlert')) {
+      e.preventDefault();
+      e.stopPropagation();
+      resetFuses();
+      return;
+    }
 
     // Direct click/touch on PLC Pushbutton switch on PLC Terminal Board
     const plcSwHit = e.target.closest('[data-plc-sw]');
@@ -5220,7 +5913,8 @@ function initInteractions() {
       updateSimulationUI();
     } else {
       recordHistorySnapshot();
-      state.wires = lab.hintWires.map((hw, i) => ({
+      const hints = getActiveHintWires(lab);
+      state.wires = hints.map((hw, i) => ({
         id: `sol_${i}_${Date.now()}`,
         from: hw.from,
         to: hw.to,
@@ -6820,42 +7514,45 @@ const plcState = {
 function getPlcSimulationState() {
   const lab = (typeof state !== 'undefined' && state.currentLabId) ? LABS[state.currentLabId] : null;
   const labId = (typeof state !== 'undefined') ? state.currentLabId : 'lab1_1';
-  const s1 = Boolean(state.switches && state.switches.S1 && state.switches.S1.pressed);
-  const s2 = Boolean(state.switches && state.switches.S2 && state.switches.S2.pressed);
+  const rawS1 = Boolean(state.switches && state.switches.S1 && state.switches.S1.pressed);
+  const rawS2 = Boolean(state.switches && state.switches.S2 && state.switches.S2.pressed);
   const pwr = Boolean(state.powerOn);
+  const isPlcLab = Boolean(lab && lab.isPlcTerminalLab);
+  const hasWires = Boolean(state.wires && state.wires.length > 0);
+  const isSyncMode = Boolean(plcState.syncWithActualWiring && hasWires);
 
-  // 1. Calculate Ideal PLC scan logic for current lab
+  // 1. Calculate Ideal PLC scan logic for current lab using raw switch inputs
   let idealM0 = false;
   let idealQ0 = false;
   let idealQ1 = false;
 
   if (labId === 'lab1_1') {
     idealM0 = false;
-    idealQ0 = pwr && s1 && s2;
+    idealQ0 = pwr && rawS1 && rawS2;
     idealQ1 = false;
   } else if (labId === 'lab1_2') {
     idealM0 = false;
-    idealQ0 = pwr && (!s1 || !s2);
+    idealQ0 = pwr && (!rawS1 || !rawS2);
     idealQ1 = false;
   } else if (labId === 'lab1_ex') {
     idealM0 = false;
-    idealQ0 = pwr && (!s1 && !s2);
+    idealQ0 = pwr && (!rawS1 && !rawS2);
     idealQ1 = false;
   } else if (labId === 'lab2_1') {
-    idealM0 = pwr && s1;
+    idealM0 = pwr && rawS1;
     idealQ0 = pwr && idealM0;
     idealQ1 = false;
   } else if (labId === 'lab2_2') {
-    idealM0 = pwr && s1;
+    idealM0 = pwr && rawS1;
     idealQ0 = pwr && idealM0;
     idealQ1 = pwr && !idealM0;
   } else if (labId === 'lab2_latch') {
     if (!pwr) {
       plcState.idealMemoryM0 = false;
     } else {
-      if (s2) {
+      if (rawS2) {
         plcState.idealMemoryM0 = false; // Stop button pressed
-      } else if (s1) {
+      } else if (rawS1) {
         plcState.idealMemoryM0 = true;  // Start button pressed
       }
     }
@@ -6864,25 +7561,25 @@ function getPlcSimulationState() {
     idealQ1 = false;
   } else if (labId === 'lab4_1') {
     idealM0 = false;
-    idealQ0 = pwr && s1;
-    idealQ1 = pwr && !s1;
+    idealQ0 = pwr && rawS1;
+    idealQ1 = pwr && !rawS1;
   } else if (labId === 'lab4_2') {
     idealM0 = false;
-    idealQ0 = pwr && s1 && s2;
+    idealQ0 = pwr && rawS1 && rawS2;
     idealQ1 = false;
   } else if (labId === 'lab5_1') {
     idealM0 = false;
-    idealQ0 = pwr && s1;
+    idealQ0 = pwr && rawS1;
     idealQ1 = false;
   } else if (labId === 'lab5_2') {
     idealM0 = false;
-    idealQ0 = pwr && !s1;
-    idealQ1 = pwr && s1;
+    idealQ0 = pwr && !rawS1;
+    idealQ1 = pwr && rawS1;
   } else if (lab && lab.customSchematic) {
     if (!pwr) {
       plcState.idealMemoryM0 = false;
     }
-    const sim = simulateCustomSchematic(lab.customSchematic, s1 ? 1 : 0, s2 ? 1 : 0, plcState.idealMemoryM0);
+    const sim = simulateCustomSchematic(lab.customSchematic, rawS1 ? 1 : 0, rawS2 ? 1 : 0, plcState.idealMemoryM0);
     if (pwr) {
       plcState.idealMemoryM0 = Boolean(sim.RELAY);
     }
@@ -6891,15 +7588,20 @@ function getPlcSimulationState() {
     idealQ1 = pwr && Boolean(sim.L2);
   }
 
+  // Electrical inputs reaching the PLC in Sync Mode
+  const s1 = (isPlcLab && isSyncMode && state.simResult && state.simResult.plcInputs)
+    ? Boolean(state.simResult.plcInputs[0])
+    : rawS1;
+  const s2 = (isPlcLab && isSyncMode && state.simResult && state.simResult.plcInputs)
+    ? Boolean(state.simResult.plcInputs[1])
+    : rawS2;
+
   // 2. Physical Board State (actual wiring)
   const actualM0 = Boolean(pwr && state.simResult && (state.simResult.K1 || state.simResult.K2));
   const actualQ0 = Boolean(pwr && state.simResult && state.simResult.L1);
   const actualQ1 = Boolean(pwr && state.simResult && state.simResult.L2);
 
   // 3. Determine active display states based on mode
-  const hasWires = Boolean(state.wires && state.wires.length > 0);
-  const isSyncMode = plcState.syncWithActualWiring && hasWires;
-
   const activeM0 = isSyncMode ? actualM0 : idealM0;
   const activeQ0 = isSyncMode ? actualQ0 : idealQ0;
   const activeQ1 = isSyncMode ? actualQ1 : idealQ1;
@@ -6910,6 +7612,8 @@ function getPlcSimulationState() {
   return {
     s1,
     s2,
+    rawS1,
+    rawS2,
     pwr,
     idealM0,
     idealQ0,
@@ -7874,6 +8578,24 @@ function initPlcLadderCoSim() {
   if (selWb) {
     selWb.addEventListener('change', (e) => {
       updatePlcModelUI(e.target.value);
+    });
+  }
+
+  // PLC Wiring Logic Selector synchronization
+  const wbPlcLogicSelect = document.getElementById('wbPlcLogicSelect');
+  if (wbPlcLogicSelect) {
+    wbPlcLogicSelect.addEventListener('change', (e) => {
+      state.plcWiringLogic = e.target.value;
+      updatePlcLogicModeUI();
+      updateSimulationUI();
+    });
+  }
+
+  // Fuse Reset Button
+  const btnResetFuse = document.getElementById('btnResetFuse');
+  if (btnResetFuse) {
+    btnResetFuse.addEventListener('click', () => {
+      resetFuses();
     });
   }
 
