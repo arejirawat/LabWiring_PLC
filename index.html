@@ -132,6 +132,9 @@
             <button type="button" id="btnTogglePlcIl" class="btn-plc-il" title="แสดง/ซ่อนชุดคำสั่ง Instruction List (IL) และตาราง Address">
               📋 ดูคำสั่ง IL
             </button>
+            <button type="button" id="btnOpenLadderPopup" class="timing-btn" title="เปิดหน้าต่าง Pop-up ลอยบนกระดานทดลอง">
+              🗗 เปิด Pop-up คู่ขนานกระดาน
+            </button>
           </div>
         </div>
 
@@ -256,6 +259,9 @@
             <button type="button" id="btnResetFuse" class="btn-reset-fuse" style="display: none;" title="คลิกเพื่อเปลี่ยน/รีเซตฟิวส์ที่ขาดใหม่">
               💥 ฟิวส์ขาด! คลิกเพื่อรีเซตฟิวส์
             </button>
+            <button type="button" id="btnToolbarLadderPopup" class="btn-toolbar-ladder" style="display: none;" title="เปิดหน้าต่าง Pop-up วงจร Ladder เพื่อดูประกอบขณะกดสวิตช์ทดสอบวงจร">
+              🪜 ดูวงจร Ladder (Popup)
+            </button>
             <span class="board-status" id="wireCountText">สายไฟที่ต่อ: 0 เส้น</span>
           </div>
 
@@ -295,6 +301,7 @@
           </div>
           <div class="fs-action-group">
             <button type="button" id="btnFsSchematic" class="btn-mini btn-mini-info">📐 ดูวงจรสัญลักษณ์</button>
+            <button type="button" id="btnFsLadder" class="btn-mini btn-mini-info" style="display: none;">🪜 ดูวงจร Ladder</button>
             <button type="button" id="btnFsDeleteMode" class="btn-mini btn-mini-delete">✂️ <span class="delete-mode-label">ลบสายไฟ</span></button>
             <button type="button" id="btnFsUndo" class="btn-mini btn-mini-secondary" disabled>↩ ย้อนกลับ (0/5)</button>
             <button type="button" id="btnFsRedo" class="btn-mini btn-mini-secondary" disabled>↪ ทำซ้ำ</button>
@@ -366,10 +373,6 @@
             <!-- Main Experiment Board Box -->
             <g id="mainBoard" transform="translate(185, 25)">
               <rect x="0" y="0" width="710" height="570" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="2" filter="url(#shadow-card)" />
-
-              <!-- Watermark & Branding -->
-              <text x="355" y="310" text-anchor="middle" fill="#64748b" opacity="0.16" font-size="38" font-weight="900" transform="rotate(-18, 355, 310)" pointer-events="none">Kru-Jirawat</text>
-              <text x="455" y="198" text-anchor="middle" fill="#475569" opacity="0.55" font-size="13" font-weight="700" pointer-events="none">Kru-Jirawat.com</text>
 
               <!-- TERMINAL BLOCK (6 Columns x 2 Rows internally linked per column) -->
               <g id="terminalBlockGroup" transform="translate(45, 35)">
@@ -537,7 +540,8 @@
 
               <!-- Footer watermark matching original worksheet -->
               <text x="18" y="556" fill="#64748b" font-size="13" font-weight="600" pointer-events="none">ชุดทดลองการเชื่อมต่อวงจรไฟฟ้าควบคุมด้วย RELAY</text>
-              <text x="692" y="556" text-anchor="end" fill="#475569" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">v2.6.0 | Kru-Jirawat</text>
+              <text x="355" y="556" text-anchor="middle" fill="#64748b" opacity="0.65" font-size="11.5" font-weight="700" pointer-events="none">พัฒนาสื่อการสอนโดย Kru-Jirawat (Kru-Jirawat.com)</text>
+              <text x="692" y="556" text-anchor="end" fill="#475569" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">v2.7.0 | Kru-Jirawat</text>
             </g>
 
             <!-- PLC Terminal Block Workbench Group (Lab 4 & Lab 5) -->
@@ -586,6 +590,31 @@
             </div>
             <div id="fsSchematicClone" class="fs-schem-body"></div>
             <div id="fsLadderClone" class="fs-schem-body fs-ladder-clone" hidden></div>
+          </div>
+
+          <!-- Floating Interactive PLC Ladder Diagram Pop-up (Works in both Normal & Fullscreen mode) -->
+          <div id="ladderPopupOverlay" class="ladder-popup-overlay" hidden>
+            <div id="ladderPopupHeader" class="ladder-popup-header" title="ลากที่แถบหัวนี้เพื่อย้ายตำแหน่งหน้าต่าง Pop-up">
+              <div class="ladder-popup-title">
+                <span>🪜 วงจร PLC Ladder (Live Co-Simulation)</span>
+                <span id="ladderPopupSyncBadge" class="ladder-popup-badge">⚡ ซิงค์วงจรจริง</span>
+              </div>
+              <div class="ladder-popup-actions">
+                <button type="button" id="btnPopupToggleSync" class="btn-popup-mini" title="สลับระหว่างซิงค์ตามสายที่ต่อจริง กับจำลองลอจิก PLC อัตโนมัติ">🔄 สลับโหมดซิงค์</button>
+                <button type="button" id="btnCloseLadderPopup" class="btn-close-fs-schem" title="ปิดหน้าต่าง Ladder Pop-up">✕</button>
+              </div>
+            </div>
+            <!-- Quick Switch Test Bar inside Pop-up -->
+            <div class="ladder-popup-testbar">
+              <span class="testbar-label">กดสวิตช์ทดสอบ:</span>
+              <button type="button" id="btnPopupSwS1" class="btn-popup-sw" data-sw="S1">🔘 PB1 (S1): OFF (0)</button>
+              <button type="button" id="btnPopupSwS2" class="btn-popup-sw" data-sw="S2">🔘 PB2 (S2): OFF (0)</button>
+              <span id="ladderPopupIoSummary" class="ladder-popup-io-summary"></span>
+            </div>
+            <div id="ladderPopupBody" class="ladder-popup-body">
+              <div id="ladderPopupClone" class="ladder-popup-svg-wrap"></div>
+              <div id="ladderPopupFooterStatus" class="ladder-popup-footer"></div>
+            </div>
           </div>
 
           <!-- Floating Verification Result Toast inside Fullscreen Popup -->
@@ -830,7 +859,7 @@
 
   <footer class="app-version-footer">
     <span>⚡ <strong>Electrical Control &amp; PLC Wiring Simulator</strong> — พัฒนาสื่อการสอนโดย <strong>Kru-Jirawat</strong></span>
-    <span class="version-pill" id="appVersionBadge">Version 2.6.0 (อัปเดตล่าสุด: 09 พ.ย. 2026)</span>
+    <span class="version-pill" id="appVersionBadge">Version 2.7.0 (อัปเดตล่าสุด: 09 พ.ย. 2026)</span>
   </footer>
 
   <script src="app.js?v=20261102_2"></script>

@@ -1182,11 +1182,10 @@ function initPlcTerminalBoard() {
   }
   html += `</g></g>`;
 
-  // Center Watermark & Branding between PB2 and F2
+  // Bottom Watermark Labels for Left and Right Panels
   html += `
-    <text x="466" y="195" text-anchor="middle" fill="#334155" opacity="0.65" font-size="13" font-weight="700" pointer-events="none">Kru-Jirawat.com</text>
-    <text x="240" y="325" text-anchor="middle" fill="#64748b" opacity="0.13" font-size="34" font-weight="900" transform="rotate(-18, 240, 325)" pointer-events="none">Kru-Jirawat</text>
-    <text x="686" y="325" text-anchor="middle" fill="#64748b" opacity="0.13" font-size="34" font-weight="900" transform="rotate(-18, 686, 325)" pointer-events="none">Kru-Jirawat</text>
+    <text x="240" y="578" text-anchor="middle" fill="#64748b" opacity="0.65" font-size="11" font-weight="700" pointer-events="none">พัฒนาสื่อการสอนโดย Kru-Jirawat (Kru-Jirawat.com)</text>
+    <text x="686" y="578" text-anchor="middle" fill="#64748b" opacity="0.65" font-size="11" font-weight="700" pointer-events="none">Kru-Jirawat.com</text>
   `;
 
   // RIGHT PANEL: PLC OUTPUT SECTION (x=470, y=18, w=432, h=584)
@@ -1400,7 +1399,7 @@ function initPlcTerminalBoard() {
 
   html += `
     <text x="26" y="594" fill="#64748b" font-size="12" font-weight="600" pointer-events="none">ชุดทดลองการเชื่อมต่ออินพุต-เอาต์พุต PLC ผ่าน TERMINAL กลาง</text>
-    <text x="894" y="594" text-anchor="end" fill="#475569" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">v2.6.0 | Kru-Jirawat</text>
+    <text x="894" y="594" text-anchor="end" fill="#475569" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">v2.7.0 | Kru-Jirawat</text>
   `;
 
   container.innerHTML = html;
@@ -2820,8 +2819,7 @@ function generateCustomSchematicSvg(schematic, options = {}) {
       <text x="18" y="224" font-size="13" font-weight="700" fill="#0f172a">0V</text>
 
       <!-- Watermark & Branding -->
-      <text x="180" y="140" text-anchor="middle" fill="#64748b" opacity="0.14" font-size="26" font-weight="900" transform="rotate(-18, 180, 140)" pointer-events="none">Kru-Jirawat</text>
-      <text x="352" y="250" text-anchor="end" fill="#64748b" opacity="0.55" font-size="9.5" font-weight="700" pointer-events="none">Kru-Jirawat</text>
+      <text x="352" y="264" text-anchor="end" fill="#64748b" opacity="0.65" font-size="9.5" font-weight="700" pointer-events="none">Kru-Jirawat</text>
     </svg>
   `;
 
@@ -2834,26 +2832,42 @@ function renderSchematic() {
   const lab = LABS[state.currentLabId];
   const s1 = state.switches.S1.pressed;
   const s2 = state.switches.S2.pressed;
-  const l1 = state.simResult.L1;
-  const l2 = state.simResult.L2;
-  const relayOn = state.simResult.K1 || state.simResult.K2;
 
-  const pwr = Boolean(state.powerOn && !state.simResult.shortCircuit);
-  const hotStroke = pwr ? '#ef4444' : '#475569';
-  const gndStroke = pwr ? '#3b82f6' : '#475569';
+  const res = state.simResult || {};
+  const pos = res.posTerminals || new Set();
+  const neg = res.negTerminals || new Set();
+  const hasWires = state.wires.length > 0;
+  const pwr = Boolean(state.powerOn && !res.shortCircuit);
+
+  const isTermWired = (tid) => state.wires.some((w) => w.from === tid || w.to === tid);
+  const isAnyWired = (...tids) => tids.some(isTermWired);
+  const isPos = (...tids) => pwr && tids.some((t) => isTermWired(t) && pos.has(t));
+  const isNeg = (...tids) => pwr && tids.some((t) => isTermWired(t) && neg.has(t));
+
+  const pwrPosActive = pwr && isTermWired('PWR_POS');
+  const pwrNegActive = pwr && isTermWired('PWR_NEG');
+  const hotStroke = pwrPosActive ? '#ef4444' : '#475569';
+  const gndStroke = pwrNegActive ? '#3b82f6' : '#475569';
   const idleStroke = '#475569';
+
+  const l1 = Boolean(res.L1);
+  const l2 = Boolean(res.L2);
+  const relayOn = Boolean(res.K1 || res.K2);
 
   let svgContent = '';
 
   if (state.currentLabId === 'lab1_1') {
     // Series S1 (NO) and S2 (NO) -> L1
-    const mid1Hot = s1;
-    const mid2Hot = s1 && s2;
+    const s1TopHot = isPos('S1_NO_1', 'S1_NO_2');
+    const mid1Hot = s1TopHot && s1;
+    const mid2Hot = isPos('L1_A', 'L1_B');
+    const l1NegHot = isNeg('L1_A', 'L1_B');
+
     svgContent = `
       <svg viewBox="0 0 360 255">
-        <text x="35" y="25" font-size="14" font-weight="700" fill="#dc2626">+12V</text>
-        <circle cx="50" cy="38" r="6" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
-        <path d="M56 38 H200 V62" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+        <text x="35" y="25" font-size="14" font-weight="700" fill="${pwrPosActive ? '#dc2626' : '#64748b'}">+12V</text>
+        <circle cx="50" cy="38" r="6" fill="#fff" stroke="${pwrPosActive ? '#dc2626' : '#64748b'}" stroke-width="2.5"/>
+        <path d="M56 38 H200 V62" fill="none" stroke="${s1TopHot ? hotStroke : idleStroke}" stroke-width="3"/>
 
         ${drawIECSwitchNO({
           id: 'S1',
@@ -2861,7 +2875,7 @@ function renderSchematic() {
           x: 200,
           yTop: 62,
           pressed: s1,
-          topEnergized: true,
+          topEnergized: s1TopHot,
           bottomEnergized: mid1Hot
         })}
 
@@ -2884,20 +2898,27 @@ function renderSchematic() {
         <path d="M189 187 L211 209 M211 187 L189 209" stroke="#0f172a" stroke-width="2"/>
         <text x="235" y="203" font-size="13" font-weight="700" fill="#0f172a">LOAD (L1)</text>
 
-        <path d="M200 214 V234 H56" fill="none" stroke="${gndStroke}" stroke-width="3"/>
-        <circle cx="50" cy="234" r="6" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
-        <text x="38" y="222" font-size="14" font-weight="700" fill="#0f172a">0V</text>
+        <path d="M200 214 V234 H56" fill="none" stroke="${l1NegHot ? gndStroke : idleStroke}" stroke-width="3"/>
+        <circle cx="50" cy="234" r="6" fill="#fff" stroke="${pwrNegActive ? '#0f172a' : '#64748b'}" stroke-width="2.5"/>
+        <text x="38" y="222" font-size="14" font-weight="700" fill="${pwrNegActive ? '#0f172a' : '#64748b'}">0V</text>
       </svg>
     `;
   } else if (state.currentLabId === 'lab1_2') {
-    // Parallel S1 (NC) and S2 (NC) -> L1 (Matches worksheet diagram)
-    const branchHot = !s1 || !s2;
+    // Parallel S1 (NC) and S2 (NC) -> L1
+    const s1TopHot = isPos('S1_NC_1', 'S1_NC_2');
+    const s2TopHot = isPos('S2_NC_1', 'S2_NC_2');
+    const s1BotHot = s1TopHot && !s1;
+    const s2BotHot = s2TopHot && !s2;
+    const branchHot = isPos('L1_A', 'L1_B');
+    const l1NegHot = isNeg('L1_A', 'L1_B');
+
     svgContent = `
       <svg viewBox="0 0 360 255">
-        <text x="25" y="24" font-size="14" font-weight="700" fill="#dc2626">+12V</text>
-        <circle cx="45" cy="38" r="6" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
-        <path d="M51 38 H280 V76 M150 38 V76" fill="none" stroke="${hotStroke}" stroke-width="3"/>
-        <circle cx="150" cy="38" r="5" fill="#0f172a"/>
+        <text x="25" y="24" font-size="14" font-weight="700" fill="${pwrPosActive ? '#dc2626' : '#64748b'}">+12V</text>
+        <circle cx="45" cy="38" r="6" fill="#fff" stroke="${pwrPosActive ? '#dc2626' : '#64748b'}" stroke-width="2.5"/>
+        <path d="M51 38 H280 V76" fill="none" stroke="${s2TopHot ? hotStroke : idleStroke}" stroke-width="3"/>
+        <path d="M150 38 V76" fill="none" stroke="${s1TopHot ? hotStroke : idleStroke}" stroke-width="3"/>
+        <circle cx="150" cy="38" r="5" fill="${s1TopHot || s2TopHot ? '#0f172a' : '#475569'}"/>
 
         ${drawIECSwitchNC({
           id: 'S1',
@@ -2905,8 +2926,8 @@ function renderSchematic() {
           x: 150,
           yTop: 76,
           pressed: s1,
-          topEnergized: true,
-          bottomEnergized: !s1
+          topEnergized: s1TopHot,
+          bottomEnergized: s1BotHot
         })}
 
         ${drawIECSwitchNC({
@@ -2915,31 +2936,34 @@ function renderSchematic() {
           x: 280,
           yTop: 76,
           pressed: s2,
-          topEnergized: true,
-          bottomEnergized: !s2
+          topEnergized: s2TopHot,
+          bottomEnergized: s2BotHot
         })}
 
         <path d="M150 110 V145 M280 110 V145 H150 V168" fill="none" stroke="${branchHot ? hotStroke : idleStroke}" stroke-width="3"/>
-        <circle cx="150" cy="145" r="5" fill="#0f172a"/>
+        <circle cx="150" cy="145" r="5" fill="${branchHot ? '#0f172a' : '#475569'}"/>
 
         <circle cx="150" cy="184" r="16" fill="${l1 ? '#fde047' : '#ffffff'}" stroke="#0f172a" stroke-width="2.5"/>
         <path d="M139 173 L161 195 M161 173 L139 195" stroke="#0f172a" stroke-width="2"/>
         <text x="185" y="189" font-size="13" font-weight="700" fill="#0f172a">LOAD (L1)</text>
 
-        <path d="M150 200 V232 H51" fill="none" stroke="${gndStroke}" stroke-width="3"/>
-        <circle cx="45" cy="232" r="6" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
-        <text x="32" y="220" font-size="14" font-weight="700" fill="#0f172a">0V</text>
+        <path d="M150 200 V232 H51" fill="none" stroke="${l1NegHot ? gndStroke : idleStroke}" stroke-width="3"/>
+        <circle cx="45" cy="232" r="6" fill="#fff" stroke="${pwrNegActive ? '#0f172a' : '#64748b'}" stroke-width="2.5"/>
+        <text x="32" y="220" font-size="14" font-weight="700" fill="${pwrNegActive ? '#0f172a' : '#64748b'}">0V</text>
       </svg>
     `;
   } else if (state.currentLabId === 'lab1_ex') {
     // NOR Logic: S1 (NC) in series with S2 (NC) -> L1
-    const mid1Hot = !s1;
-    const mid2Hot = !s1 && !s2;
+    const s1TopHot = isPos('S1_NC_1', 'S1_NC_2');
+    const mid1Hot = s1TopHot && !s1;
+    const mid2Hot = isPos('L1_A', 'L1_B');
+    const l1NegHot = isNeg('L1_A', 'L1_B');
+
     svgContent = `
       <svg viewBox="0 0 360 255">
-        <text x="35" y="25" font-size="14" font-weight="700" fill="#dc2626">+12V</text>
-        <circle cx="50" cy="38" r="6" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
-        <path d="M56 38 H200 V62" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+        <text x="35" y="25" font-size="14" font-weight="700" fill="${pwrPosActive ? '#dc2626' : '#64748b'}">+12V</text>
+        <circle cx="50" cy="38" r="6" fill="#fff" stroke="${pwrPosActive ? '#dc2626' : '#64748b'}" stroke-width="2.5"/>
+        <path d="M56 38 H200 V62" fill="none" stroke="${s1TopHot ? hotStroke : idleStroke}" stroke-width="3"/>
 
         ${drawIECSwitchNC({
           id: 'S1',
@@ -2947,7 +2971,7 @@ function renderSchematic() {
           x: 200,
           yTop: 62,
           pressed: s1,
-          topEnergized: true,
+          topEnergized: s1TopHot,
           bottomEnergized: mid1Hot
         })}
 
@@ -2969,19 +2993,28 @@ function renderSchematic() {
         <path d="M189 187 L211 209 M211 187 L189 209" stroke="#0f172a" stroke-width="2"/>
         <text x="235" y="203" font-size="13" font-weight="700" fill="#0f172a">LOAD (L1)</text>
 
-        <path d="M200 214 V234 H56" fill="none" stroke="${gndStroke}" stroke-width="3"/>
-        <circle cx="50" cy="234" r="6" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
-        <text x="38" y="222" font-size="14" font-weight="700" fill="#0f172a">0V</text>
+        <path d="M200 214 V234 H56" fill="none" stroke="${l1NegHot ? gndStroke : idleStroke}" stroke-width="3"/>
+        <circle cx="50" cy="234" r="6" fill="#fff" stroke="${pwrNegActive ? '#0f172a' : '#64748b'}" stroke-width="2.5"/>
+        <text x="38" y="222" font-size="14" font-weight="700" fill="${pwrNegActive ? '#0f172a' : '#64748b'}">0V</text>
       </svg>
     `;
   } else if (state.currentLabId === 'lab2_1') {
-    // Relay Basic Circuit (Matches Doc2 image4 with accurate IEC symbols)
+    // Relay Basic Circuit
+    const s1TopHot = isPos('S1_NO_1', 'S1_NO_2');
+    const s1BotHot = s1TopHot && s1;
+    const relayActive = Boolean(res.K1 || res.K2);
+    const coilNegHot = isNeg('K1_14', 'K1_13');
+    const contactTopHot = isPos('K1_9', 'K1_12');
+    const contactBotHot = relayActive && contactTopHot;
+    const l1NegHot = isNeg('L1_A', 'L1_B');
+
     svgContent = `
       <svg viewBox="0 0 360 255">
-        <text x="20" y="22" font-size="13" font-weight="700" fill="#dc2626">+12V</text>
-        <circle cx="40" cy="36" r="5" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
-        <path d="M45 36 H265 V76 M140 36 V76" fill="none" stroke="${hotStroke}" stroke-width="2.8"/>
-        <circle cx="140" cy="36" r="4.5" fill="#0f172a"/>
+        <text x="20" y="22" font-size="13" font-weight="700" fill="${pwrPosActive ? '#dc2626' : '#64748b'}">+12V</text>
+        <circle cx="40" cy="36" r="5" fill="#fff" stroke="${pwrPosActive ? '#dc2626' : '#64748b'}" stroke-width="2.5"/>
+        <path d="M45 36 H265 V76" fill="none" stroke="${contactTopHot ? hotStroke : idleStroke}" stroke-width="2.8"/>
+        <path d="M140 36 V76" fill="none" stroke="${s1TopHot ? hotStroke : idleStroke}" stroke-width="2.8"/>
+        <circle cx="140" cy="36" r="4.5" fill="${s1TopHot || contactTopHot ? '#0f172a' : '#475569'}"/>
 
         ${drawIECSwitchNO({
           id: 'S1',
@@ -2989,14 +3022,14 @@ function renderSchematic() {
           x: 140,
           yTop: 76,
           pressed: s1,
-          topEnergized: true,
-          bottomEnergized: s1
+          topEnergized: s1TopHot,
+          bottomEnergized: s1BotHot
         })}
 
-        <path d="M140 110 V168" fill="none" stroke="${s1 ? hotStroke : idleStroke}" stroke-width="2.8"/>
+        <path d="M140 110 V168" fill="none" stroke="${s1BotHot ? hotStroke : idleStroke}" stroke-width="2.8"/>
 
         <!-- Relay Coil K -->
-        <rect x="118" y="168" width="44" height="24" fill="${relayOn ? '#dcfce7' : '#ffffff'}" stroke="#0f172a" stroke-width="2.2"/>
+        <rect x="118" y="168" width="44" height="24" fill="${relayActive ? '#dcfce7' : '#ffffff'}" stroke="#0f172a" stroke-width="2.2"/>
         <text x="98" y="185" font-size="13" font-weight="700" fill="#0f172a">K</text>
         <text x="140" y="163" text-anchor="middle" font-size="10" fill="#475569">14(+)</text>
         <text x="140" y="204" text-anchor="middle" font-size="10" fill="#475569">13(-)</text>
@@ -3004,10 +3037,10 @@ function renderSchematic() {
         <!-- Relay Contact K (NO: 9 COM, 5 NO) -->
         <text x="218" y="96" font-size="13" font-weight="700" fill="#0f172a">K (NO)</text>
         <text x="282" y="74" font-size="10" fill="#475569">9(COM)</text>
-        <circle cx="265" cy="76" r="3" fill="#fff" stroke="#dc2626" stroke-width="2"/>
-        <circle cx="265" cy="110" r="3" fill="#fff" stroke="${relayOn ? '#ef4444' : '#334155'}" stroke-width="2"/>
-        <line x1="265" y1="107" x2="${relayOn ? 265 : 251}" y2="${relayOn ? 76 : 80}" stroke="${relayOn ? hotStroke : idleStroke}" stroke-width="3" stroke-linecap="round"/>
-        <path d="M265 110 V166" fill="none" stroke="${relayOn ? hotStroke : idleStroke}" stroke-width="2.8"/>
+        <circle cx="265" cy="76" r="3" fill="#fff" stroke="${contactTopHot ? '#dc2626' : '#475569'}" stroke-width="2"/>
+        <circle cx="265" cy="110" r="3" fill="#fff" stroke="${contactBotHot ? '#ef4444' : '#334155'}" stroke-width="2"/>
+        <line x1="265" y1="107" x2="${relayActive ? 265 : 251}" y2="${relayActive ? 76 : 80}" stroke="${contactBotHot ? hotStroke : idleStroke}" stroke-width="3" stroke-linecap="round"/>
+        <path d="M265 110 V166" fill="none" stroke="${contactBotHot ? hotStroke : idleStroke}" stroke-width="2.8"/>
         <text x="282" y="118" font-size="10" fill="#475569">5(NO)</text>
 
         <!-- Lamp L1 -->
@@ -3016,20 +3049,31 @@ function renderSchematic() {
         <text x="296" y="185" font-size="13" font-weight="700" fill="#0f172a">L1</text>
 
         <!-- 0V Rail -->
-        <path d="M140 192 V232 M265 194 V232 H45" fill="none" stroke="${gndStroke}" stroke-width="2.8"/>
-        <circle cx="140" cy="232" r="4.5" fill="#0f172a"/>
-        <circle cx="40" cy="232" r="5" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
-        <text x="25" y="220" font-size="13" font-weight="700" fill="#0f172a">0V</text>
+        <path d="M140 192 V232 M265 194 V232 H45" fill="none" stroke="${(coilNegHot || l1NegHot) ? gndStroke : idleStroke}" stroke-width="2.8"/>
+        <circle cx="140" cy="232" r="4.5" fill="${coilNegHot ? '#0f172a' : '#475569'}"/>
+        <circle cx="40" cy="232" r="5" fill="#fff" stroke="${pwrNegActive ? '#0f172a' : '#64748b'}" stroke-width="2.5"/>
+        <text x="25" y="220" font-size="13" font-weight="700" fill="${pwrNegActive ? '#0f172a' : '#64748b'}">0V</text>
       </svg>
     `;
   } else if (state.currentLabId === 'lab2_2') {
-    // Relay Changeover Contact (SPDT) controlling L1 (NO) and L2 (NC) (Matches Doc2 image6)
+    // Relay Changeover Contact (SPDT) controlling L1 (NO) and L2 (NC)
+    const s1TopHot = isPos('S1_NO_1', 'S1_NO_2');
+    const s1BotHot = s1TopHot && s1;
+    const relayActive = Boolean(res.K1 || res.K2);
+    const coilNegHot = isNeg('K1_14', 'K1_13');
+    const comHot = isPos('K1_9', 'K1_12');
+    const noHot = relayActive && comHot;
+    const ncHot = !relayActive && comHot;
+    const l1NegHot = isNeg('L1_A', 'L1_B');
+    const l2NegHot = isNeg('L2_A', 'L2_B');
+
     svgContent = `
       <svg viewBox="0 0 360 255">
-        <text x="18" y="22" font-size="13" font-weight="700" fill="#dc2626">+12V</text>
-        <circle cx="38" cy="36" r="5" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
-        <path d="M43 36 H252 V74 M120 36 V74" fill="none" stroke="${hotStroke}" stroke-width="2.8"/>
-        <circle cx="120" cy="36" r="4.5" fill="#0f172a"/>
+        <text x="18" y="22" font-size="13" font-weight="700" fill="${pwrPosActive ? '#dc2626' : '#64748b'}">+12V</text>
+        <circle cx="38" cy="36" r="5" fill="#fff" stroke="${pwrPosActive ? '#dc2626' : '#64748b'}" stroke-width="2.5"/>
+        <path d="M43 36 H252 V74" fill="none" stroke="${comHot ? hotStroke : idleStroke}" stroke-width="2.8"/>
+        <path d="M120 36 V74" fill="none" stroke="${s1TopHot ? hotStroke : idleStroke}" stroke-width="2.8"/>
+        <circle cx="120" cy="36" r="4.5" fill="${s1TopHot || comHot ? '#0f172a' : '#475569'}"/>
 
         ${drawIECSwitchNO({
           id: 'S1',
@@ -3037,14 +3081,14 @@ function renderSchematic() {
           x: 120,
           yTop: 74,
           pressed: s1,
-          topEnergized: true,
-          bottomEnergized: s1
+          topEnergized: s1TopHot,
+          bottomEnergized: s1BotHot
         })}
 
-        <path d="M120 108 V168" fill="none" stroke="${s1 ? hotStroke : idleStroke}" stroke-width="2.8"/>
+        <path d="M120 108 V168" fill="none" stroke="${s1BotHot ? hotStroke : idleStroke}" stroke-width="2.8"/>
 
         <!-- Coil K -->
-        <rect x="98" y="168" width="44" height="24" fill="${relayOn ? '#dcfce7' : '#ffffff'}" stroke="#0f172a" stroke-width="2.2"/>
+        <rect x="98" y="168" width="44" height="24" fill="${relayActive ? '#dcfce7' : '#ffffff'}" stroke="#0f172a" stroke-width="2.2"/>
         <text x="80" y="185" font-size="13" font-weight="700" fill="#0f172a">K</text>
         <text x="120" y="163" text-anchor="middle" font-size="10" fill="#475569">14(+)</text>
         <text x="120" y="204" text-anchor="middle" font-size="10" fill="#475569">13(-)</text>
@@ -3052,17 +3096,17 @@ function renderSchematic() {
         <!-- Changeover Contact K (COM=9, NO=5->L1, NC=1->L2) -->
         <text x="206" y="92" font-size="13" font-weight="700" fill="#0f172a">K</text>
         <text x="262" y="70" font-size="10" fill="#475569">9(COM)</text>
-        <circle cx="252" cy="74" r="3" fill="#fff" stroke="#dc2626" stroke-width="2"/>
+        <circle cx="252" cy="74" r="3" fill="#fff" stroke="${comHot ? '#dc2626' : '#475569'}" stroke-width="2"/>
         <!-- NC Post (Right) -->
-        <path d="M262 104 H285 V166" fill="none" stroke="${!relayOn ? hotStroke : idleStroke}" stroke-width="2.8"/>
-        <circle cx="268" cy="104" r="2.8" fill="#fff" stroke="${!relayOn ? '#ef4444' : '#334155'}" stroke-width="2"/>
+        <path d="M262 104 H285 V166" fill="none" stroke="${ncHot ? hotStroke : idleStroke}" stroke-width="2.8"/>
+        <circle cx="268" cy="104" r="2.8" fill="#fff" stroke="${ncHot ? '#ef4444' : '#334155'}" stroke-width="2"/>
         <text x="293" y="106" font-size="10" fill="#475569">1(NC)</text>
         <!-- NO Post (Left) -->
-        <path d="M232 104 V166" fill="none" stroke="${relayOn ? hotStroke : idleStroke}" stroke-width="2.8"/>
-        <circle cx="232" cy="104" r="2.8" fill="#fff" stroke="${relayOn ? '#ef4444' : '#334155'}" stroke-width="2"/>
+        <path d="M232 104 V166" fill="none" stroke="${noHot ? hotStroke : idleStroke}" stroke-width="2.8"/>
+        <circle cx="232" cy="104" r="2.8" fill="#fff" stroke="${noHot ? '#ef4444' : '#334155'}" stroke-width="2"/>
         <text x="196" y="114" font-size="10" fill="#475569">5(NO)</text>
         <!-- Wiper Arm -->
-        <line x1="252" y1="74" x2="${relayOn ? 232 : 268}" y2="104" stroke="${hotStroke}" stroke-width="3" stroke-linecap="round"/>
+        <line x1="252" y1="74" x2="${relayActive ? 232 : 268}" y2="104" stroke="${comHot ? hotStroke : idleStroke}" stroke-width="3" stroke-linecap="round"/>
 
         <!-- Lamp L1 -->
         <circle cx="232" cy="180" r="14" fill="${l1 ? '#fde047' : '#ffffff'}" stroke="#0f172a" stroke-width="2.2"/>
@@ -3075,22 +3119,30 @@ function renderSchematic() {
         <text x="310" y="185" font-size="13" font-weight="700" fill="#0f172a">L2</text>
 
         <!-- 0V Rail -->
-        <path d="M120 192 V232 M232 194 V232 M285 194 V232 H43" fill="none" stroke="${gndStroke}" stroke-width="2.8"/>
-        <circle cx="120" cy="232" r="4.5" fill="#0f172a"/>
-        <circle cx="232" cy="232" r="4.5" fill="#0f172a"/>
-        <circle cx="38" cy="232" r="5" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
-        <text x="22" y="220" font-size="13" font-weight="700" fill="#0f172a">0V</text>
+        <path d="M120 192 V232 M232 194 V232 M285 194 V232 H43" fill="none" stroke="${(coilNegHot || l1NegHot || l2NegHot) ? gndStroke : idleStroke}" stroke-width="2.8"/>
+        <circle cx="120" cy="232" r="4.5" fill="${coilNegHot ? '#0f172a' : '#475569'}"/>
+        <circle cx="232" cy="232" r="4.5" fill="${l1NegHot ? '#0f172a' : '#475569'}"/>
+        <circle cx="38" cy="232" r="5" fill="#fff" stroke="${pwrNegActive ? '#0f172a' : '#64748b'}" stroke-width="2.5"/>
+        <text x="22" y="220" font-size="13" font-weight="700" fill="${pwrNegActive ? '#0f172a' : '#64748b'}">0V</text>
       </svg>
     `;
   } else if (state.currentLabId === 'lab2_latch') {
     // Self-holding circuit schematic with IEC NC Stop & NO Start
-    const afterStopHot = !s2;
-    const latchedHot = afterStopHot && (s1 || relayOn);
+    const stopTopHot = isPos('S2_NC_1', 'S2_NC_2');
+    const afterStopHot = stopTopHot && !s2;
+    const startHot = afterStopHot && s1;
+    const relayActive = Boolean(res.K1 || res.K2);
+    const contactTopHot = afterStopHot && isPos('K1_9', 'K1_12');
+    const latchHot = relayActive && contactTopHot;
+    const latchedHot = afterStopHot && (startHot || latchHot || isPos('K1_14', 'K1_13'));
+    const coilNegHot = isNeg('K1_14', 'K1_13');
+    const l1NegHot = isNeg('L1_A', 'L1_B');
+
     svgContent = `
       <svg viewBox="0 0 360 255">
-        <text x="15" y="22" font-size="13" font-weight="700" fill="#dc2626">+12V</text>
-        <circle cx="35" cy="34" r="5" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
-        <path d="M40 34 H130 V48" fill="none" stroke="${hotStroke}" stroke-width="2.6"/>
+        <text x="15" y="22" font-size="13" font-weight="700" fill="${pwrPosActive ? '#dc2626' : '#64748b'}">+12V</text>
+        <circle cx="35" cy="34" r="5" fill="#fff" stroke="${pwrPosActive ? '#dc2626' : '#64748b'}" stroke-width="2.5"/>
+        <path d="M40 34 H130 V48" fill="none" stroke="${stopTopHot ? hotStroke : idleStroke}" stroke-width="2.6"/>
 
         ${drawIECSwitchNC({
           id: 'S2',
@@ -3098,12 +3150,12 @@ function renderSchematic() {
           x: 130,
           yTop: 48,
           pressed: s2,
-          topEnergized: true,
+          topEnergized: stopTopHot,
           bottomEnergized: afterStopHot
         })}
 
         <path d="M130 82 V96 H215 V108 M130 96 V108" fill="none" stroke="${afterStopHot ? hotStroke : idleStroke}" stroke-width="2.6"/>
-        <circle cx="130" cy="96" r="4" fill="#0f172a"/>
+        <circle cx="130" cy="96" r="4" fill="${afterStopHot ? '#0f172a' : '#475569'}"/>
 
         ${drawIECSwitchNO({
           id: 'S1',
@@ -3112,21 +3164,21 @@ function renderSchematic() {
           yTop: 108,
           pressed: s1,
           topEnergized: afterStopHot,
-          bottomEnergized: s1 && afterStopHot
+          bottomEnergized: startHot
         })}
 
         <!-- K1 NO Self-holding contact -->
         <text x="226" y="130" font-size="12" font-weight="700" fill="#0f172a">K1(9-5)</text>
-        <circle cx="215" cy="108" r="2.8" fill="#fff" stroke="${afterStopHot ? '#ef4444' : '#334155'}" stroke-width="2"/>
-        <circle cx="215" cy="142" r="2.8" fill="#fff" stroke="${latchedHot ? '#ef4444' : '#334155'}" stroke-width="2"/>
-        <line x1="215" y1="139" x2="${relayOn ? 215 : 202}" y2="${relayOn ? 108 : 112}" stroke="${relayOn && afterStopHot ? hotStroke : idleStroke}" stroke-width="2.8" stroke-linecap="round"/>
+        <circle cx="215" cy="108" r="2.8" fill="#fff" stroke="${contactTopHot ? '#ef4444' : '#334155'}" stroke-width="2"/>
+        <circle cx="215" cy="142" r="2.8" fill="#fff" stroke="${latchHot ? '#ef4444' : '#334155'}" stroke-width="2"/>
+        <line x1="215" y1="139" x2="${relayActive ? 215 : 202}" y2="${relayActive ? 108 : 112}" stroke="${relayActive && contactTopHot ? hotStroke : idleStroke}" stroke-width="2.8" stroke-linecap="round"/>
 
         <path d="M130 142 V156 H290 V172 M215 142 V156 M130 156 V172" fill="none" stroke="${latchedHot ? hotStroke : idleStroke}" stroke-width="2.6"/>
-        <circle cx="130" cy="156" r="4" fill="#0f172a"/>
-        <circle cx="215" cy="156" r="4" fill="#0f172a"/>
+        <circle cx="130" cy="156" r="4" fill="${latchedHot ? '#0f172a' : '#475569'}"/>
+        <circle cx="215" cy="156" r="4" fill="${latchedHot ? '#0f172a' : '#475569'}"/>
 
         <!-- Coil K1 -->
-        <rect x="110" y="172" width="40" height="22" fill="${relayOn ? '#dcfce7' : '#ffffff'}" stroke="#0f172a" stroke-width="2"/>
+        <rect x="110" y="172" width="40" height="22" fill="${relayActive ? '#dcfce7' : '#ffffff'}" stroke="#0f172a" stroke-width="2"/>
         <text x="86" y="188" font-size="12" font-weight="700" fill="#0f172a">K1</text>
 
         <!-- Lamp L1 -->
@@ -3134,30 +3186,44 @@ function renderSchematic() {
         <path d="M281 175 L299 193 M299 175 L281 193" stroke="#0f172a" stroke-width="2"/>
         <text x="312" y="188" font-size="12" font-weight="700" fill="#0f172a">L1</text>
 
-        <path d="M130 194 V232 M290 197 V232 H40" fill="none" stroke="${gndStroke}" stroke-width="2.6"/>
-        <circle cx="130" cy="232" r="4" fill="#0f172a"/>
-        <circle cx="35" cy="232" r="5" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
-        <text x="18" y="220" font-size="13" font-weight="700" fill="#0f172a">0V</text>
+        <path d="M130 194 V232 M290 197 V232 H40" fill="none" stroke="${(coilNegHot || l1NegHot) ? gndStroke : idleStroke}" stroke-width="2.6"/>
+        <circle cx="130" cy="232" r="4" fill="${coilNegHot ? '#0f172a' : '#475569'}"/>
+        <circle cx="35" cy="232" r="5" fill="#fff" stroke="${pwrNegActive ? '#0f172a' : '#64748b'}" stroke-width="2.5"/>
+        <text x="18" y="220" font-size="13" font-weight="700" fill="${pwrNegActive ? '#0f172a' : '#64748b'}">0V</text>
       </svg>
     `;
   } else if (state.currentLabId === 'lab4_1') {
     const spec = getPlcModelSpec();
-    const hasWires = state.wires.length > 0;
-    const f1Blown = Boolean(state.fuseBlown && state.fuseBlown.F1);
-    const logicMode = (hasWires && state.simResult && state.simResult.detectedInputLogic)
-      ? state.simResult.detectedInputLogic
-      : (state.plcWiringLogic || 'negative');
+
+    // Auto-sync logic mode if wiring detected
+    if (hasWires && res.detectedInputLogic) {
+      if (state.plcWiringLogic !== res.detectedInputLogic) {
+        state.plcWiringLogic = res.detectedInputLogic;
+        const wbSel = document.getElementById('wbPlcLogicSelect');
+        if (wbSel) wbSel.value = res.detectedInputLogic;
+      }
+    }
+    const logicMode = state.plcWiringLogic || 'negative';
     const isPos = logicMode === 'positive';
 
-    const in0Active = hasWires ? Boolean(state.simResult.plcInputs && state.simResult.plcInputs[0]) : (pwr && !f1Blown && s1);
-    const fuse1Stroke = (!f1Blown && pwr) ? hotStroke : idleStroke;
+    const f1Blown = Boolean(state.fuseBlown && state.fuseBlown.F1);
+    const f1Wired = isAnyWired('F1_T', 'F1_B');
+    const f1InHot = pwr && f1Wired && (pos.has('F1_T') || pos.has('F1_B'));
+    const f1OutHot = pwr && !f1Blown && f1Wired && pos.has('F1_T') && pos.has('F1_B');
+
+    const comWired = isAnyWired('PIN_COM_T', 'PIN_COM_B');
+    const comPosHot = pwr && comWired && f1OutHot && (pos.has('PIN_COM_T') || pos.has('PIN_COM_B'));
+    const comNegHot = pwr && comWired && (neg.has('PIN_COM_T') || neg.has('PIN_COM_B'));
+
+    const s1Wired = isAnyWired('S1_NO_1', 'S1_NO_2', 'S1_NC_1', 'S1_NC_2');
+    const in0Active = Boolean(hasWires && res.plcInputs && res.plcInputs[0]);
 
     const fuse1Svg = f1Blown
       ? `<rect x="88" y="60" width="24" height="42" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="2"/>
          <text x="100" y="85" text-anchor="middle" font-size="9" font-weight="800" fill="#fca5a5">💥ขาด</text>`
-      : `<rect x="88" y="60" width="24" height="42" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="2"/>
-         <line x1="100" y1="64" x2="100" y2="98" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2"/>
-         <text x="100" y="85" text-anchor="middle" font-size="11" font-weight="800" fill="#0369a1">F1</text>`;
+      : `<rect x="88" y="60" width="24" height="42" rx="4" fill="${f1InHot ? '#f0f9ff' : '#f8fafc'}" stroke="${f1InHot ? '#0284c7' : '#64748b'}" stroke-width="2"/>
+         <line x1="100" y1="64" x2="100" y2="98" stroke="${f1InHot ? '#ef4444' : '#94a3b8'}" stroke-width="1.8" stroke-dasharray="2 2"/>
+         <text x="100" y="85" text-anchor="middle" font-size="11" font-weight="800" fill="${f1InHot ? '#0369a1' : '#64748b'}">F1</text>`;
 
     const badgeSvg = `
       <rect x="75" y="8" width="210" height="20" rx="10" fill="${isPos ? '#064e3b' : '#1e3a8a'}" stroke="${isPos ? '#10b981' : '#3b82f6'}" stroke-width="1.2"/>
@@ -3169,18 +3235,18 @@ function renderSchematic() {
       svgContent = `
         <svg viewBox="0 0 360 270">
           ${badgeSvg}
-          <text x="25" y="44" font-size="13" font-weight="700" fill="#dc2626">+24VDC</text>
-          <circle cx="45" cy="56" r="6" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
-          <text x="25" y="254" font-size="13" font-weight="700" fill="#0f172a">0V</text>
-          <circle cx="45" cy="242" r="6" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
+          <text x="25" y="44" font-size="13" font-weight="700" fill="${pwrPosActive ? '#dc2626' : '#64748b'}">+24VDC</text>
+          <circle cx="45" cy="56" r="6" fill="#fff" stroke="${pwrPosActive ? '#dc2626' : '#64748b'}" stroke-width="2.5"/>
+          <text x="25" y="254" font-size="13" font-weight="700" fill="${pwrNegActive ? '#0f172a' : '#64748b'}">0V</text>
+          <circle cx="45" cy="242" r="6" fill="#fff" stroke="${pwrNegActive ? '#0f172a' : '#64748b'}" stroke-width="2.5"/>
 
           <!-- +24V to Fuse F1 to COM -->
-          <path d="M51 56 H100 V60" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+          <path d="M51 56 H100 V60" fill="none" stroke="${f1InHot ? hotStroke : idleStroke}" stroke-width="3"/>
           ${fuse1Svg}
-          <path d="M100 102 V130 H155" fill="none" stroke="${fuse1Stroke}" stroke-width="3"/>
+          <path d="M100 102 V130 H155" fill="none" stroke="${comPosHot ? hotStroke : idleStroke}" stroke-width="3"/>
 
           <!-- 0V line to Switch S1 NO to I0.0 / X0 -->
-          <path d="M51 242 H100 V205" fill="none" stroke="${gndStroke}" stroke-width="3"/>
+          <path d="M51 242 H100 V205" fill="none" stroke="${pwrNegActive && s1Wired ? gndStroke : idleStroke}" stroke-width="3"/>
           ${drawIECSwitchNO({
             id: 'S1',
             label: 'S1 (3-4)',
@@ -3188,7 +3254,7 @@ function renderSchematic() {
             yTop: 165,
             pressed: s1,
             topEnergized: in0Active,
-            bottomEnergized: pwr
+            bottomEnergized: pwrNegActive && s1Wired
           })}
           <path d="M100 165 V155 H155" fill="none" stroke="${in0Active ? gndStroke : idleStroke}" stroke-width="3"/>
 
@@ -3197,7 +3263,7 @@ function renderSchematic() {
           <rect x="155" y="42" width="185" height="26" rx="8" fill="#1e293b"/>
           <text x="247" y="60" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName} INPUTS</text>
 
-          <circle cx="155" cy="130" r="5" fill="${fuse1Stroke === hotStroke ? '#ef4444' : '#475569'}"/>
+          <circle cx="155" cy="130" r="5" fill="${comPosHot ? '#ef4444' : '#475569'}"/>
           <text x="166" y="134" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="#f8fafc">${spec.inCom}</text>
           <text x="210" y="134" font-size="9" fill="#94a3b8">(+24V Source)</text>
 
@@ -3217,35 +3283,35 @@ function renderSchematic() {
       svgContent = `
         <svg viewBox="0 0 360 270">
           ${badgeSvg}
-          <text x="25" y="44" font-size="13" font-weight="700" fill="#dc2626">+24VDC</text>
-          <circle cx="45" cy="56" r="6" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
-          <text x="25" y="254" font-size="13" font-weight="700" fill="#0f172a">0V</text>
-          <circle cx="45" cy="242" r="6" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
+          <text x="25" y="44" font-size="13" font-weight="700" fill="${pwrPosActive ? '#dc2626' : '#64748b'}">+24VDC</text>
+          <circle cx="45" cy="56" r="6" fill="#fff" stroke="${pwrPosActive ? '#dc2626' : '#64748b'}" stroke-width="2.5"/>
+          <text x="25" y="254" font-size="13" font-weight="700" fill="${pwrNegActive ? '#0f172a' : '#64748b'}">0V</text>
+          <circle cx="45" cy="242" r="6" fill="#fff" stroke="${pwrNegActive ? '#0f172a' : '#64748b'}" stroke-width="2.5"/>
 
           <!-- +24V to Fuse F1 to S1 NO to I0.0 / X0 -->
-          <path d="M51 56 H100 V60" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+          <path d="M51 56 H100 V60" fill="none" stroke="${f1InHot ? hotStroke : idleStroke}" stroke-width="3"/>
           ${fuse1Svg}
-          <path d="M100 102 V118" fill="none" stroke="${fuse1Stroke}" stroke-width="3"/>
+          <path d="M100 102 V118" fill="none" stroke="${f1OutHot && s1Wired ? hotStroke : idleStroke}" stroke-width="3"/>
           ${drawIECSwitchNO({
             id: 'S1',
             label: 'S1 (3-4)',
             x: 100,
             yTop: 118,
             pressed: s1,
-            topEnergized: fuse1Stroke === hotStroke,
+            topEnergized: f1OutHot && s1Wired,
             bottomEnergized: in0Active
           })}
           <path d="M100 152 V155 H155" fill="none" stroke="${in0Active ? hotStroke : idleStroke}" stroke-width="3"/>
 
           <!-- 0V line to COM (0V Sink) -->
-          <path d="M51 242 H130 V130 H155" fill="none" stroke="${gndStroke}" stroke-width="3"/>
+          <path d="M51 242 H130 V130 H155" fill="none" stroke="${comNegHot ? gndStroke : idleStroke}" stroke-width="3"/>
 
           <!-- PLC Block -->
           <rect x="155" y="42" width="185" height="195" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
           <rect x="155" y="42" width="185" height="26" rx="8" fill="#1e293b"/>
           <text x="247" y="60" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName} INPUTS</text>
 
-          <circle cx="155" cy="130" r="5" fill="#3b82f6"/>
+          <circle cx="155" cy="130" r="5" fill="${comNegHot ? '#3b82f6' : '#475569'}"/>
           <text x="166" y="134" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="#f8fafc">${spec.inCom}</text>
           <text x="210" y="134" font-size="9" fill="#94a3b8">(0V Sink)</text>
 
@@ -3263,23 +3329,39 @@ function renderSchematic() {
     }
   } else if (state.currentLabId === 'lab4_2') {
     const spec = getPlcModelSpec();
-    const hasWires = state.wires.length > 0;
-    const f1Blown = Boolean(state.fuseBlown && state.fuseBlown.F1);
-    const logicMode = (hasWires && state.simResult && state.simResult.detectedInputLogic)
-      ? state.simResult.detectedInputLogic
-      : (state.plcWiringLogic || 'negative');
+
+    if (hasWires && res.detectedInputLogic) {
+      if (state.plcWiringLogic !== res.detectedInputLogic) {
+        state.plcWiringLogic = res.detectedInputLogic;
+        const wbSel = document.getElementById('wbPlcLogicSelect');
+        if (wbSel) wbSel.value = res.detectedInputLogic;
+      }
+    }
+    const logicMode = state.plcWiringLogic || 'negative';
     const isPos = logicMode === 'positive';
 
-    const in0Active = hasWires ? Boolean(state.simResult.plcInputs && state.simResult.plcInputs[0]) : (pwr && !f1Blown && s1);
-    const in1Active = hasWires ? Boolean(state.simResult.plcInputs && state.simResult.plcInputs[1]) : (pwr && !f1Blown && s2);
-    const fuse1Stroke = (!f1Blown && pwr) ? hotStroke : idleStroke;
+    const f1Blown = Boolean(state.fuseBlown && state.fuseBlown.F1);
+    const f1Wired = isAnyWired('F1_T', 'F1_B');
+    const f1InHot = pwr && f1Wired && (pos.has('F1_T') || pos.has('F1_B'));
+    const f1OutHot = pwr && !f1Blown && f1Wired && pos.has('F1_T') && pos.has('F1_B');
+
+    const comWired = isAnyWired('PIN_COM_T', 'PIN_COM_B');
+    const comPosHot = pwr && comWired && f1OutHot && (pos.has('PIN_COM_T') || pos.has('PIN_COM_B'));
+    const comNegHot = pwr && comWired && (neg.has('PIN_COM_T') || neg.has('PIN_COM_B'));
+
+    const s1Wired = isAnyWired('S1_NO_1', 'S1_NO_2', 'S1_NC_1', 'S1_NC_2');
+    const s2Wired = isAnyWired('S2_NO_1', 'S2_NO_2', 'S2_NC_1', 'S2_NC_2');
+
+    const in0Active = Boolean(hasWires && res.plcInputs && res.plcInputs[0]);
+    const in1Active = Boolean(hasWires && res.plcInputs && res.plcInputs[1]);
+    const q0Active = Boolean(hasWires && res.plcOutputs && res.plcOutputs.Q0);
 
     const fuse1Svg = f1Blown
       ? `<rect x="73" y="55" width="24" height="38" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="2"/>
          <text x="85" y="78" text-anchor="middle" font-size="9" font-weight="800" fill="#fca5a5">💥ขาด</text>`
-      : `<rect x="73" y="55" width="24" height="38" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="2"/>
-         <line x1="85" y1="59" x2="85" y2="89" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2"/>
-         <text x="85" y="78" text-anchor="middle" font-size="11" font-weight="800" fill="#0369a1">F1</text>`;
+      : `<rect x="73" y="55" width="24" height="38" rx="4" fill="${f1InHot ? '#f0f9ff' : '#f8fafc'}" stroke="${f1InHot ? '#0284c7' : '#64748b'}" stroke-width="2"/>
+         <line x1="85" y1="59" x2="85" y2="89" stroke="${f1InHot ? '#ef4444' : '#94a3b8'}" stroke-width="1.8" stroke-dasharray="2 2"/>
+         <text x="85" y="78" text-anchor="middle" font-size="11" font-weight="800" fill="${f1InHot ? '#0369a1' : '#64748b'}">F1</text>`;
 
     const badgeSvg = `
       <rect x="75" y="8" width="210" height="20" rx="10" fill="${isPos ? '#064e3b' : '#1e3a8a'}" stroke="${isPos ? '#10b981' : '#3b82f6'}" stroke-width="1.2"/>
@@ -3291,18 +3373,18 @@ function renderSchematic() {
       svgContent = `
         <svg viewBox="0 0 360 270">
           ${badgeSvg}
-          <text x="20" y="38" font-size="13" font-weight="700" fill="#dc2626">+24VDC</text>
-          <circle cx="40" cy="50" r="6" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
-          <text x="20" y="258" font-size="13" font-weight="700" fill="#0f172a">0V</text>
-          <circle cx="40" cy="246" r="6" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
+          <text x="20" y="38" font-size="13" font-weight="700" fill="${pwrPosActive ? '#dc2626' : '#64748b'}">+24VDC</text>
+          <circle cx="40" cy="50" r="6" fill="#fff" stroke="${pwrPosActive ? '#dc2626' : '#64748b'}" stroke-width="2.5"/>
+          <text x="20" y="258" font-size="13" font-weight="700" fill="${pwrNegActive ? '#0f172a' : '#64748b'}">0V</text>
+          <circle cx="40" cy="246" r="6" fill="#fff" stroke="${pwrNegActive ? '#0f172a' : '#64748b'}" stroke-width="2.5"/>
 
           <!-- +24V to Fuse F1 to COM -->
-          <path d="M46 50 H85 V55" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+          <path d="M46 50 H85 V55" fill="none" stroke="${f1InHot ? hotStroke : idleStroke}" stroke-width="3"/>
           ${fuse1Svg}
-          <path d="M85 93 V118 H155" fill="none" stroke="${fuse1Stroke}" stroke-width="3"/>
+          <path d="M85 93 V118 H155" fill="none" stroke="${comPosHot ? hotStroke : idleStroke}" stroke-width="3"/>
 
           <!-- 0V to S1 & S2 -->
-          <path d="M46 246 H115 V215 M70 246 V215" fill="none" stroke="${gndStroke}" stroke-width="3"/>
+          <path d="M46 246 H115 V215 M70 246 V215" fill="none" stroke="${pwrNegActive && (s1Wired || s2Wired) ? gndStroke : idleStroke}" stroke-width="3"/>
           ${drawIECSwitchNO({
             id: 'S1',
             label: 'S1',
@@ -3310,7 +3392,7 @@ function renderSchematic() {
             yTop: 175,
             pressed: s1,
             topEnergized: in0Active,
-            bottomEnergized: pwr
+            bottomEnergized: pwrNegActive && s1Wired
           })}
           <path d="M70 175 V145 H155" fill="none" stroke="${in0Active ? gndStroke : idleStroke}" stroke-width="3"/>
 
@@ -3321,7 +3403,7 @@ function renderSchematic() {
             yTop: 175,
             pressed: s2,
             topEnergized: in1Active,
-            bottomEnergized: pwr
+            bottomEnergized: pwrNegActive && s2Wired
           })}
           <path d="M115 175 V168 H155" fill="none" stroke="${in1Active ? gndStroke : idleStroke}" stroke-width="3"/>
 
@@ -3330,7 +3412,7 @@ function renderSchematic() {
           <rect x="155" y="38" width="185" height="26" rx="8" fill="#1e293b"/>
           <text x="247" y="56" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName} AND LOGIC</text>
 
-          <circle cx="155" cy="118" r="5" fill="${fuse1Stroke === hotStroke ? '#ef4444' : '#475569'}"/>
+          <circle cx="155" cy="118" r="5" fill="${comPosHot ? '#ef4444' : '#475569'}"/>
           <text x="166" y="122" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="#f8fafc">${spec.inCom}</text>
 
           <circle cx="155" cy="145" r="5" fill="${in0Active ? '#22c55e' : '#475569'}"/>
@@ -3341,7 +3423,7 @@ function renderSchematic() {
 
           <rect x="168" y="188" width="160" height="40" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
           <text x="248" y="203" text-anchor="middle" font-size="9" font-weight="700" fill="#94a3b8">AND OUTPUT: S1 ∧ S2</text>
-          <text x="248" y="220" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="800" fill="${l1 ? '#4ade80' : '#64748b'}">${spec.termOutShort(0)}: ${l1 ? 'ON (1)' : 'OFF (0)'}</text>
+          <text x="248" y="220" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="800" fill="${q0Active ? '#4ade80' : '#64748b'}">${spec.termOutShort(0)}: ${q0Active ? 'ON (1)' : 'OFF (0)'}</text>
         </svg>
       `;
     } else {
@@ -3349,22 +3431,22 @@ function renderSchematic() {
       svgContent = `
         <svg viewBox="0 0 360 270">
           ${badgeSvg}
-          <text x="20" y="38" font-size="13" font-weight="700" fill="#dc2626">+24VDC</text>
-          <circle cx="40" cy="50" r="6" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
-          <text x="20" y="258" font-size="13" font-weight="700" fill="#0f172a">0V</text>
-          <circle cx="40" cy="246" r="6" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
+          <text x="20" y="38" font-size="13" font-weight="700" fill="${pwrPosActive ? '#dc2626' : '#64748b'}">+24VDC</text>
+          <circle cx="40" cy="50" r="6" fill="#fff" stroke="${pwrPosActive ? '#dc2626' : '#64748b'}" stroke-width="2.5"/>
+          <text x="20" y="258" font-size="13" font-weight="700" fill="${pwrNegActive ? '#0f172a' : '#64748b'}">0V</text>
+          <circle cx="40" cy="246" r="6" fill="#fff" stroke="${pwrNegActive ? '#0f172a' : '#64748b'}" stroke-width="2.5"/>
 
           <!-- +24V to Fuse F1 to S1 & S2 NO contacts -->
-          <path d="M46 50 H85 V55" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+          <path d="M46 50 H85 V55" fill="none" stroke="${f1InHot ? hotStroke : idleStroke}" stroke-width="3"/>
           ${fuse1Svg}
-          <path d="M85 93 V105 H65 V115 M85 105 H110 V115" fill="none" stroke="${fuse1Stroke}" stroke-width="3"/>
+          <path d="M85 93 V105 H65 V115 M85 105 H110 V115" fill="none" stroke="${f1OutHot && (s1Wired || s2Wired) ? hotStroke : idleStroke}" stroke-width="3"/>
           ${drawIECSwitchNO({
             id: 'S1',
             label: 'S1',
             x: 65,
             yTop: 115,
             pressed: s1,
-            topEnergized: fuse1Stroke === hotStroke,
+            topEnergized: f1OutHot && s1Wired,
             bottomEnergized: in0Active
           })}
           <path d="M65 149 V145 H155" fill="none" stroke="${in0Active ? hotStroke : idleStroke}" stroke-width="3"/>
@@ -3375,20 +3457,20 @@ function renderSchematic() {
             x: 110,
             yTop: 115,
             pressed: s2,
-            topEnergized: fuse1Stroke === hotStroke,
+            topEnergized: f1OutHot && s2Wired,
             bottomEnergized: in1Active
           })}
           <path d="M110 149 V168 H155" fill="none" stroke="${in1Active ? hotStroke : idleStroke}" stroke-width="3"/>
 
           <!-- 0V to COM (0V Sink) -->
-          <path d="M46 246 H135 V118 H155" fill="none" stroke="${gndStroke}" stroke-width="3"/>
+          <path d="M46 246 H135 V118 H155" fill="none" stroke="${comNegHot ? gndStroke : idleStroke}" stroke-width="3"/>
 
           <!-- PLC Block -->
           <rect x="155" y="38" width="185" height="202" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
           <rect x="155" y="38" width="185" height="26" rx="8" fill="#1e293b"/>
           <text x="247" y="56" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName} AND LOGIC</text>
 
-          <circle cx="155" cy="118" r="5" fill="#3b82f6"/>
+          <circle cx="155" cy="118" r="5" fill="${comNegHot ? '#3b82f6' : '#475569'}"/>
           <text x="166" y="122" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="#f8fafc">${spec.inCom}</text>
           <text x="210" y="122" font-size="9" fill="#94a3b8">(0V Sink)</text>
 
@@ -3400,37 +3482,59 @@ function renderSchematic() {
 
           <rect x="168" y="188" width="160" height="40" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
           <text x="248" y="203" text-anchor="middle" font-size="9" font-weight="700" fill="#94a3b8">AND OUTPUT: S1 ∧ S2</text>
-          <text x="248" y="220" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="800" fill="${l1 ? '#4ade80' : '#64748b'}">${spec.termOutShort(0)}: ${l1 ? 'ON (1)' : 'OFF (0)'}</text>
+          <text x="248" y="220" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="800" fill="${q0Active ? '#4ade80' : '#64748b'}">${spec.termOutShort(0)}: ${q0Active ? 'ON (1)' : 'OFF (0)'}</text>
         </svg>
       `;
     }
   } else if (state.currentLabId === 'lab5_1') {
     const spec = getPlcModelSpec();
-    const hasWires = state.wires.length > 0;
-    const f1Blown = Boolean(state.fuseBlown && state.fuseBlown.F1);
-    const f2Blown = Boolean(state.fuseBlown && state.fuseBlown.F2);
-    const logicMode = (hasWires && state.simResult && state.simResult.detectedInputLogic)
-      ? state.simResult.detectedInputLogic
-      : (state.plcWiringLogic || 'negative');
+
+    if (hasWires && res.detectedInputLogic) {
+      if (state.plcWiringLogic !== res.detectedInputLogic) {
+        state.plcWiringLogic = res.detectedInputLogic;
+        const wbSel = document.getElementById('wbPlcLogicSelect');
+        if (wbSel) wbSel.value = res.detectedInputLogic;
+      }
+    }
+    const logicMode = state.plcWiringLogic || 'negative';
     const isPos = logicMode === 'positive';
 
-    const in0Active = hasWires ? Boolean(state.simResult.plcInputs && state.simResult.plcInputs[0]) : (pwr && !f1Blown && s1);
-    const fuse1Stroke = (!f1Blown && pwr) ? hotStroke : idleStroke;
-    const fuse2Stroke = (!f2Blown && pwr) ? hotStroke : idleStroke;
+    const f1Blown = Boolean(state.fuseBlown && state.fuseBlown.F1);
+    const f2Blown = Boolean(state.fuseBlown && state.fuseBlown.F2);
+
+    const f1Wired = isAnyWired('F1_T', 'F1_B');
+    const f1InHot = pwr && f1Wired && (pos.has('F1_T') || pos.has('F1_B'));
+    const f1OutHot = pwr && !f1Blown && f1Wired && pos.has('F1_T') && pos.has('F1_B');
+
+    const comWired = isAnyWired('PIN_COM_T', 'PIN_COM_B');
+    const comPosHot = pwr && comWired && f1OutHot && (pos.has('PIN_COM_T') || pos.has('PIN_COM_B'));
+    const comNegHot = pwr && comWired && (neg.has('PIN_COM_T') || neg.has('PIN_COM_B'));
+
+    const s1Wired = isAnyWired('S1_NO_1', 'S1_NO_2', 'S1_NC_1', 'S1_NC_2');
+    const in0Active = Boolean(hasWires && res.plcInputs && res.plcInputs[0]);
+
+    const f2Wired = isAnyWired('F2_T', 'F2_B');
+    const f2InHot = pwr && f2Wired && (pos.has('F2_T') || pos.has('F2_B'));
+    const f2OutHot = pwr && !f2Blown && f2Wired && pos.has('F2_T') && pos.has('F2_B');
+
+    const com0Wired = isAnyWired('POUT_COM0_T', 'POUT_COM0_B');
+    const com0Hot = pwr && com0Wired && f2OutHot && (pos.has('POUT_COM0_T') || pos.has('POUT_COM0_B'));
+
+    const l1GndWired = isNeg('L1_A', 'L1_B');
 
     const fuse1Svg = f1Blown
       ? `<rect x="68" y="55" width="24" height="36" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="1.8"/>
          <text x="80" y="77" text-anchor="middle" font-size="9" font-weight="800" fill="#fca5a5">💥ขาด</text>`
-      : `<rect x="68" y="55" width="24" height="36" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.8"/>
-         <line x1="80" y1="59" x2="80" y2="87" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2"/>
-         <text x="80" y="77" text-anchor="middle" font-size="10.5" font-weight="800" fill="#0369a1">F1</text>`;
+      : `<rect x="68" y="55" width="24" height="36" rx="4" fill="${f1InHot ? '#f0f9ff' : '#f8fafc'}" stroke="${f1InHot ? '#0284c7' : '#64748b'}" stroke-width="1.8"/>
+         <line x1="80" y1="59" x2="80" y2="87" stroke="${f1InHot ? '#ef4444' : '#94a3b8'}" stroke-width="1.8" stroke-dasharray="2 2"/>
+         <text x="80" y="77" text-anchor="middle" font-size="10.5" font-weight="800" fill="${f1InHot ? '#0369a1' : '#64748b'}">F1</text>`;
 
     const fuse2Svg = f2Blown
       ? `<rect x="298" y="55" width="24" height="36" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="1.8"/>
          <text x="310" y="77" text-anchor="middle" font-size="9" font-weight="800" fill="#fca5a5">💥ขาด</text>`
-      : `<rect x="298" y="55" width="24" height="36" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.8"/>
-         <line x1="310" y1="59" x2="310" y2="87" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2"/>
-         <text x="310" y="77" text-anchor="middle" font-size="10.5" font-weight="800" fill="#0369a1">F2</text>`;
+      : `<rect x="298" y="55" width="24" height="36" rx="4" fill="${f2InHot ? '#f0f9ff' : '#f8fafc'}" stroke="${f2InHot ? '#0284c7' : '#64748b'}" stroke-width="1.8"/>
+         <line x1="310" y1="59" x2="310" y2="87" stroke="${f2InHot ? '#ef4444' : '#94a3b8'}" stroke-width="1.8" stroke-dasharray="2 2"/>
+         <text x="310" y="77" text-anchor="middle" font-size="10.5" font-weight="800" fill="${f2InHot ? '#0369a1' : '#64748b'}">F2</text>`;
 
     const badgeSvg = `
       <rect x="75" y="8" width="210" height="20" rx="10" fill="${isPos ? '#064e3b' : '#1e3a8a'}" stroke="${isPos ? '#10b981' : '#3b82f6'}" stroke-width="1.2"/>
@@ -3440,17 +3544,17 @@ function renderSchematic() {
     svgContent = `
       <svg viewBox="0 0 360 270">
         ${badgeSvg}
-        <text x="20" y="36" font-size="13" font-weight="700" fill="#dc2626">+24VDC</text>
-        <circle cx="38" cy="48" r="6" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
-        <text x="20" y="258" font-size="13" font-weight="700" fill="#0f172a">0V</text>
-        <circle cx="38" cy="246" r="6" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
+        <text x="20" y="36" font-size="13" font-weight="700" fill="${pwrPosActive ? '#dc2626' : '#64748b'}">+24VDC</text>
+        <circle cx="38" cy="48" r="6" fill="#fff" stroke="${pwrPosActive ? '#dc2626' : '#64748b'}" stroke-width="2.5"/>
+        <text x="20" y="258" font-size="13" font-weight="700" fill="${pwrNegActive ? '#0f172a' : '#64748b'}">0V</text>
+        <circle cx="38" cy="246" r="6" fill="#fff" stroke="${pwrNegActive ? '#0f172a' : '#64748b'}" stroke-width="2.5"/>
 
         <!-- Input wiring -->
         ${!isPos ? `
-          <path d="M44 48 H80 V55" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+          <path d="M44 48 H80 V55" fill="none" stroke="${f1InHot ? hotStroke : idleStroke}" stroke-width="3"/>
           ${fuse1Svg}
-          <path d="M80 91 V110 H135" fill="none" stroke="${fuse1Stroke}" stroke-width="3"/>
-          <path d="M44 246 H80 V210" fill="none" stroke="${gndStroke}" stroke-width="3"/>
+          <path d="M80 91 V110 H135" fill="none" stroke="${comPosHot ? hotStroke : idleStroke}" stroke-width="3"/>
+          <path d="M44 246 H80 V210" fill="none" stroke="${pwrNegActive && s1Wired ? gndStroke : idleStroke}" stroke-width="3"/>
           ${drawIECSwitchNO({
             id: 'S1',
             label: 'PB1',
@@ -3458,81 +3562,104 @@ function renderSchematic() {
             yTop: 168,
             pressed: s1,
             topEnergized: in0Active,
-            bottomEnergized: pwr
+            bottomEnergized: pwrNegActive && s1Wired
           })}
           <path d="M80 168 V140 H135" fill="none" stroke="${in0Active ? gndStroke : idleStroke}" stroke-width="3"/>
         ` : `
-          <path d="M44 48 H80 V55" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+          <path d="M44 48 H80 V55" fill="none" stroke="${f1InHot ? hotStroke : idleStroke}" stroke-width="3"/>
           ${fuse1Svg}
-          <path d="M80 91 V118" fill="none" stroke="${fuse1Stroke}" stroke-width="3"/>
+          <path d="M80 91 V118" fill="none" stroke="${f1OutHot && s1Wired ? hotStroke : idleStroke}" stroke-width="3"/>
           ${drawIECSwitchNO({
             id: 'S1',
             label: 'PB1',
             x: 80,
             yTop: 118,
             pressed: s1,
-            topEnergized: fuse1Stroke === hotStroke,
+            topEnergized: f1OutHot && s1Wired,
             bottomEnergized: in0Active
           })}
           <path d="M80 152 V140 H135" fill="none" stroke="${in0Active ? hotStroke : idleStroke}" stroke-width="3"/>
-          <path d="M44 246 H110 V110 H135" fill="none" stroke="${gndStroke}" stroke-width="3"/>
+          <path d="M44 246 H110 V110 H135" fill="none" stroke="${comNegHot ? gndStroke : idleStroke}" stroke-width="3"/>
         `}
 
         <!-- PLC Block -->
         <rect x="135" y="38" width="125" height="192" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
         <text x="197" y="56" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName}</text>
         <text x="145" y="80" font-size="9" fill="#94a3b8">INPUTS</text>
-        <circle cx="135" cy="110" r="5" fill="${!isPos ? (fuse1Stroke === hotStroke ? '#ef4444' : '#475569') : '#3b82f6'}"/>
+        <circle cx="135" cy="110" r="5" fill="${!isPos ? (comPosHot ? '#ef4444' : '#475569') : (comNegHot ? '#3b82f6' : '#475569')}"/>
         <text x="145" y="114" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#fff">${spec.inCom}</text>
         <circle cx="135" cy="140" r="5" fill="${in0Active ? '#22c55e' : '#475569'}"/>
         <text x="145" y="144" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${in0Active ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(0)}</text>
 
         <text x="215" y="80" font-size="9" fill="#94a3b8">OUTPUTS</text>
-        <circle cx="260" cy="110" r="5" fill="${fuse2Stroke === hotStroke ? '#ef4444' : '#475569'}"/>
+        <circle cx="260" cy="110" r="5" fill="${com0Hot ? '#ef4444' : '#475569'}"/>
         <text x="220" y="114" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#fff">COM0</text>
         <circle cx="260" cy="140" r="5" fill="${l1 ? '#facc15' : '#475569'}"/>
         <text x="232" y="144" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${l1 ? '#fde047' : '#cbd5e1'}">${spec.termOutShort(0)}</text>
 
         <!-- Output side wiring: +24V -> F2 -> COM0 -->
-        <path d="M44 48 H310 V55" fill="none" stroke="${hotStroke}" stroke-width="3"/>
+        <path d="M44 48 H310 V55" fill="none" stroke="${f2InHot ? hotStroke : idleStroke}" stroke-width="3"/>
         ${fuse2Svg}
-        <path d="M310 91 V110 H260" fill="none" stroke="${fuse2Stroke}" stroke-width="3"/>
+        <path d="M310 91 V110 H260" fill="none" stroke="${com0Hot ? hotStroke : idleStroke}" stroke-width="3"/>
 
         <!-- Q0 -> PL1 (Red) -> 0V -->
         <path d="M260 140 H310 V165" fill="none" stroke="${l1 ? hotStroke : idleStroke}" stroke-width="3"/>
         <circle cx="310" cy="180" r="14" fill="${l1 ? '#ef4444' : '#7f1d1d'}" stroke="#0f172a" stroke-width="2"/>
         <path d="M300 170 L320 190 M320 170 L300 190" stroke="#fff" stroke-width="2"/>
         <text x="330" y="184" font-size="11" font-weight="700" fill="#dc2626">PL1</text>
-        <path d="M310 194 V246 H44" fill="none" stroke="${gndStroke}" stroke-width="3"/>
+        <path d="M310 194 V246 H44" fill="none" stroke="${l1GndWired && pwrNegActive ? gndStroke : idleStroke}" stroke-width="3"/>
       </svg>
     `;
   } else if (state.currentLabId === 'lab5_2') {
     const spec = getPlcModelSpec();
-    const hasWires = state.wires.length > 0;
-    const f1Blown = Boolean(state.fuseBlown && state.fuseBlown.F1);
-    const f2Blown = Boolean(state.fuseBlown && state.fuseBlown.F2);
-    const logicMode = (hasWires && state.simResult && state.simResult.detectedInputLogic)
-      ? state.simResult.detectedInputLogic
-      : (state.plcWiringLogic || 'negative');
+
+    if (hasWires && res.detectedInputLogic) {
+      if (state.plcWiringLogic !== res.detectedInputLogic) {
+        state.plcWiringLogic = res.detectedInputLogic;
+        const wbSel = document.getElementById('wbPlcLogicSelect');
+        if (wbSel) wbSel.value = res.detectedInputLogic;
+      }
+    }
+    const logicMode = state.plcWiringLogic || 'negative';
     const isPos = logicMode === 'positive';
 
-    const in0Active = hasWires ? Boolean(state.simResult.plcInputs && state.simResult.plcInputs[0]) : (pwr && !f1Blown && s1);
-    const fuse1Stroke = (!f1Blown && pwr) ? hotStroke : idleStroke;
-    const fuse2Stroke = (!f2Blown && pwr) ? hotStroke : idleStroke;
+    const f1Blown = Boolean(state.fuseBlown && state.fuseBlown.F1);
+    const f2Blown = Boolean(state.fuseBlown && state.fuseBlown.F2);
+
+    const f1Wired = isAnyWired('F1_T', 'F1_B');
+    const f1InHot = pwr && f1Wired && (pos.has('F1_T') || pos.has('F1_B'));
+    const f1OutHot = pwr && !f1Blown && f1Wired && pos.has('F1_T') && pos.has('F1_B');
+
+    const comWired = isAnyWired('PIN_COM_T', 'PIN_COM_B');
+    const comPosHot = pwr && comWired && f1OutHot && (pos.has('PIN_COM_T') || pos.has('PIN_COM_B'));
+    const comNegHot = pwr && comWired && (neg.has('PIN_COM_T') || neg.has('PIN_COM_B'));
+
+    const s1Wired = isAnyWired('S1_NO_1', 'S1_NO_2', 'S1_NC_1', 'S1_NC_2');
+    const in0Active = Boolean(hasWires && res.plcInputs && res.plcInputs[0]);
+
+    const f2Wired = isAnyWired('F2_T', 'F2_B');
+    const f2InHot = pwr && f2Wired && (pos.has('F2_T') || pos.has('F2_B'));
+    const f2OutHot = pwr && !f2Blown && f2Wired && pos.has('F2_T') && pos.has('F2_B');
+
+    const com0Wired = isAnyWired('POUT_COM0_T', 'POUT_COM0_B');
+    const com0Hot = pwr && com0Wired && f2OutHot && (pos.has('POUT_COM0_T') || pos.has('POUT_COM0_B'));
+
+    const l1GndWired = isNeg('L1_A', 'L1_B');
+    const l2GndWired = isNeg('L2_A', 'L2_B');
 
     const fuse1Svg = f1Blown
       ? `<rect x="64" y="48" width="22" height="34" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="1.8"/>
          <text x="75" y="70" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fca5a5">💥ขาด</text>`
-      : `<rect x="64" y="48" width="22" height="34" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.8"/>
-         <line x1="75" y1="52" x2="75" y2="78" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2"/>
-         <text x="75" y="70" text-anchor="middle" font-size="10" font-weight="800" fill="#0369a1">F1</text>`;
+      : `<rect x="64" y="48" width="22" height="34" rx="4" fill="${f1InHot ? '#f0f9ff' : '#f8fafc'}" stroke="${f1InHot ? '#0284c7' : '#64748b'}" stroke-width="1.8"/>
+         <line x1="75" y1="52" x2="75" y2="78" stroke="${f1InHot ? '#ef4444' : '#94a3b8'}" stroke-width="1.8" stroke-dasharray="2 2"/>
+         <text x="75" y="70" text-anchor="middle" font-size="10" font-weight="800" fill="${f1InHot ? '#0369a1' : '#64748b'}">F1</text>`;
 
     const fuse2Svg = f2Blown
       ? `<rect x="284" y="48" width="22" height="34" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="1.8"/>
          <text x="295" y="70" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fca5a5">💥ขาด</text>`
-      : `<rect x="284" y="48" width="22" height="34" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.8"/>
-         <line x1="295" y1="52" x2="295" y2="78" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2"/>
-         <text x="295" y="70" text-anchor="middle" font-size="10" font-weight="800" fill="#0369a1">F2</text>`;
+      : `<rect x="284" y="48" width="22" height="34" rx="4" fill="${f2InHot ? '#f0f9ff' : '#f8fafc'}" stroke="${f2InHot ? '#0284c7' : '#64748b'}" stroke-width="1.8"/>
+         <line x1="295" y1="52" x2="295" y2="78" stroke="${f2InHot ? '#ef4444' : '#94a3b8'}" stroke-width="1.8" stroke-dasharray="2 2"/>
+         <text x="295" y="70" text-anchor="middle" font-size="10" font-weight="800" fill="${f2InHot ? '#0369a1' : '#64748b'}">F2</text>`;
 
     const badgeSvg = `
       <rect x="75" y="8" width="210" height="20" rx="10" fill="${isPos ? '#064e3b' : '#1e3a8a'}" stroke="${isPos ? '#10b981' : '#3b82f6'}" stroke-width="1.2"/>
@@ -3542,17 +3669,17 @@ function renderSchematic() {
     svgContent = `
       <svg viewBox="0 0 360 270">
         ${badgeSvg}
-        <text x="15" y="34" font-size="12" font-weight="700" fill="#dc2626">+24VDC</text>
-        <circle cx="35" cy="46" r="5" fill="#fff" stroke="#dc2626" stroke-width="2.5"/>
-        <text x="15" y="260" font-size="12" font-weight="700" fill="#0f172a">0V</text>
-        <circle cx="35" cy="248" r="5" fill="#fff" stroke="#0f172a" stroke-width="2.5"/>
+        <text x="15" y="34" font-size="12" font-weight="700" fill="${pwrPosActive ? '#dc2626' : '#64748b'}">+24VDC</text>
+        <circle cx="35" cy="46" r="5" fill="#fff" stroke="${pwrPosActive ? '#dc2626' : '#64748b'}" stroke-width="2.5"/>
+        <text x="15" y="260" font-size="12" font-weight="700" fill="${pwrNegActive ? '#0f172a' : '#64748b'}">0V</text>
+        <circle cx="35" cy="248" r="5" fill="#fff" stroke="${pwrNegActive ? '#0f172a' : '#64748b'}" stroke-width="2.5"/>
 
         <!-- Input side wiring -->
         ${!isPos ? `
-          <path d="M40 46 H75 V48" fill="none" stroke="${hotStroke}" stroke-width="2.5"/>
+          <path d="M40 46 H75 V48" fill="none" stroke="${f1InHot ? hotStroke : idleStroke}" stroke-width="2.5"/>
           ${fuse1Svg}
-          <path d="M75 82 V108 H125" fill="none" stroke="${fuse1Stroke}" stroke-width="2.5"/>
-          <path d="M40 248 H75 V200" fill="none" stroke="${gndStroke}" stroke-width="2.5"/>
+          <path d="M75 82 V108 H125" fill="none" stroke="${comPosHot ? hotStroke : idleStroke}" stroke-width="2.5"/>
+          <path d="M40 248 H75 V200" fill="none" stroke="${pwrNegActive && s1Wired ? gndStroke : idleStroke}" stroke-width="2.5"/>
           ${drawIECSwitchNO({
             id: 'S1',
             label: 'PB1',
@@ -3560,35 +3687,35 @@ function renderSchematic() {
             yTop: 160,
             pressed: s1,
             topEnergized: in0Active,
-            bottomEnergized: pwr
+            bottomEnergized: pwrNegActive && s1Wired
           })}
           <path d="M75 160 V136 H125" fill="none" stroke="${in0Active ? gndStroke : idleStroke}" stroke-width="2.5"/>
         ` : `
-          <path d="M40 46 H75 V48" fill="none" stroke="${hotStroke}" stroke-width="2.5"/>
+          <path d="M40 46 H75 V48" fill="none" stroke="${f1InHot ? hotStroke : idleStroke}" stroke-width="2.5"/>
           ${fuse1Svg}
-          <path d="M75 82 V115" fill="none" stroke="${fuse1Stroke}" stroke-width="2.5"/>
+          <path d="M75 82 V115" fill="none" stroke="${f1OutHot && s1Wired ? hotStroke : idleStroke}" stroke-width="2.5"/>
           ${drawIECSwitchNO({
             id: 'S1',
             label: 'PB1',
             x: 75,
             yTop: 115,
             pressed: s1,
-            topEnergized: fuse1Stroke === hotStroke,
+            topEnergized: f1OutHot && s1Wired,
             bottomEnergized: in0Active
           })}
           <path d="M75 149 V136 H125" fill="none" stroke="${in0Active ? hotStroke : idleStroke}" stroke-width="2.5"/>
-          <path d="M40 248 H105 V108 H125" fill="none" stroke="${gndStroke}" stroke-width="2.5"/>
+          <path d="M40 248 H105 V108 H125" fill="none" stroke="${comNegHot ? gndStroke : idleStroke}" stroke-width="2.5"/>
         `}
 
         <!-- PLC Block -->
         <rect x="125" y="32" width="130" height="203" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
         <text x="190" y="50" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName}</text>
-        <circle cx="125" cy="108" r="5" fill="${!isPos ? (fuse1Stroke === hotStroke ? '#ef4444' : '#475569') : '#3b82f6'}"/>
+        <circle cx="125" cy="108" r="5" fill="${!isPos ? (comPosHot ? '#ef4444' : '#475569') : (comNegHot ? '#3b82f6' : '#475569')}"/>
         <text x="135" y="112" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#fff">${spec.inCom}</text>
         <circle cx="125" cy="136" r="5" fill="${in0Active ? '#22c55e' : '#475569'}"/>
         <text x="135" y="140" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${in0Active ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(0)}</text>
 
-        <circle cx="255" cy="108" r="5" fill="${fuse2Stroke === hotStroke ? '#ef4444' : '#475569'}"/>
+        <circle cx="255" cy="108" r="5" fill="${com0Hot ? '#ef4444' : '#475569'}"/>
         <text x="215" y="112" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#fff">COM0</text>
         <circle cx="255" cy="136" r="5" fill="${l1 ? '#facc15' : '#475569'}"/>
         <text x="225" y="140" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${l1 ? '#fde047' : '#cbd5e1'}">${spec.termOutShort(0)}</text>
@@ -3596,9 +3723,9 @@ function renderSchematic() {
         <text x="225" y="168" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="${l2 ? '#4ade80' : '#cbd5e1'}">${spec.termOutShort(1)}</text>
 
         <!-- F2 to COM0 -->
-        <path d="M40 46 H295 V48" fill="none" stroke="${hotStroke}" stroke-width="2.5"/>
+        <path d="M40 46 H295 V48" fill="none" stroke="${f2InHot ? hotStroke : idleStroke}" stroke-width="2.5"/>
         ${fuse2Svg}
-        <path d="M295 82 V108 H255" fill="none" stroke="${fuse2Stroke}" stroke-width="2.5"/>
+        <path d="M295 82 V108 H255" fill="none" stroke="${com0Hot ? hotStroke : idleStroke}" stroke-width="2.5"/>
 
         <!-- Q0 -> PL1 (Red) -->
         <path d="M255 136 H295 V155" fill="none" stroke="${l1 ? hotStroke : idleStroke}" stroke-width="2.5"/>
@@ -3613,7 +3740,7 @@ function renderSchematic() {
         <text x="314" y="222" font-size="10.5" font-weight="700" fill="#16a34a">PL2</text>
 
         <!-- Lamps return to 0V -->
-        <path d="M295 180 V248 M340 220 V248 H40" fill="none" stroke="${gndStroke}" stroke-width="2.5"/>
+        <path d="M295 180 V248 M340 220 V248 H40" fill="none" stroke="${(l1GndWired || l2GndWired) && pwrNegActive ? gndStroke : idleStroke}" stroke-width="2.5"/>
       </svg>
     `;
   } else if (lab && lab.customSchematic) {
@@ -3630,8 +3757,7 @@ function renderSchematic() {
 
   if (svgContent && !svgContent.includes('Kru-Jirawat')) {
     const wmSvg = `
-      <text x="180" y="140" text-anchor="middle" fill="#64748b" opacity="0.14" font-size="26" font-weight="900" transform="rotate(-18, 180, 140)" pointer-events="none">Kru-Jirawat</text>
-      <text x="352" y="250" text-anchor="end" fill="#64748b" opacity="0.55" font-size="9.5" font-weight="700" pointer-events="none">Kru-Jirawat</text>
+      <text x="352" y="264" text-anchor="end" fill="#64748b" opacity="0.65" font-size="9.5" font-weight="700" pointer-events="none">Kru-Jirawat</text>
     `;
     svgContent = svgContent.replace('</svg>', `${wmSvg}</svg>`);
   }
@@ -5340,6 +5466,19 @@ function loadLab(labId) {
   if (wbPlcLogicSelect) {
     wbPlcLogicSelect.style.display = isPlcLab ? '' : 'none';
     wbPlcLogicSelect.value = state.plcWiringLogic || 'negative';
+  }
+
+  const btnToolbarLadder = document.getElementById('btnToolbarLadderPopup');
+  if (btnToolbarLadder) {
+    btnToolbarLadder.style.display = isPlcLab ? '' : 'none';
+  }
+  const btnFsLadder = document.getElementById('btnFsLadder');
+  if (btnFsLadder) {
+    btnFsLadder.style.display = isPlcLab ? '' : 'none';
+  }
+  if (!isPlcLab) {
+    const ladderOverlay = document.getElementById('ladderPopupOverlay');
+    if (ladderOverlay) ladderOverlay.hidden = true;
   }
 
   updatePlcModelUI(state.plcModel);
@@ -8588,8 +8727,7 @@ function renderPlcLadderDiagram() {
 
   if (svgContent && !svgContent.includes('Kru-Jirawat')) {
     const wmSvg = `
-      <text x="180" y="140" text-anchor="middle" fill="#64748b" opacity="0.14" font-size="26" font-weight="900" transform="rotate(-18, 180, 140)" pointer-events="none">Kru-Jirawat</text>
-      <text x="352" y="250" text-anchor="end" fill="#64748b" opacity="0.55" font-size="9.5" font-weight="700" pointer-events="none">Kru-Jirawat</text>
+      <text x="352" y="264" text-anchor="end" fill="#64748b" opacity="0.65" font-size="9.5" font-weight="700" pointer-events="none">Kru-Jirawat</text>
     `;
     svgContent = svgContent.replace('</svg>', `${wmSvg}</svg>`);
   }
@@ -8599,6 +8737,60 @@ function renderPlcLadderDiagram() {
   const fsLadderClone = document.getElementById('fsLadderClone');
   if (fsLadderClone) {
     fsLadderClone.innerHTML = svgContent;
+  }
+
+  const popupClone = document.getElementById('ladderPopupClone');
+  if (popupClone) {
+    popupClone.innerHTML = svgContent;
+  }
+
+  // Update Ladder Pop-up Quick Switch test buttons & status
+  const btnPopupSwS1 = document.getElementById('btnPopupSwS1');
+  if (btnPopupSwS1) {
+    btnPopupSwS1.classList.toggle('active', Boolean(state.switches.S1.pressed));
+    btnPopupSwS1.textContent = `🔘 PB1 (S1): ${state.switches.S1.pressed ? 'ON (1)' : 'OFF (0)'}`;
+  }
+  const btnPopupSwS2 = document.getElementById('btnPopupSwS2');
+  const hasS2 = labId === 'lab4_2' || labId === 'lab5_2';
+  if (btnPopupSwS2) {
+    btnPopupSwS2.style.display = hasS2 ? '' : 'none';
+    if (hasS2) {
+      btnPopupSwS2.classList.toggle('active', Boolean(state.switches.S2.pressed));
+      btnPopupSwS2.textContent = `🔘 PB2 (S2): ${state.switches.S2.pressed ? 'ON (1)' : 'OFF (0)'}`;
+    }
+  }
+
+  const ioSummary = document.getElementById('ladderPopupIoSummary');
+  if (ioSummary) {
+    const in0Val = pState.activeIn0 ? '1' : '0';
+    const in1Val = pState.activeIn1 ? '1' : '0';
+    const q0Val = pState.activeQ0 ? '1' : '0';
+    const q1Val = pState.activeQ1 ? '1' : '0';
+    if (hasS2) {
+      ioSummary.textContent = `${spec.in0}=${in0Val} ${spec.in1}=${in1Val} | ${spec.out0}=${q0Val}`;
+    } else {
+      ioSummary.textContent = `${spec.in0}=${in0Val} | ${spec.out0}=${q0Val}${labId === 'lab5_2' ? ` ${spec.out1}=${q1Val}` : ''}`;
+    }
+  }
+
+  const syncBadge = document.getElementById('ladderPopupSyncBadge');
+  if (syncBadge) {
+    if (plcState.syncWithActualWiring) {
+      syncBadge.className = 'ladder-popup-badge';
+      syncBadge.textContent = '⚡ ซิงค์วงจรจริง';
+    } else {
+      syncBadge.className = 'ladder-popup-badge manual';
+      syncBadge.textContent = '⚙️ จำลองอิสระ';
+    }
+  }
+
+  const footerStatus = document.getElementById('ladderPopupFooterStatus');
+  if (footerStatus) {
+    if (plcState.syncWithActualWiring) {
+      footerStatus.innerHTML = `สถานะ: <b>ซิงค์ตามสายที่ต่อจริง</b> (${pState.activeIn0 ? 'IN0 Active' : 'IN0 Off'}, ${pState.activeQ0 ? 'OUT0 Active' : 'OUT0 Off'})`;
+    } else {
+      footerStatus.innerHTML = `สถานะ: <b>จำลองลอจิกอัตโนมัติ</b> (กด PB1/PB2 หรือแตะ Contact ในรูป เพื่อทดสอบ)`;
+    }
   }
 
   updatePlcAddressTable(pState);
@@ -8768,9 +8960,138 @@ function initPlcLadderCoSim() {
     fsLadderClone.addEventListener('click', handleLadderSwitchClick);
   }
 
+  const popupClone = document.getElementById('ladderPopupClone');
+  if (popupClone) {
+    popupClone.addEventListener('click', handleLadderSwitchClick);
+  }
+
   const inRow = document.getElementById('tm221InputsRow');
   if (inRow) {
     inRow.addEventListener('click', handleLadderSwitchClick);
+  }
+
+  // PLC Ladder Popup Floating Overlay Controls
+  const ladderOverlay = document.getElementById('ladderPopupOverlay');
+  const toggleLadderPopup = () => {
+    if (!ladderOverlay) return;
+    ladderOverlay.hidden = !ladderOverlay.hidden;
+    if (!ladderOverlay.hidden) {
+      renderPlcLadderDiagram();
+    }
+  };
+
+  const btnToolbarLadder = document.getElementById('btnToolbarLadderPopup');
+  if (btnToolbarLadder) {
+    btnToolbarLadder.addEventListener('click', toggleLadderPopup);
+  }
+
+  const btnFsLadder = document.getElementById('btnFsLadder');
+  if (btnFsLadder) {
+    btnFsLadder.addEventListener('click', toggleLadderPopup);
+  }
+
+  const btnOpenLadderPopup = document.getElementById('btnOpenLadderPopup');
+  if (btnOpenLadderPopup) {
+    btnOpenLadderPopup.addEventListener('click', () => {
+      if (!ladderOverlay) return;
+      ladderOverlay.hidden = false;
+      renderPlcLadderDiagram();
+      ladderOverlay.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
+
+  const btnCloseLadderPopup = document.getElementById('btnCloseLadderPopup');
+  if (btnCloseLadderPopup) {
+    btnCloseLadderPopup.addEventListener('click', () => {
+      if (ladderOverlay) ladderOverlay.hidden = true;
+    });
+  }
+
+  const btnPopupToggleSync = document.getElementById('btnPopupToggleSync');
+  if (btnPopupToggleSync) {
+    btnPopupToggleSync.addEventListener('click', () => {
+      plcState.syncWithActualWiring = !plcState.syncWithActualWiring;
+      updateSimulationUI();
+    });
+  }
+
+  const btnPopupSwS1 = document.getElementById('btnPopupSwS1');
+  if (btnPopupSwS1) {
+    btnPopupSwS1.addEventListener('click', () => {
+      state.switches.S1.pressed = !state.switches.S1.pressed;
+      updateSimulationUI();
+    });
+  }
+
+  const btnPopupSwS2 = document.getElementById('btnPopupSwS2');
+  if (btnPopupSwS2) {
+    btnPopupSwS2.addEventListener('click', () => {
+      state.switches.S2.pressed = !state.switches.S2.pressed;
+      updateSimulationUI();
+    });
+  }
+
+  // Draggable logic for #ladderPopupHeader
+  const popupHeader = document.getElementById('ladderPopupHeader');
+  if (popupHeader && ladderOverlay) {
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let initLeft = 0;
+    let initTop = 0;
+
+    popupHeader.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button')) return;
+      isDragging = true;
+      popupHeader.setPointerCapture(e.pointerId);
+
+      const rect = ladderOverlay.getBoundingClientRect();
+      const parentRect = ladderOverlay.parentElement.getBoundingClientRect();
+
+      initLeft = rect.left - parentRect.left;
+      initTop = rect.top - parentRect.top;
+      startX = e.clientX;
+      startY = e.clientY;
+
+      ladderOverlay.style.bottom = 'auto';
+      ladderOverlay.style.right = 'auto';
+      ladderOverlay.style.left = `${initLeft}px`;
+      ladderOverlay.style.top = `${initTop}px`;
+      e.preventDefault();
+    });
+
+    popupHeader.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+
+      const parentRect = ladderOverlay.parentElement.getBoundingClientRect();
+      const rect = ladderOverlay.getBoundingClientRect();
+
+      let newLeft = initLeft + dx;
+      let newTop = initTop + dy;
+
+      const maxLeft = parentRect.width - rect.width;
+      const maxTop = parentRect.height - rect.height;
+
+      newLeft = Math.max(0, Math.min(newLeft, Math.max(0, maxLeft)));
+      newTop = Math.max(0, Math.min(newTop, Math.max(0, maxTop)));
+
+      ladderOverlay.style.left = `${newLeft}px`;
+      ladderOverlay.style.top = `${newTop}px`;
+    });
+
+    const stopDrag = (e) => {
+      if (isDragging) {
+        isDragging = false;
+        try {
+          popupHeader.releasePointerCapture(e.pointerId);
+        } catch (_) {}
+      }
+    };
+
+    popupHeader.addEventListener('pointerup', stopDrag);
+    popupHeader.addEventListener('pointercancel', stopDrag);
   }
 
   // Mobile Fullscreen tabs (Schematic vs Ladder)
