@@ -1184,8 +1184,8 @@ function initPlcTerminalBoard() {
 
   // Bottom Watermark Labels for Left and Right Panels
   html += `
-    <text x="240" y="578" text-anchor="middle" fill="#64748b" opacity="0.65" font-size="11" font-weight="700" pointer-events="none">พัฒนาสื่อการสอนโดย Kru-Jirawat (Kru-Jirawat.com)</text>
-    <text x="686" y="578" text-anchor="middle" fill="#64748b" opacity="0.65" font-size="11" font-weight="700" pointer-events="none">Kru-Jirawat.com</text>
+    <text x="234" y="582" text-anchor="middle" fill="#64748b" opacity="0.75" font-size="9" font-weight="700" pointer-events="none">พัฒนาโดย Kru-Jirawat Saengkhunnatham ELECTRONICS THAI-AUSTRIAN TECHNICAL COLLEGE</text>
+    <text x="686" y="582" text-anchor="middle" fill="#64748b" opacity="0.75" font-size="9" font-weight="700" pointer-events="none">Kru-Jirawat Saengkhunnatham | ELECTRONICS THAI-AUSTRIAN TECHNICAL COLLEGE</text>
   `;
 
   // RIGHT PANEL: PLC OUTPUT SECTION (x=470, y=18, w=432, h=584)
@@ -1398,8 +1398,8 @@ function initPlcTerminalBoard() {
   html += `</g></g>`;
 
   html += `
-    <text x="26" y="594" fill="#64748b" font-size="12" font-weight="600" pointer-events="none">ชุดทดลองการเชื่อมต่ออินพุต-เอาต์พุต PLC ผ่าน TERMINAL กลาง</text>
-    <text x="894" y="594" text-anchor="end" fill="#475569" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">v2.8.0 | Kru-Jirawat</text>
+    <text x="26" y="594" fill="#64748b" font-size="11" font-weight="600" pointer-events="none">ชุดทดลองการเชื่อมต่ออินพุต-เอาต์พุต PLC ผ่าน TERMINAL กลาง</text>
+    <text x="894" y="594" text-anchor="end" fill="#475569" font-size="9.5" font-weight="700" pointer-events="none">พัฒนาโดย Kru-Jirawat Saengkhunnatham ELECTRONICS THAI-AUSTRIAN TECHNICAL COLLEGE (v2.8.1)</text>
   `;
 
   container.innerHTML = html;
@@ -2831,7 +2831,7 @@ function generateCustomSchematicSvg(schematic, options = {}) {
       <text x="18" y="224" font-size="13" font-weight="700" fill="#0f172a">0V</text>
 
       <!-- Watermark & Branding -->
-      <text x="352" y="264" text-anchor="end" fill="#64748b" opacity="0.65" font-size="9.5" font-weight="700" pointer-events="none">Kru-Jirawat</text>
+      <text x="372" y="254" text-anchor="end" fill="#64748b" opacity="0.65" font-size="7.5" font-weight="700" pointer-events="none">Kru-Jirawat Saengkhunnatham | ELECTRONICS THAI-AUSTRIAN TECHNICAL COLLEGE</text>
     </svg>
   `;
 
@@ -3767,9 +3767,11 @@ function renderSchematic() {
     });
   }
 
-  if (svgContent && !svgContent.includes('Kru-Jirawat')) {
+  if (svgContent && !svgContent.includes('Saengkhunnatham')) {
+    const vbMatch = svgContent.match(/viewBox=["']0\s+0\s+(\d+)\s+(\d+)["']/);
+    const svgH = vbMatch ? parseInt(vbMatch[2], 10) : 270;
     const wmSvg = `
-      <text x="352" y="264" text-anchor="end" fill="#64748b" opacity="0.65" font-size="9.5" font-weight="700" pointer-events="none">Kru-Jirawat</text>
+      <text x="372" y="${svgH - 6}" text-anchor="end" fill="#64748b" opacity="0.65" font-size="7.5" font-weight="700" pointer-events="none">Kru-Jirawat Saengkhunnatham | ELECTRONICS THAI-AUSTRIAN TECHNICAL COLLEGE</text>
     `;
     svgContent = svgContent.replace('</svg>', `${wmSvg}</svg>`);
   }
@@ -5217,13 +5219,13 @@ function renderTimingDiagramCanvas() {
     ctx.restore();
   }
 
-  // Subtle Kru-Jirawat watermark
+  // Subtle Kru-Jirawat Saengkhunnatham watermark
   ctx.save();
-  ctx.fillStyle = 'rgba(100, 116, 139, 0.22)';
-  ctx.font = '700 11px JetBrains Mono, monospace';
+  ctx.fillStyle = 'rgba(100, 116, 139, 0.28)';
+  ctx.font = '700 9px "Prompt", sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'bottom';
-  ctx.fillText('Kru-Jirawat.com', width - 12, height - 6);
+  ctx.fillText('Kru-Jirawat Saengkhunnatham | ELECTRONICS THAI-AUSTRIAN TECHNICAL COLLEGE', width - 12, height - 6);
   ctx.restore();
 
   ctx.restore();
@@ -9254,9 +9256,11 @@ function renderPlcLadderDiagram() {
     `;
   }
 
-  if (svgContent && !svgContent.includes('Kru-Jirawat')) {
+  if (svgContent && !svgContent.includes('Saengkhunnatham')) {
+    const vbMatch = svgContent.match(/viewBox=["']0\s+0\s+(\d+)\s+(\d+)["']/);
+    const svgH = vbMatch ? parseInt(vbMatch[2], 10) : 270;
     const wmSvg = `
-      <text x="352" y="264" text-anchor="end" fill="#64748b" opacity="0.65" font-size="9.5" font-weight="700" pointer-events="none">Kru-Jirawat</text>
+      <text x="372" y="${svgH - 5}" text-anchor="end" fill="#64748b" opacity="0.65" font-size="7.5" font-weight="700" pointer-events="none">Kru-Jirawat Saengkhunnatham | ELECTRONICS THAI-AUSTRIAN TECHNICAL COLLEGE</text>
     `;
     svgContent = svgContent.replace('</svg>', `${wmSvg}</svg>`);
   }
