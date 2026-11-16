@@ -84,9 +84,201 @@ function getPlcModelSpec(model = (typeof state !== 'undefined' ? state.plcModel 
   };
 }
 
+// Helper to build dynamic hint / solution wires for lab_summary_3_5 based on user-configured bits & logic
+function buildSummaryLabHintWires() {
+  const sumCfg = (typeof plcState !== 'undefined' && plcState.summaryConfig) ? plcState.summaryConfig : {
+    s1Bit: 2,
+    s1ContactType: 'NO',
+    useS2: true,
+    s2Bit: 4,
+    s2ContactType: 'NO',
+    pl1Bit: 1,
+    pl1Color: 'red',
+    usePL2: true,
+    pl2Bit: 3,
+    pl2Color: 'green',
+    rungCount: 2
+  };
+  const isPos = (typeof state !== 'undefined' && state.plcWiringLogic === 'positive');
+  const wires = [];
+
+  const s1Term1 = sumCfg.s1ContactType === 'NO' ? 'S1_NO_1' : 'S1_NC_1';
+  const s1Term2 = sumCfg.s1ContactType === 'NO' ? 'S1_NO_2' : 'S1_NC_2';
+  const s2Term1 = sumCfg.s2ContactType === 'NO' ? 'S2_NO_1' : 'S2_NC_1';
+  const s2Term2 = sumCfg.s2ContactType === 'NO' ? 'S2_NO_2' : 'S2_NC_2';
+
+  const inPinA = `PIN_I${sumCfg.s1Bit}_T`;
+  const inPinB = `PIN_I${sumCfg.s2Bit}_T`;
+  const inX1 = 30 + (sumCfg.s1Bit + 3) * 35 + 17.5;
+  const inX2 = 30 + (sumCfg.s2Bit + 3) * 35 + 17.5;
+
+  if (!isPos) {
+    // Negative Logic: 24V -> F1 -> COM, 0V -> switches -> I pins
+    wires.push({
+      from: 'PIN_24V_T',
+      to: 'F1_B',
+      color: '#ef4444',
+      waypoints: [{ x: 48, y: 280 }, { x: 68, y: 260 }]
+    });
+    wires.push({
+      from: 'F1_T',
+      to: 'PIN_COM_T',
+      color: '#ef4444',
+      waypoints: [{ x: 92, y: 139 }, { x: 92, y: 350 }, { x: 118, y: 370 }]
+    });
+    wires.push({
+      from: 'PIN_0V_T',
+      to: s1Term2,
+      color: '#3b82f6',
+      waypoints: [{ x: 83, y: 330 }, { x: 225, y: 330 }]
+    });
+    wires.push({
+      from: s1Term1,
+      to: inPinA,
+      color: '#ef4444',
+      waypoints: [{ x: 161, y: 340 }, { x: inX1, y: 360 }]
+    });
+
+    if (sumCfg.useS2) {
+      wires.push({
+        from: s1Term2,
+        to: s2Term2,
+        color: '#3b82f6',
+        waypoints: [{ x: 225, y: 265 }, { x: 385, y: 265 }]
+      });
+      wires.push({
+        from: s2Term1,
+        to: inPinB,
+        color: '#ef4444',
+        waypoints: [{ x: 321, y: 340 }, { x: inX2, y: 360 }]
+      });
+    }
+  } else {
+    // Positive Logic: 0V -> COM, 24V -> F1 -> switches -> I pins
+    wires.push({
+      from: 'PIN_0V_T',
+      to: 'PIN_COM_T',
+      color: '#3b82f6',
+      waypoints: [{ x: 83, y: 365 }, { x: 118, y: 365 }]
+    });
+    wires.push({
+      from: 'PIN_24V_T',
+      to: 'F1_B',
+      color: '#ef4444',
+      waypoints: [{ x: 48, y: 280 }, { x: 68, y: 260 }]
+    });
+    wires.push({
+      from: 'F1_T',
+      to: s1Term2,
+      color: '#ef4444',
+      waypoints: [{ x: 92, y: 139 }, { x: 92, y: 330 }, { x: 225, y: 330 }]
+    });
+    wires.push({
+      from: s1Term1,
+      to: inPinA,
+      color: '#ef4444',
+      waypoints: [{ x: 161, y: 340 }, { x: inX1, y: 360 }]
+    });
+
+    if (sumCfg.useS2) {
+      wires.push({
+        from: s1Term2,
+        to: s2Term2,
+        color: '#ef4444',
+        waypoints: [{ x: 225, y: 265 }, { x: 385, y: 265 }]
+      });
+      wires.push({
+        from: s2Term1,
+        to: inPinB,
+        color: '#ef4444',
+        waypoints: [{ x: 321, y: 340 }, { x: inX2, y: 360 }]
+      });
+    }
+  }
+
+  // Output side
+  const bitsUsed = [sumCfg.pl1Bit];
+  if (sumCfg.usePL2) bitsUsed.push(sumCfg.pl2Bit);
+  const needCom0 = bitsUsed.some((b) => b <= 3);
+  const needCom1 = bitsUsed.some((b) => b >= 4);
+
+  wires.push({
+    from: 'POUT_24V_T',
+    to: 'F2_B',
+    color: '#ef4444',
+    waypoints: [{ x: 504, y: 330 }, { x: 518, y: 330 }]
+  });
+
+  if (needCom0) {
+    wires.push({
+      from: 'F2_T',
+      to: 'POUT_COM0_T',
+      color: '#ef4444',
+      waypoints: [{ x: 548, y: 139 }, { x: 548, y: 350 }, { x: 577, y: 350 }]
+    });
+  }
+  if (needCom1 && !needCom0) {
+    wires.push({
+      from: 'F2_T',
+      to: 'POUT_COM1_T',
+      color: '#ef4444',
+      waypoints: [{ x: 548, y: 139 }, { x: 548, y: 350 }, { x: 760, y: 350 }]
+    });
+  } else if (needCom0 && needCom1) {
+    wires.push({
+      from: 'POUT_COM0_T',
+      to: 'POUT_COM1_T',
+      color: '#ef4444',
+      waypoints: [{ x: 577, y: 335 }, { x: 760, y: 335 }]
+    });
+  }
+
+  const getQColCenterX = (qBit) => {
+    const colIdx = (qBit < 4) ? (qBit + 3) : (qBit + 4);
+    return 486 + colIdx * 36.5 + 18.25;
+  };
+
+  const pl1Col = sumCfg.pl1Color === 'green' ? '#22c55e' : '#ef4444';
+  const pl2Col = sumCfg.pl2Color === 'red' ? '#ef4444' : '#22c55e';
+
+  wires.push({
+    from: `POUT_Q${sumCfg.pl1Bit}_B`,
+    to: 'L1_A',
+    color: pl1Col,
+    waypoints: [{ x: getQColCenterX(sumCfg.pl1Bit), y: 340 }, { x: 624, y: 340 }]
+  });
+
+  if (sumCfg.usePL2) {
+    wires.push({
+      from: `POUT_Q${sumCfg.pl2Bit}_B`,
+      to: 'L2_A',
+      color: pl2Col,
+      waypoints: [{ x: getQColCenterX(sumCfg.pl2Bit), y: 340 }, { x: 779, y: 340 }]
+    });
+    wires.push({
+      from: 'L1_B',
+      to: 'L2_B',
+      color: '#3b82f6',
+      waypoints: [{ x: 672, y: 280 }, { x: 827, y: 280 }]
+    });
+  }
+
+  wires.push({
+    from: 'L1_B',
+    to: 'POUT_0V_B',
+    color: '#3b82f6',
+    waypoints: [{ x: 672, y: 360 }, { x: 541, y: 360 }]
+  });
+
+  return wires;
+}
+
 // Helper to return the active hint / solution wires based on current wiring logic (Negative vs Positive)
 function getActiveHintWires(lab) {
   if (!lab) return [];
+  if (lab.id === 'lab_summary_3_5') {
+    return buildSummaryLabHintWires();
+  }
   if (lab.isPlcTerminalLab && typeof state !== 'undefined' && state.plcWiringLogic === 'positive' && lab.hintWiresPositive) {
     return lab.hintWiresPositive;
   }
@@ -881,6 +1073,27 @@ const LABS = {
         waypoints: [{ x: 672, y: 360 }, { x: 541, y: 360 }]
       }
     ]
+  },
+
+  lab_summary_3_5: {
+    id: 'lab_summary_3_5',
+    title: 'แบบฝึกหัดสรุปใบงานที่ 3-5: ออกแบบโจทย์ PLC & Ladder และการต่อสายด้วยตนเอง',
+    objective: 'กำหนด Bit Input/Output, ชนิดหน้าสัมผัสสวิตช์ (NO/NC), สีหลอดไฟ และจำนวน Rung ได้ด้วยตนเอง ออกแบบโปรแกรม Ladder และต่อสายไฟจริงบนชุดฝึกให้ทำงานตามเงื่อนไขอย่างถูกต้อง',
+    isPlcTerminalLab: true,
+    isSummaryLab: true,
+    plcInputOnlyLab: false,
+    inputs: ['S1', 'S2'],
+    outputs: ['L1', 'L2'],
+    showL2: true,
+    showS2: true,
+    showRelays: false,
+    truthTable: [
+      { S1: 0, S2: 0, expected: { L1: 0, L2: 0 } },
+      { S1: 0, S2: 1, expected: { L1: 0, L2: 0 } },
+      { S1: 1, S2: 0, expected: { L1: 0, L2: 0 } },
+      { S1: 1, S2: 1, expected: { L1: 0, L2: 0 } }
+    ],
+    logicComparison: 'แบบฝึกหัดสรุป: ฝึกทักษะการออกแบบวงจร Ladder และการต่อสายฮาร์ดแวร์จริงตามโจทย์ที่กำหนดด้วยตนเอง'
   }
 };
 
@@ -1287,7 +1500,7 @@ function initPlcTerminalBoard() {
       <g id="plcLamp1Group" transform="translate(590, 95)">
         <!-- Top blue label box -->
         <rect x="23" y="-22" width="70" height="24" rx="3" fill="#dbeafe" stroke="#334155" stroke-width="1.5" />
-        <text x="58" y="-6" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="800">PL1</text>
+        <text id="plcLamp1Title" x="58" y="-6" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="800">PL1</text>
 
         <!-- Lamp Dome Lens at top (y = 8..52) -->
         <circle id="plcLamp1Halo" cx="58" cy="36" r="40" fill="#ef4444" opacity="0" filter="url(#glow-yellow)" />
@@ -1318,7 +1531,7 @@ function initPlcTerminalBoard() {
       <g id="plcLamp2Group" transform="translate(745, 95)">
         <!-- Top blue label box -->
         <rect x="23" y="-22" width="70" height="24" rx="3" fill="#dbeafe" stroke="#334155" stroke-width="1.5" />
-        <text x="58" y="-6" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="800">PL2</text>
+        <text id="plcLamp2Title" x="58" y="-6" text-anchor="middle" fill="#0f172a" font-size="14" font-weight="800">PL2</text>
 
         <!-- Lamp Dome Lens at top (y = 8..52) -->
         <circle id="plcLamp2Halo" cx="58" cy="36" r="40" fill="#22c55e" opacity="0" filter="url(#glow-green)" />
@@ -1399,7 +1612,7 @@ function initPlcTerminalBoard() {
 
   html += `
     <text x="26" y="594" fill="#64748b" font-size="12" font-weight="600" pointer-events="none">ชุดทดลองการเชื่อมต่ออินพุต-เอาต์พุต PLC ผ่าน TERMINAL กลาง</text>
-    <text x="894" y="594" text-anchor="end" fill="#475569" font-size="11.5" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">Designed by Kru-Jirawat TATC | v2.8.2</text>
+    <text x="894" y="594" text-anchor="end" fill="#475569" font-size="11.5" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">Designed by Kru-Jirawat TATC | v2.9.0</text>
   `;
 
   container.innerHTML = html;
@@ -1778,7 +1991,21 @@ function evaluateCircuit(customInputs = null, prevRelayState = { K1: false, K2: 
     const plcOutputs = { Q0: false, Q1: false, Q2: false, Q3: false, Q4: false, Q5: false, Q6: false };
     const currentLabId = (typeof state !== 'undefined' ? state.currentLabId : '');
     if (powerActive && comPowered && detectedInputLogic !== null) {
-      if (typeof plcState !== 'undefined' && plcState.ladderPracticeMode && !state.showingHints) {
+      if (currentLabId === 'lab_summary_3_5') {
+        const sumCfg = (typeof plcState !== 'undefined' && plcState.summaryConfig) ? plcState.summaryConfig : {};
+        const inA = Boolean(plcInputs[sumCfg.s1Bit ?? 2]);
+        const inB = Boolean(sumCfg.useS2 ? plcInputs[sumCfg.s2Bit ?? 4] : false);
+        const ladderRes = evaluateUserLadder(inA, inB, plcState.userMemoryM0, true);
+        const pl1Bit = sumCfg.pl1Bit ?? 1;
+        plcOutputs['Q' + pl1Bit] = Boolean(ladderRes.Q0);
+        if (sumCfg.usePL2) {
+          const pl2Bit = sumCfg.pl2Bit ?? 3;
+          plcOutputs['Q' + pl2Bit] = Boolean(ladderRes.Q1);
+        }
+        if (!customInputs) {
+          plcState.userMemoryM0 = ladderRes.M0;
+        }
+      } else if (typeof plcState !== 'undefined' && plcState.ladderPracticeMode && !state.showingHints) {
         // Practice Ladder Mode is ACTIVE: Evaluate user's constructed Ladder Diagram
         const ladderRes = evaluateUserLadder(plcInputs[0], plcInputs[1], plcState.userMemoryM0, true);
         plcOutputs.Q0 = ladderRes.Q0;
@@ -2160,15 +2387,38 @@ function updateSimulationUI() {
   if (lamp2Halo) lamp2Halo.setAttribute('opacity', res.L2 ? '0.95' : '0');
 
   // Update Pilot Lamp PL1 & PL2 on PLC Terminal Board
+  const isSummary = state.currentLabId === 'lab_summary_3_5';
+  const sumCfg = (typeof plcState !== 'undefined' && plcState.summaryConfig) ? plcState.summaryConfig : {};
+  const pl1IsGreen = isSummary && sumCfg.pl1Color === 'green';
+  const pl2IsRed = isSummary && sumCfg.pl2Color === 'red';
+
   const plcLamp1Body = document.getElementById('plcLamp1Body');
   const plcLamp1Halo = document.getElementById('plcLamp1Halo');
-  if (plcLamp1Body) plcLamp1Body.setAttribute('fill', res.L1 ? '#ef4444' : '#7f1d1d');
-  if (plcLamp1Halo) plcLamp1Halo.setAttribute('opacity', res.L1 ? '0.95' : '0');
+  if (plcLamp1Body) {
+    if (pl1IsGreen) {
+      plcLamp1Body.setAttribute('fill', res.L1 ? '#22c55e' : '#064e3b');
+    } else {
+      plcLamp1Body.setAttribute('fill', res.L1 ? '#ef4444' : '#7f1d1d');
+    }
+  }
+  if (plcLamp1Halo) {
+    plcLamp1Halo.setAttribute('fill', pl1IsGreen ? '#22c55e' : '#ef4444');
+    plcLamp1Halo.setAttribute('opacity', res.L1 ? '0.95' : '0');
+  }
 
   const plcLamp2Body = document.getElementById('plcLamp2Body');
   const plcLamp2Halo = document.getElementById('plcLamp2Halo');
-  if (plcLamp2Body) plcLamp2Body.setAttribute('fill', res.L2 ? '#22c55e' : '#064e3b');
-  if (plcLamp2Halo) plcLamp2Halo.setAttribute('opacity', res.L2 ? '0.95' : '0');
+  if (plcLamp2Body) {
+    if (pl2IsRed) {
+      plcLamp2Body.setAttribute('fill', res.L2 ? '#ef4444' : '#7f1d1d');
+    } else {
+      plcLamp2Body.setAttribute('fill', res.L2 ? '#22c55e' : '#064e3b');
+    }
+  }
+  if (plcLamp2Halo) {
+    plcLamp2Halo.setAttribute('fill', pl2IsRed ? '#ef4444' : '#22c55e');
+    plcLamp2Halo.setAttribute('opacity', res.L2 ? '0.95' : '0');
+  }
 
   // Update PLC Input Terminal LEDs & Panel Monitor LEDs (0..8)
   for (let k = 0; k <= 8; k++) {
@@ -3755,6 +4005,258 @@ function renderSchematic() {
         <path d="M295 180 V248 M340 220 V248 H40" fill="none" stroke="${(l1GndWired || l2GndWired) && pwrNegActive ? gndStroke : idleStroke}" stroke-width="2.5"/>
       </svg>
     `;
+  } else if (state.currentLabId === 'lab_summary_3_5') {
+    const spec = getPlcModelSpec();
+    const sumCfg = (typeof plcState !== 'undefined' && plcState.summaryConfig) ? plcState.summaryConfig : {};
+
+    if (hasWires && res.detectedInputLogic) {
+      if (state.plcWiringLogic !== res.detectedInputLogic) {
+        state.plcWiringLogic = res.detectedInputLogic;
+        const wbSel = document.getElementById('wbPlcLogicSelect');
+        if (wbSel) wbSel.value = res.detectedInputLogic;
+      }
+    }
+    const logicMode = state.plcWiringLogic || 'negative';
+    const isPos = logicMode === 'positive';
+
+    const f1Blown = Boolean(state.fuseBlown && state.fuseBlown.F1);
+    const f2Blown = Boolean(state.fuseBlown && state.fuseBlown.F2);
+
+    const f1Wired = isAnyWired('F1_T', 'F1_B');
+    const f1InHot = pwr && f1Wired && (pos.has('F1_T') || pos.has('F1_B'));
+    const f1OutHot = pwr && !f1Blown && f1Wired && pos.has('F1_T') && pos.has('F1_B');
+
+    const comWired = isAnyWired('PIN_COM_T', 'PIN_COM_B');
+    const comPosHot = pwr && comWired && f1OutHot && (pos.has('PIN_COM_T') || pos.has('PIN_COM_B'));
+    const comNegHot = pwr && comWired && (neg.has('PIN_COM_T') || neg.has('PIN_COM_B'));
+
+    const s1Wired = isAnyWired('S1_NO_1', 'S1_NO_2', 'S1_NC_1', 'S1_NC_2');
+    const s2Wired = isAnyWired('S2_NO_1', 'S2_NO_2', 'S2_NC_1', 'S2_NC_2');
+
+    const inAActive = Boolean(hasWires && res.plcInputs && res.plcInputs[sumCfg.s1Bit ?? 2]);
+    const inBActive = Boolean(hasWires && res.plcInputs && res.plcInputs[sumCfg.s2Bit ?? 4]);
+
+    const f2Wired = isAnyWired('F2_T', 'F2_B');
+    const f2InHot = pwr && f2Wired && (pos.has('F2_T') || pos.has('F2_B'));
+    const f2OutHot = pwr && !f2Blown && f2Wired && pos.has('F2_T') && pos.has('F2_B');
+
+    const com0Wired = isAnyWired('POUT_COM0_T', 'POUT_COM0_B');
+    const com1Wired = isAnyWired('POUT_COM1_T', 'POUT_COM1_B');
+    const com0Hot = pwr && com0Wired && f2OutHot && (pos.has('POUT_COM0_T') || pos.has('POUT_COM0_B'));
+    const com1Hot = pwr && com1Wired && f2OutHot && (pos.has('POUT_COM1_T') || pos.has('POUT_COM1_B'));
+
+    const l1GndWired = isNeg('L1_A', 'L1_B');
+    const l2GndWired = isNeg('L2_A', 'L2_B');
+
+    const fuse1Svg = f1Blown
+      ? `<rect x="64" y="48" width="22" height="34" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="1.8"/>
+         <text x="75" y="70" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fca5a5">💥ขาด</text>`
+      : `<rect x="64" y="48" width="22" height="34" rx="4" fill="${f1InHot ? '#f0f9ff' : '#f8fafc'}" stroke="${f1InHot ? '#0284c7' : '#64748b'}" stroke-width="1.8"/>
+         <line x1="75" y1="52" x2="75" y2="78" stroke="${f1InHot ? '#ef4444' : '#94a3b8'}" stroke-width="1.8" stroke-dasharray="2 2"/>
+         <text x="75" y="70" text-anchor="middle" font-size="10" font-weight="800" fill="${f1InHot ? '#0369a1' : '#64748b'}">F1</text>`;
+
+    const fuse2Svg = f2Blown
+      ? `<rect x="284" y="48" width="22" height="34" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="1.8"/>
+         <text x="295" y="70" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fca5a5">💥ขาด</text>`
+      : `<rect x="284" y="48" width="22" height="34" rx="4" fill="${f2InHot ? '#f0f9ff' : '#f8fafc'}" stroke="${f2InHot ? '#0284c7' : '#64748b'}" stroke-width="1.8"/>
+         <line x1="295" y1="52" x2="295" y2="78" stroke="${f2InHot ? '#ef4444' : '#94a3b8'}" stroke-width="1.8" stroke-dasharray="2 2"/>
+         <text x="295" y="70" text-anchor="middle" font-size="10" font-weight="800" fill="${f2InHot ? '#0369a1' : '#64748b'}">F2</text>`;
+
+    const badgeSvg = `
+      <rect x="50" y="8" width="260" height="20" rx="10" fill="${isPos ? '#064e3b' : '#1e3a8a'}" stroke="${isPos ? '#10b981' : '#3b82f6'}" stroke-width="1.2"/>
+      <text x="180" y="22" text-anchor="middle" font-size="9" font-weight="700" fill="#ffffff">โจทย์สรุป: ${isPos ? 'Positive Logic' : 'Negative Logic'} | PB1(${sumCfg.s1ContactType}) ➔ ${spec.termInShort(sumCfg.s1Bit ?? 2)}</text>
+    `;
+
+    const pl1Color = sumCfg.pl1Color || 'red';
+    const pl2Color = sumCfg.pl2Color || 'green';
+    const pl1Fill = l1 ? (pl1Color === 'green' ? '#22c55e' : '#ef4444') : (pl1Color === 'green' ? '#064e3b' : '#7f1d1d');
+    const pl2Fill = l2 ? (pl2Color === 'red' ? '#ef4444' : '#22c55e') : (pl2Color === 'red' ? '#7f1d1d' : '#064e3b');
+
+    const s1IsNO = (sumCfg.s1ContactType !== 'NC');
+    const s2IsNO = (sumCfg.s2ContactType !== 'NC');
+
+    const useS2 = Boolean(sumCfg.useS2);
+    const usePL2 = Boolean(sumCfg.usePL2);
+
+    const s1Y = useS2 ? 116 : 148;
+    const s2Y = 172;
+
+    const pl1Y = usePL2 ? 138 : 168;
+    const pl2Y = 188;
+
+    const outBitA = sumCfg.pl1Bit ?? 1;
+    const outBitB = sumCfg.pl2Bit ?? 3;
+    const needCom0 = (outBitA <= 3) || (usePL2 && outBitB <= 3);
+    const needCom1 = (outBitA >= 4) || (usePL2 && outBitB >= 4);
+
+    svgContent = `
+      <svg viewBox="0 0 360 270">
+        ${badgeSvg}
+        <text x="15" y="34" font-size="12" font-weight="700" fill="${pwrPosActive ? '#dc2626' : '#64748b'}">+24VDC</text>
+        <circle cx="35" cy="46" r="5" fill="#fff" stroke="${pwrPosActive ? '#dc2626' : '#64748b'}" stroke-width="2.5"/>
+        <text x="15" y="260" font-size="12" font-weight="700" fill="${pwrNegActive ? '#0f172a' : '#64748b'}">0V</text>
+        <circle cx="35" cy="248" r="5" fill="#fff" stroke="${pwrNegActive ? '#0f172a' : '#64748b'}" stroke-width="2.5"/>
+
+        <!-- Input side wiring -->
+        ${!isPos ? `
+          <!-- Negative Logic: +24V -> F1 -> COM -->
+          <path d="M40 46 H75 V48" fill="none" stroke="${f1InHot ? hotStroke : idleStroke}" stroke-width="2.5"/>
+          ${fuse1Svg}
+          <path d="M75 82 V100 H125" fill="none" stroke="${comPosHot ? hotStroke : idleStroke}" stroke-width="2.5"/>
+
+          <!-- 0V -> PB1 -> InA -->
+          <path d="M40 248 H75 V${s1Y + 38}" fill="none" stroke="${pwrNegActive && s1Wired ? gndStroke : idleStroke}" stroke-width="2.5"/>
+          ${s1IsNO ? drawIECSwitchNO({
+            id: 'S1',
+            label: `PB1 (${sumCfg.s1ContactType})`,
+            x: 75,
+            yTop: s1Y,
+            pressed: s1,
+            topEnergized: inAActive,
+            bottomEnergized: pwrNegActive && s1Wired
+          }) : drawIECSwitchNC({
+            id: 'S1',
+            label: `PB1 (${sumCfg.s1ContactType})`,
+            x: 75,
+            yTop: s1Y,
+            pressed: s1,
+            topEnergized: inAActive,
+            bottomEnergized: pwrNegActive && s1Wired
+          })}
+          <path d="M75 ${s1Y} V125 H125" fill="none" stroke="${inAActive ? gndStroke : idleStroke}" stroke-width="2.5"/>
+
+          ${useS2 ? `
+            <!-- 0V bridge -> PB2 -> InB -->
+            <path d="M75 ${s1Y + 38} V${s2Y + 38}" fill="none" stroke="${pwrNegActive && s2Wired ? gndStroke : idleStroke}" stroke-width="2.5"/>
+            ${s2IsNO ? drawIECSwitchNO({
+              id: 'S2',
+              label: `PB2 (${sumCfg.s2ContactType})`,
+              x: 75,
+              yTop: s2Y,
+              pressed: s2,
+              topEnergized: inBActive,
+              bottomEnergized: pwrNegActive && s2Wired
+            }) : drawIECSwitchNC({
+              id: 'S2',
+              label: `PB2 (${sumCfg.s2ContactType})`,
+              x: 75,
+              yTop: s2Y,
+              pressed: s2,
+              topEnergized: inBActive,
+              bottomEnergized: pwrNegActive && s2Wired
+            })}
+            <path d="M75 ${s2Y} V150 H125" fill="none" stroke="${inBActive ? gndStroke : idleStroke}" stroke-width="2.5"/>
+          ` : ''}
+        ` : `
+          <!-- Positive Logic: +24V -> F1 -> switches -> I pins; 0V -> COM -->
+          <path d="M40 46 H75 V48" fill="none" stroke="${f1InHot ? hotStroke : idleStroke}" stroke-width="2.5"/>
+          ${fuse1Svg}
+          <path d="M75 82 V${s1Y}" fill="none" stroke="${f1OutHot && s1Wired ? hotStroke : idleStroke}" stroke-width="2.5"/>
+          ${s1IsNO ? drawIECSwitchNO({
+            id: 'S1',
+            label: `PB1 (${sumCfg.s1ContactType})`,
+            x: 75,
+            yTop: s1Y,
+            pressed: s1,
+            topEnergized: f1OutHot && s1Wired,
+            bottomEnergized: inAActive
+          }) : drawIECSwitchNC({
+            id: 'S1',
+            label: `PB1 (${sumCfg.s1ContactType})`,
+            x: 75,
+            yTop: s1Y,
+            pressed: s1,
+            topEnergized: f1OutHot && s1Wired,
+            bottomEnergized: inAActive
+          })}
+          <path d="M75 ${s1Y + 34} V125 H125" fill="none" stroke="${inAActive ? hotStroke : idleStroke}" stroke-width="2.5"/>
+
+          ${useS2 ? `
+            <path d="M75 ${s1Y} V${s2Y}" fill="none" stroke="${f1OutHot && s2Wired ? hotStroke : idleStroke}" stroke-width="2.5"/>
+            ${s2IsNO ? drawIECSwitchNO({
+              id: 'S2',
+              label: `PB2 (${sumCfg.s2ContactType})`,
+              x: 75,
+              yTop: s2Y,
+              pressed: s2,
+              topEnergized: f1OutHot && s2Wired,
+              bottomEnergized: inBActive
+            }) : drawIECSwitchNC({
+              id: 'S2',
+              label: `PB2 (${sumCfg.s2ContactType})`,
+              x: 75,
+              yTop: s2Y,
+              pressed: s2,
+              topEnergized: f1OutHot && s2Wired,
+              bottomEnergized: inBActive
+            })}
+            <path d="M75 ${s2Y + 34} V150 H125" fill="none" stroke="${inBActive ? hotStroke : idleStroke}" stroke-width="2.5"/>
+          ` : ''}
+
+          <!-- 0V -> COM -->
+          <path d="M40 248 H105 V100 H125" fill="none" stroke="${comNegHot ? gndStroke : idleStroke}" stroke-width="2.5"/>
+        `}
+
+        <!-- PLC Block (center) -->
+        <rect x="125" y="32" width="130" height="203" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
+        <text x="190" y="50" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">${spec.shortName}</text>
+
+        <!-- Input COM pin -->
+        <circle cx="125" cy="100" r="5" fill="${!isPos ? (comPosHot ? '#ef4444' : '#475569') : (comNegHot ? '#3b82f6' : '#475569')}"/>
+        <text x="135" y="104" font-family="'JetBrains Mono', monospace" font-size="9.5" font-weight="700" fill="#fff">${spec.inCom}</text>
+
+        <!-- Input pin 1 -->
+        <circle cx="125" cy="125" r="5" fill="${inAActive ? '#22c55e' : '#475569'}"/>
+        <text x="135" y="129" font-family="'JetBrains Mono', monospace" font-size="9.5" font-weight="700" fill="${inAActive ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(sumCfg.s1Bit ?? 2)}</text>
+
+        <!-- Input pin 2 -->
+        ${useS2 ? `
+          <circle cx="125" cy="150" r="5" fill="${inBActive ? '#22c55e' : '#475569'}"/>
+          <text x="135" y="154" font-family="'JetBrains Mono', monospace" font-size="9.5" font-weight="700" fill="${inBActive ? '#4ade80' : '#cbd5e1'}">${spec.termInShort(sumCfg.s2Bit ?? 4)}</text>
+        ` : ''}
+
+        <!-- Output COM pin(s) -->
+        ${needCom0 ? `
+          <circle cx="255" cy="100" r="5" fill="${com0Hot ? '#ef4444' : '#475569'}"/>
+          <text x="220" y="104" font-family="'JetBrains Mono', monospace" font-size="9.5" font-weight="700" fill="#fff">COM0</text>
+        ` : (needCom1 ? `
+          <circle cx="255" cy="100" r="5" fill="${com1Hot ? '#ef4444' : '#475569'}"/>
+          <text x="220" y="104" font-family="'JetBrains Mono', monospace" font-size="9.5" font-weight="700" fill="#fff">COM1</text>
+        ` : '')}
+
+        <!-- Output pin 1 -->
+        <circle cx="255" cy="${pl1Y}" r="5" fill="${l1 ? '#facc15' : '#475569'}"/>
+        <text x="225" y="${pl1Y + 4}" font-family="'JetBrains Mono', monospace" font-size="9.5" font-weight="700" fill="${l1 ? '#fde047' : '#cbd5e1'}">${spec.termOutShort(outBitA)}</text>
+
+        <!-- Output pin 2 -->
+        ${usePL2 ? `
+          <circle cx="255" cy="${pl2Y}" r="5" fill="${l2 ? '#facc15' : '#475569'}"/>
+          <text x="225" y="${pl2Y + 4}" font-family="'JetBrains Mono', monospace" font-size="9.5" font-weight="700" fill="${l2 ? '#fde047' : '#cbd5e1'}">${spec.termOutShort(outBitB)}</text>
+        ` : ''}
+
+        <!-- Output side wiring: +24V -> F2 -> COM0/COM1 -->
+        <path d="M40 46 H295 V48" fill="none" stroke="${f2InHot ? hotStroke : idleStroke}" stroke-width="2.5"/>
+        ${fuse2Svg}
+        <path d="M295 82 V100 H255" fill="none" stroke="${(com0Hot || com1Hot) ? hotStroke : idleStroke}" stroke-width="2.5"/>
+
+        <!-- OutA -> PL1 -->
+        <path d="M255 ${pl1Y} H295 V${pl1Y + 16}" fill="none" stroke="${l1 ? (pl1Color === 'green' ? '#22c55e' : hotStroke) : idleStroke}" stroke-width="2.5"/>
+        <circle cx="295" cy="${pl1Y + 28}" r="12" fill="${pl1Fill}" stroke="#0f172a" stroke-width="2"/>
+        <path d="M287 ${pl1Y + 20} L303 ${pl1Y + 36} M303 ${pl1Y + 20} L287 ${pl1Y + 36}" stroke="#fff" stroke-width="1.8"/>
+        <text x="314" y="${pl1Y + 32}" font-size="10" font-weight="700" fill="${pl1Color === 'green' ? '#22c55e' : '#dc2626'}">PL1(${pl1Color === 'green' ? 'เขียว' : 'แดง'})</text>
+
+        <!-- OutB -> PL2 -->
+        ${usePL2 ? `
+          <path d="M255 ${pl2Y} H335 V${pl2Y + 16}" fill="none" stroke="${l2 ? (pl2Color === 'green' ? '#22c55e' : hotStroke) : idleStroke}" stroke-width="2.5"/>
+          <circle cx="335" cy="${pl2Y + 28}" r="12" fill="${pl2Fill}" stroke="#0f172a" stroke-width="2"/>
+          <path d="M327 ${pl2Y + 20} L343 ${pl2Y + 36} M343 ${pl2Y + 20} L327 ${pl2Y + 36}" stroke="#fff" stroke-width="1.8"/>
+          <text x="314" y="${pl2Y + 46}" font-size="10" font-weight="700" fill="${pl2Color === 'green' ? '#22c55e' : '#dc2626'}">PL2(${pl2Color === 'green' ? 'เขียว' : 'แดง'})</text>
+        ` : ''}
+
+        <!-- Lamps ground return to 0V -->
+        <path d="M295 ${pl1Y + 40} V248 ${usePL2 ? `M335 ${pl2Y + 40} V248` : ''} H40" fill="none" stroke="${(l1GndWired || l2GndWired) && pwrNegActive ? gndStroke : idleStroke}" stroke-width="2.5"/>
+      </svg>
+    `;
   } else if (lab && lab.customSchematic) {
     svgContent = generateCustomSchematicSvg(lab.customSchematic, {
       s1,
@@ -3815,9 +4317,16 @@ function renderTruthTable(verificationResults = null) {
 
   lab.inputs.forEach((inp) => {
     if (isPlc) {
-      if (inp === 'S1') headers += `<th>S1 (${spec.termInShort(0)})</th>`;
-      else if (inp === 'S2') headers += `<th>S2 (${spec.termInShort(1)})</th>`;
-      else headers += `<th>${inp}</th>`;
+      if (lab.id === 'lab_summary_3_5') {
+        const sumCfg = (typeof plcState !== 'undefined' && plcState.summaryConfig) ? plcState.summaryConfig : {};
+        if (inp === 'S1') headers += `<th>PB1 (${spec.termInShort(sumCfg.s1Bit ?? 2)})</th>`;
+        else if (inp === 'S2') headers += `<th>PB2 (${spec.termInShort(sumCfg.s2Bit ?? 4)})</th>`;
+        else headers += `<th>${inp}</th>`;
+      } else {
+        if (inp === 'S1') headers += `<th>S1 (${spec.termInShort(0)})</th>`;
+        else if (inp === 'S2') headers += `<th>S2 (${spec.termInShort(1)})</th>`;
+        else headers += `<th>${inp}</th>`;
+      }
     } else {
       headers += `<th>${inp}</th>`;
     }
@@ -3827,7 +4336,12 @@ function renderTruthTable(verificationResults = null) {
   }
   lab.outputs.forEach((out) => {
     if (isPlc) {
-      if (lab.plcInputOnlyLab) {
+      if (lab.id === 'lab_summary_3_5') {
+        const sumCfg = (typeof plcState !== 'undefined' && plcState.summaryConfig) ? plcState.summaryConfig : {};
+        if (out === 'L1') headers += `<th>PL1 (${spec.termOutShort(sumCfg.pl1Bit ?? 1)}) คาดหวัง</th>`;
+        else if (out === 'L2') headers += `<th>PL2 (${spec.termOutShort(sumCfg.pl2Bit ?? 3)}) คาดหวัง</th>`;
+        else headers += `<th>${out} (คาดหวัง)</th>`;
+      } else if (lab.plcInputOnlyLab) {
         if (out === 'L1') headers += `<th>ไฟสถานะ ${spec.termOutShort(0)} (บน Panel)</th>`;
         else if (out === 'L2') headers += `<th>ไฟสถานะ ${spec.termOutShort(1)} (บน Panel)</th>`;
         else headers += `<th>${out} (คาดหวัง)</th>`;
@@ -4027,12 +4541,169 @@ function applyTruthTableRow(rowIdx) {
   updateSimulationUI();
 }
 
+// Diagnostic Hint Engine for lab_summary_3_5: pinpoints exact miswired bit or contact
+function getSummaryLabDiagnosticHint() {
+  const sumCfg = (typeof plcState !== 'undefined' && plcState.summaryConfig) ? plcState.summaryConfig : {};
+  const spec = getPlcModelSpec();
+  const isPos = (state.plcWiringLogic === 'positive');
+
+  const isTermWired = (tid) => state.wires.some((w) => w.from === tid || w.to === tid);
+  const isAnyWired = (...tids) => tids.some(isTermWired);
+
+  // 1. Fuse F1 input COM power check
+  const comWired = isAnyWired('PIN_COM_T', 'PIN_COM_B');
+  const f1Wired = isAnyWired('F1_T', 'F1_B');
+  if (!isPos) {
+    if (!f1Wired || !isTermWired('PIN_24V_T')) {
+      return 'ฝั่งอินพุตยังไม่ได้ต่อสายไฟเลี้ยง +24V เข้าขั้วล่างฟิวส์ F1 (F1_B)';
+    }
+    if (!comWired) {
+      return `ฝั่งอินพุตยังไม่ได้ต่อสายจากขั้วบนฟิวส์ F1 (F1_T) ไปยังขั้วคอมมอน ${spec.inCom}`;
+    }
+  } else {
+    if (!comWired || !isTermWired('PIN_0V_T')) {
+      return `โหมด Positive Logic: ขั้วคอมมอน ${spec.inCom} ต้องต่อสายไปยัง 0V`;
+    }
+  }
+
+  // 2. Check PB1 (S1) contact and pin
+  const s1Type = sumCfg.s1ContactType || 'NO';
+  const s1Expected = s1Type === 'NO' ? ['S1_NO_1', 'S1_NO_2'] : ['S1_NC_1', 'S1_NC_2'];
+  const s1Wrong = s1Type === 'NO' ? ['S1_NC_1', 'S1_NC_2'] : ['S1_NO_1', 'S1_NO_2'];
+
+  if (isAnyWired(...s1Wrong)) {
+    return `สวิตช์ PB1 โจทย์กำหนดให้ใช้หน้าสัมผัส ${s1Type} (${s1Type === 'NO' ? 'ขั้ว 3-4' : 'ขั้ว 1-2'}) แต่ตรวจพบการต่อสายที่ขั้ว ${s1Type === 'NO' ? 'NC (ขั้ว 1-2)' : 'NO (ขั้ว 3-4)'}`;
+  }
+  if (!isAnyWired(...s1Expected)) {
+    return `สวิตช์ PB1 ยังไม่ได้ต่อสายที่ขั้ว ${s1Type} (${s1Type === 'NO' ? 'ขั้ว 3-4' : 'ขั้ว 1-2'})`;
+  }
+
+  const s1TargetPin = `PIN_I${sumCfg.s1Bit ?? 2}`;
+  const s1TargetWired = isAnyWired(`${s1TargetPin}_T`, `${s1TargetPin}_B`);
+  if (!s1TargetWired) {
+    for (let k = 0; k <= 8; k++) {
+      if (k !== (sumCfg.s1Bit ?? 2) && isAnyWired(`PIN_I${k}_T`, `PIN_I${k}_B`)) {
+        if (!sumCfg.useS2 || k !== sumCfg.s2Bit) {
+          return `สวิตช์ PB1 ต้องเชื่อมต่อไปยังขั้วอินพุต ${spec.termInShort(sumCfg.s1Bit ?? 2)} แต่ตรวจพบการต่อเข้าขั้ว ${spec.termInShort(k)}`;
+        }
+      }
+    }
+    return `ยังไม่ได้ต่อสายไฟจากสวิตช์ PB1 เข้าสู่ขั้วอินพุต ${spec.termInShort(sumCfg.s1Bit ?? 2)} ของ PLC`;
+  }
+
+  // 3. Check PB2 (S2) if enabled
+  if (sumCfg.useS2) {
+    const s2Type = sumCfg.s2ContactType || 'NO';
+    const s2Expected = s2Type === 'NO' ? ['S2_NO_1', 'S2_NO_2'] : ['S2_NC_1', 'S2_NC_2'];
+    const s2Wrong = s2Type === 'NO' ? ['S2_NC_1', 'S2_NC_2'] : ['S2_NO_1', 'S2_NO_2'];
+
+    if (isAnyWired(...s2Wrong)) {
+      return `สวิตช์ PB2 โจทย์กำหนดให้ใช้หน้าสัมผัส ${s2Type} (${s2Type === 'NO' ? 'ขั้ว 3-4' : 'ขั้ว 1-2'}) แต่ตรวจพบการต่อสายที่ขั้ว ${s2Type === 'NO' ? 'NC (ขั้ว 1-2)' : 'NO (ขั้ว 3-4)'}`;
+    }
+    if (!isAnyWired(...s2Expected)) {
+      return `สวิตช์ PB2 ยังไม่ได้ต่อสายที่ขั้ว ${s2Type} (${s2Type === 'NO' ? 'ขั้ว 3-4' : 'ขั้ว 1-2'})`;
+    }
+
+    const s2TargetPin = `PIN_I${sumCfg.s2Bit ?? 4}`;
+    const s2TargetWired = isAnyWired(`${s2TargetPin}_T`, `${s2TargetPin}_B`);
+    if (!s2TargetWired) {
+      for (let k = 0; k <= 8; k++) {
+        if (k !== (sumCfg.s2Bit ?? 4) && k !== sumCfg.s1Bit && isAnyWired(`PIN_I${k}_T`, `PIN_I${k}_B`)) {
+          return `สวิตช์ PB2 ต้องเชื่อมต่อไปยังขั้วอินพุต ${spec.termInShort(sumCfg.s2Bit ?? 4)} แต่ตรวจพบการต่อเข้าขั้ว ${spec.termInShort(k)}`;
+        }
+      }
+      return `ยังไม่ได้ต่อสายไฟจากสวิตช์ PB2 เข้าสู่ขั้วอินพุต ${spec.termInShort(sumCfg.s2Bit ?? 4)} ของ PLC`;
+    }
+  }
+
+  // 4. Output COM check
+  const needCom0 = ((sumCfg.pl1Bit ?? 1) <= 3) || (sumCfg.usePL2 && (sumCfg.pl2Bit ?? 3) <= 3);
+  const needCom1 = ((sumCfg.pl1Bit ?? 1) >= 4) || (sumCfg.usePL2 && (sumCfg.pl2Bit ?? 3) >= 4);
+
+  const f2Wired = isAnyWired('F2_T', 'F2_B');
+  if (!f2Wired || !isTermWired('POUT_24V_T')) {
+    return 'ฝั่งเอาต์พุตยังไม่ได้ต่อสายไฟเลี้ยง 24V จาก POUT 24V เข้าขั้วล่างฟิวส์ F2 (F2_B)';
+  }
+
+  const com0Wired = isAnyWired('POUT_COM0_T', 'POUT_COM0_B');
+  const com1Wired = isAnyWired('POUT_COM1_T', 'POUT_COM1_B');
+
+  if (needCom0 && !com0Wired) {
+    const bitShow = (sumCfg.pl1Bit <= 3) ? sumCfg.pl1Bit : sumCfg.pl2Bit;
+    return `เอาต์พุต ${spec.termOutShort(bitShow)} อยู่ในกลุ่ม COM0 (Q0-Q3) กรุณาต่อสาย 24V ผ่านขั้วบนฟิวส์ F2 (F2_T) เข้าขั้ว COM0`;
+  }
+  if (needCom1 && !com1Wired) {
+    const bitShow = (sumCfg.pl1Bit >= 4) ? sumCfg.pl1Bit : sumCfg.pl2Bit;
+    return `เอาต์พุต ${spec.termOutShort(bitShow)} อยู่ในกลุ่ม COM1 (Q4-Q6) กรุณาต่อสาย 24V ผ่านฟิวส์ F2 (หรือพ่วงจาก COM0) เข้าขั้ว COM1`;
+  }
+
+  // 5. Output PL1 check
+  const pl1Bit = sumCfg.pl1Bit ?? 1;
+  const pl1Pin = `POUT_Q${pl1Bit}`;
+  const pl1PinWired = isAnyWired(`${pl1Pin}_T`, `${pl1Pin}_B`);
+  const pl1Wired = isAnyWired('L1_A', 'L1_B');
+  if (!pl1Wired) {
+    return `ยังไม่ได้ต่อสายเข้าหลอดไฟ PL1 (${sumCfg.pl1Color === 'green' ? 'สีเขียว' : 'สีแดง'})`;
+  }
+  if (!pl1PinWired) {
+    for (let k = 0; k <= 6; k++) {
+      if (k !== pl1Bit && (!sumCfg.usePL2 || k !== sumCfg.pl2Bit) && isAnyWired(`POUT_Q${k}_T`, `POUT_Q${k}_B`)) {
+        return `หลอดไฟ PL1 ต้องต่อมาจากขั้วเอาต์พุต ${spec.termOutShort(pl1Bit)} แต่ตรวจพบการต่อจาก ${spec.termOutShort(k)}`;
+      }
+    }
+    return `ยังไม่ได้ต่อสายไฟจากขั้วเอาต์พุต ${spec.termOutShort(pl1Bit)} ไปยังหลอดไฟ PL1`;
+  }
+
+  // 6. Output PL2 check if enabled
+  if (sumCfg.usePL2) {
+    const pl2Bit = sumCfg.pl2Bit ?? 3;
+    const pl2Pin = `POUT_Q${pl2Bit}`;
+    const pl2PinWired = isAnyWired(`${pl2Pin}_T`, `${pl2Pin}_B`);
+    const pl2Wired = isAnyWired('L2_A', 'L2_B');
+    if (!pl2Wired) {
+      return `ยังไม่ได้ต่อสายเข้าหลอดไฟ PL2 (${sumCfg.pl2Color === 'red' ? 'สีแดง' : 'สีเขียว'})`;
+    }
+    if (!pl2PinWired) {
+      for (let k = 0; k <= 6; k++) {
+        if (k !== pl2Bit && k !== pl1Bit && isAnyWired(`POUT_Q${k}_T`, `POUT_Q${k}_B`)) {
+          return `หลอดไฟ PL2 ต้องต่อมาจากขั้วเอาต์พุต ${spec.termOutShort(pl2Bit)} แต่ตรวจพบการต่อจาก ${spec.termOutShort(k)}`;
+        }
+      }
+      return `ยังไม่ได้ต่อสายไฟจากขั้วเอาต์พุต ${spec.termOutShort(pl2Bit)} ไปยังหลอดไฟ PL2`;
+    }
+  }
+
+  // 7. Ground return check
+  const gndWired = isAnyWired('POUT_0V_T', 'POUT_0V_B');
+  if (!gndWired) {
+    return 'ยังไม่ได้ต่อสายกราวด์ 0V จากหลอดไฟกลับเข้าสู่ขั้ว POUT 0V เพื่อให้ครบวงจร';
+  }
+
+  return 'ตรวจสอบการต่อสายอินพุตและเอาต์พุตให้ตรงกับโจทย์ที่กำหนด และตรวจดูว่าผัง Ladder สอดคล้องกับการทำงานที่ต้องการหรือไม่';
+}
+
 // Automated Circuit Verification Engine
 function runAutomatedVerification() {
   const lab = LABS[state.currentLabId];
   const banner = document.getElementById('verificationMessage');
   const scoreBadge = document.getElementById('scoreBadge');
   const isPlcLab = Boolean(lab && lab.isPlcTerminalLab);
+
+  if (state.currentLabId === 'lab_summary_3_5') {
+    const lCheck = verifyUserLadderAgainstLab('lab_summary_3_5');
+    if (!lCheck.passed) {
+      banner.className = 'verification-banner error';
+      banner.innerHTML = `
+        <div class="banner-icon">⚠️</div>
+        <div class="banner-text">
+          <strong>ยังไม่ได้ต่อวงจร Ladder Diagram ให้สมบูรณ์:</strong> ${lCheck.reason || 'กรุณาคลิกเลือกหน้าสัมผัส Input และ Coil Output ในแถบเครื่องมือ Ladder ด้านซ้ายให้ครบถ้วนก่อนกดตรวจสอบ'}
+        </div>
+      `;
+      scoreBadge.className = 'score-badge fail';
+      scoreBadge.textContent = 'Ladder ยังไม่ครบ (0/10)';
+      return;
+    }
+  }
 
   if (state.wires.length === 0) {
     banner.className = 'verification-banner error';
@@ -4164,7 +4835,14 @@ function runAutomatedVerification() {
   } else if (allPassed) {
     banner.className = 'verification-banner success';
     let logicSuccessNote = '';
-    if (isPlcLab) {
+    if (state.currentLabId === 'lab_summary_3_5') {
+      const spec = getPlcModelSpec();
+      const sumCfg = plcState.summaryConfig || {};
+      const modeText = (detectedLogic === 'positive')
+        ? 'Positive Logic (Sink Input: COM = 0V)'
+        : 'Negative Logic (Source Input: COM = +24V)';
+      logicSuccessNote = `<br/>🌟 <b>โจทย์ที่กำหนดและต่อสายสำเร็จ:</b> สวิตช์ PB1 (${sumCfg.s1ContactType}) ➔ ${spec.termInShort(sumCfg.s1Bit ?? 2)}${sumCfg.useS2 ? `, PB2 (${sumCfg.s2ContactType}) ➔ ${spec.termInShort(sumCfg.s2Bit ?? 4)}` : ''} | เอาต์พุต ${spec.termOutShort(sumCfg.pl1Bit ?? 1)} ➔ PL1 (${sumCfg.pl1Color === 'green' ? 'สีเขียว' : 'สีแดง'})${sumCfg.usePL2 ? `, ${spec.termOutShort(sumCfg.pl2Bit ?? 3)} ➔ PL2 (${sumCfg.pl2Color === 'red' ? 'สีแดง' : 'สีเขียว'})` : ''} (${modeText})`;
+    } else if (isPlcLab) {
       const modeText = (detectedLogic === 'positive')
         ? 'Positive Logic (Sink Input: COM = 0V)'
         : 'Negative Logic (Source Input: COM = +24V)';
@@ -4173,8 +4851,8 @@ function runAutomatedVerification() {
     banner.innerHTML = `
       <div class="banner-icon">✅</div>
       <div class="banner-text">
-        <strong>ยอดเยี่ยม! วงจรทำงานถูกต้องสมบูรณ์ 100%</strong><br/>
-        ผ่านการทดสอบครบทุกเงื่อนไขของตารางความจริง (${passedCount}/${totalCount} เงื่อนไข) — เปรียบเทียบการทำงาน: <b>${lab.logicComparison}</b>
+        <strong>ยอดเยี่ยม! วงจรและโปรแกรม Ladder ทำงานถูกต้องสมบูรณ์ 100%</strong><br/>
+        ผ่านการทดสอบครบทุกเงื่อนไขของตารางความจริง (${passedCount}/${totalCount} เงื่อนไข) — ${lab.logicComparison}
         ${logicSuccessNote}
       </div>
     `;
@@ -4182,7 +4860,9 @@ function runAutomatedVerification() {
     scoreBadge.textContent = `ผ่าน (${score}/10 คะแนน)`;
   } else {
     let diagHint = 'ตรวจสอบการเลือกขั้ว NO / NC ของสวิตช์ และการต่อครบวงจรกลับไปยังขั้ว 0V (-)';
-    if (hasBypassedF1 || hasBypassedF2) {
+    if (state.currentLabId === 'lab_summary_3_5') {
+      diagHint = getSummaryLabDiagnosticHint();
+    } else if (hasBypassedF1 || hasBypassedF2) {
       diagHint = '⚠️ ตรวจพบการต่อสายข้ามฟิวส์ (FUSE): กรุณาต่อสายไฟเลี้ยงผ่านฟิวส์ F ตามวงจรสัญลักษณ์เพื่อความปลอดภัย';
     } else if (isPlcLab) {
       diagHint = (state.plcWiringLogic === 'positive')
@@ -5540,6 +6220,34 @@ function loadLab(labId) {
     if (typeof resetUserLadderForCurrentLab === 'function') {
       resetUserLadderForCurrentLab(!plcState.ladderPracticeMode);
     }
+  }
+
+  if (labId === 'lab_summary_3_5') {
+    if (typeof syncSummaryLabConfiguration === 'function') {
+      syncSummaryLabConfiguration();
+    }
+  } else {
+    const sumPanel = document.getElementById('summaryLabConfigPanel');
+    if (sumPanel) {
+      sumPanel.hidden = true;
+      sumPanel.style.display = 'none';
+    }
+    const l1Title = document.getElementById('plcLamp1Title');
+    if (l1Title) l1Title.textContent = 'PL1';
+    const l2Title = document.getElementById('plcLamp2Title');
+    if (l2Title) l2Title.textContent = 'PL2';
+    const l1Icon = document.getElementById('plcLamp1Icon');
+    if (l1Icon) l1Icon.textContent = 'RED';
+    const l2Icon = document.getElementById('plcLamp2Icon');
+    if (l2Icon) l2Icon.textContent = 'GRN';
+    const l1Body = document.getElementById('plcLamp1Body');
+    if (l1Body) l1Body.setAttribute('fill', '#7f1d1d');
+    const l2Body = document.getElementById('plcLamp2Body');
+    if (l2Body) l2Body.setAttribute('fill', '#064e3b');
+    const l1Halo = document.getElementById('plcLamp1Halo');
+    if (l1Halo) l1Halo.setAttribute('fill', '#ef4444');
+    const l2Halo = document.getElementById('plcLamp2Halo');
+    if (l2Halo) l2Halo.setAttribute('fill', '#22c55e');
   }
 
   renderTruthTable();
@@ -7824,7 +8532,20 @@ const plcState = {
     { slot1: null, slot2: 'WIRE', parSlot: null, coil: null },
     { slot1: null, slot2: 'WIRE', parSlot: null, coil: null }
   ],
-  userMemoryM0: false
+  userMemoryM0: false,
+  summaryConfig: {
+    s1Bit: 2,
+    s1ContactType: 'NO',
+    useS2: true,
+    s2Bit: 4,
+    s2ContactType: 'NO',
+    pl1Bit: 1,
+    pl1Color: 'red',
+    usePL2: true,
+    pl2Bit: 3,
+    pl2Color: 'green',
+    rungCount: 2
+  }
 };
 
 function getTargetLadderForLab(labId) {
@@ -7864,6 +8585,16 @@ function getTargetLadderForLab(labId) {
       { slot1: 'I0_NC', slot2: 'WIRE', parSlot: null, coil: 'Q0' },
       { slot1: 'I0_NO', slot2: 'WIRE', parSlot: null, coil: 'Q1' }
     ];
+  } else if (labId === 'lab_summary_3_5') {
+    const sumCfg = plcState.summaryConfig || {};
+    const rCount = sumCfg.rungCount || 2;
+    if (rCount === 1) {
+      return [{ slot1: 'I0_NO', slot2: 'WIRE', parSlot: null, coil: 'Q0' }];
+    }
+    return [
+      { slot1: 'I0_NO', slot2: 'WIRE', parSlot: null, coil: 'Q0' },
+      { slot1: 'I1_NO', slot2: 'WIRE', parSlot: null, coil: 'Q1' }
+    ];
   }
   return [
     { slot1: 'I0_NO', slot2: 'WIRE', parSlot: null, coil: 'Q0' },
@@ -7885,6 +8616,12 @@ function resetUserLadderForCurrentLab(fillSolution = false) {
     }));
   }
   plcState.userMemoryM0 = false;
+  if (labId === 'lab_summary_3_5' && typeof computeSummaryLabTruthTable === 'function') {
+    computeSummaryLabTruthTable();
+    if (typeof renderTruthTable === 'function') {
+      renderTruthTable();
+    }
+  }
   updateLadderBuilderUI();
   if (typeof renderPlcLadderDiagram === 'function') {
     renderPlcLadderDiagram();
@@ -7983,6 +8720,43 @@ function verifyUserLadderAgainstLab(labId = state.currentLabId) {
         ? 'ยังไม่ได้ต่อวงจร Ladder Diagram'
         : (!allContactsFilled ? 'ยังวางหน้าสัมผัส Input ไม่ครบถ้วน' : 'ยังวาง Coil เอาต์พุตไม่ครบถ้วน')
     };
+  }
+
+  // Verification for summary lab (custom defined problem)
+  if (labId === 'lab_summary_3_5') {
+    const sumCfg = plcState.summaryConfig || {};
+    const rCount = sumCfg.rungCount || 2;
+    let anyFilledSummary = false;
+    let allComplete = true;
+    let missingReason = '';
+    for (let i = 0; i < rCount; i++) {
+      const ur = rungs[i];
+      if (!ur) {
+        allComplete = false;
+        missingReason = `Rung ${i} ยังไม่ได้วางอุปกรณ์`;
+        break;
+      }
+      if (ur.slot1 || ur.parSlot || ur.coil || (ur.slot2 && ur.slot2 !== 'WIRE')) {
+        anyFilledSummary = true;
+      }
+      if (!ur.slot1 && !ur.parSlot) {
+        allComplete = false;
+        missingReason = `Rung ${i} ยังไม่ได้วางหน้าสัมผัส Input (คลิกที่ช่อง + Contact 1 หรือ + ขนาน)`;
+        break;
+      }
+      if (!ur.coil) {
+        allComplete = false;
+        missingReason = `Rung ${i} ยังไม่ได้วาง Coil เอาต์พุต (คลิกที่ช่อง ( ) Coil)`;
+        break;
+      }
+    }
+    if (!anyFilledSummary) {
+      return { passed: false, missingLadder: true, reason: 'ยังไม่ได้ออกแบบวงจร Ladder Diagram: กรุณาคลิกเลือกหน้าสัมผัสและ Coil ในแถบเครื่องมือ Ladder ด้านซ้ายเพื่อวางในผังวงจร' };
+    }
+    if (!allComplete) {
+      return { passed: false, missingLadder: true, reason: missingReason };
+    }
+    return { passed: true, missingLadder: false, reason: '' };
   }
 
   // Simulation test against lab truth table
@@ -8085,6 +8859,13 @@ function handleLadderSlotClick(e) {
     }
   }
 
+  if (state.currentLabId === 'lab_summary_3_5' && typeof computeSummaryLabTruthTable === 'function') {
+    computeSummaryLabTruthTable();
+    if (typeof renderTruthTable === 'function') {
+      renderTruthTable();
+    }
+  }
+
   updateSimulationUI();
 }
 
@@ -8095,8 +8876,60 @@ function renderPracticeLadderSVG(pState, spec) {
   const pwr = pState.pwr;
   let curM0 = plcState.userMemoryM0;
 
-  const rungH = 76;
+  const isSummary = pState.labId === 'lab_summary_3_5';
+  const rungH = 82;
   const H = Math.max(90, 36 + rungs.length * rungH);
+
+  const getContactInfo = (token) => {
+    if (!token) return { isNC: false, addr: '', sym: '' };
+    const isNC = token.endsWith('_NC');
+    const isM = token.startsWith('M0');
+    const isS2 = token.startsWith('I1');
+    let addr = '';
+    let sym = '';
+    if (isM) {
+      addr = (spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0');
+      sym = 'K1';
+    } else if (isSummary) {
+      const sumCfg = (typeof plcState !== 'undefined' && plcState.summaryConfig) ? plcState.summaryConfig : {};
+      if (isS2) {
+        addr = spec.termIn(sumCfg.s2Bit ?? 4);
+        sym = 'PB2';
+      } else {
+        addr = spec.termIn(sumCfg.s1Bit ?? 2);
+        sym = 'PB1';
+      }
+    } else {
+      addr = isS2 ? spec.in1 : spec.in0;
+      sym = isS2 ? 'S2' : 'S1';
+    }
+    return { isNC, addr, sym };
+  };
+
+  const getCoilInfo = (coil) => {
+    if (!coil) return { isM: false, isQ1: false, addr: '', sym: '' };
+    const isM = coil === 'M0';
+    const isQ1 = coil === 'Q1';
+    let addr = '';
+    let sym = '';
+    if (isM) {
+      addr = (spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0');
+      sym = 'K1';
+    } else if (isSummary) {
+      const sumCfg = (typeof plcState !== 'undefined' && plcState.summaryConfig) ? plcState.summaryConfig : {};
+      if (isQ1) {
+        addr = spec.termOut(sumCfg.pl2Bit ?? 3);
+        sym = `PL2(${sumCfg.pl2Color === 'red' ? 'แดง' : 'เขียว'})`;
+      } else {
+        addr = spec.termOut(sumCfg.pl1Bit ?? 1);
+        sym = `PL1(${sumCfg.pl1Color === 'green' ? 'เขียว' : 'แดง'})`;
+      }
+    } else {
+      addr = isQ1 ? spec.out1 : spec.out0;
+      sym = isQ1 ? 'PL2' : 'PL1';
+    }
+    return { isM, isQ1, addr, sym };
+  };
 
   let rungsSvg = '';
   rungs.forEach((r, rIdx) => {
@@ -8135,15 +8968,10 @@ function renderPracticeLadderSVG(pState, spec) {
 
     let slot1Svg = '';
     if (r.slot1) {
-      const isNC = r.slot1.endsWith('_NC');
-      const isM = r.slot1.startsWith('M0');
-      const isS2 = r.slot1.startsWith('I1');
-      const addr = isM ? (spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0') : (isS2 ? spec.in1 : spec.in0);
-      const sym = isM ? 'K1' : (isS2 ? 'S2' : 'S1');
-
-      const contactContent = isNC
-        ? drawLadderContactNC(cx1, cy, addr, sym, c1Closed, isHotIn, null)
-        : drawLadderContactNO(cx1, cy, addr, sym, c1Closed, isHotIn, null);
+      const cInfo = getContactInfo(r.slot1);
+      const contactContent = cInfo.isNC
+        ? drawLadderContactNC(cx1, cy, cInfo.addr, cInfo.sym, c1Closed, isHotIn, null)
+        : drawLadderContactNO(cx1, cy, cInfo.addr, cInfo.sym, c1Closed, isHotIn, null);
 
       slot1Svg = `
         <g class="ladder-slot-hit" data-rung="${rIdx}" data-slot="slot1" title="คลิกเพื่อเปลี่ยนหรือลบ Contact 1">
@@ -8162,23 +8990,19 @@ function renderPracticeLadderSVG(pState, spec) {
 
     const targetRungs = getTargetLadderForLab(pState.labId);
     const targetHasPar = targetRungs[rIdx] && targetRungs[rIdx].parSlot;
+    const showParSlot = Boolean(r.parSlot || targetHasPar || isSummary || plcState.ladderPracticeMode);
     let parSvg = '';
-    if (r.parSlot || targetHasPar) {
+    if (showParSlot) {
       const cyP = cy + 24;
       const wireIn = isHotIn;
       const wireOut = parHotOut;
 
       let parNode = '';
       if (r.parSlot) {
-        const isNC = r.parSlot.endsWith('_NC');
-        const isM = r.parSlot.startsWith('M0');
-        const isS2 = r.parSlot.startsWith('I1');
-        const addr = isM ? (spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0') : (isS2 ? spec.in1 : spec.in0);
-        const sym = isM ? 'K1' : (isS2 ? 'S2' : 'S1');
-
-        const contactContent = isNC
-          ? drawLadderContactNC(cx1, cyP, addr, sym, parClosed, wireIn, null)
-          : drawLadderContactNO(cx1, cyP, addr, sym, parClosed, wireIn, null);
+        const cInfo = getContactInfo(r.parSlot);
+        const contactContent = cInfo.isNC
+          ? drawLadderContactNC(cx1, cyP, cInfo.addr, cInfo.sym, parClosed, wireIn, null)
+          : drawLadderContactNO(cx1, cyP, cInfo.addr, cInfo.sym, parClosed, wireIn, null);
 
         parNode = `
           <g class="ladder-slot-hit" data-rung="${rIdx}" data-slot="parSlot" title="คลิกเพื่อเปลี่ยนหรือลบ Contact ขนาน">
@@ -8218,16 +9042,12 @@ function renderPracticeLadderSVG(pState, spec) {
         </g>
       `;
     } else if (r.slot2) {
-      const isNC = r.slot2.endsWith('_NC');
-      const isM = r.slot2.startsWith('M0');
-      const isS2 = r.slot2.startsWith('I1');
-      const addr = isM ? (spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0') : (isS2 ? spec.in1 : spec.in0);
-      const sym = isM ? 'K1' : (isS2 ? 'S2' : 'S1');
+      const cInfo = getContactInfo(r.slot2);
       const c2Closed = evalLadderContact(r.slot2, in0, in1, curM0);
 
-      const contactContent = isNC
-        ? drawLadderContactNC(cx2, cy, addr, sym, c2Closed, midHot, null)
-        : drawLadderContactNO(cx2, cy, addr, sym, c2Closed, midHot, null);
+      const contactContent = cInfo.isNC
+        ? drawLadderContactNC(cx2, cy, cInfo.addr, cInfo.sym, c2Closed, midHot, null)
+        : drawLadderContactNO(cx2, cy, cInfo.addr, cInfo.sym, c2Closed, midHot, null);
 
       slot2Svg = `
         <g class="ladder-slot-hit" data-rung="${rIdx}" data-slot="slot2" title="คลิกเพื่อเปลี่ยนหรือลบ Contact 2">
@@ -8248,11 +9068,8 @@ function renderPracticeLadderSVG(pState, spec) {
 
     let coilSvg = '';
     if (r.coil) {
-      const isM = r.coil === 'M0';
-      const isQ1 = r.coil === 'Q1';
-      const addr = isM ? (spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0') : (isQ1 ? spec.out1 : spec.out0);
-      const sym = isM ? 'K1' : (isQ1 ? 'PL2' : 'PL1');
-      const coilContent = drawLadderCoil(cxC, cy, addr, sym, rungHot, isM ? 'mem' : 'out', rungHot);
+      const cInfo = getCoilInfo(r.coil);
+      const coilContent = drawLadderCoil(cxC, cy, cInfo.addr, cInfo.sym, rungHot, cInfo.isM ? 'mem' : 'out', rungHot);
 
       coilSvg = `
         <g class="ladder-slot-hit" data-rung="${rIdx}" data-slot="coil" title="คลิกเพื่อเปลี่ยนหรือลบ Coil">
@@ -8286,7 +9103,7 @@ function renderPracticeLadderSVG(pState, spec) {
   const check = verifyUserLadderAgainstLab(pState.labId);
   let statusBannerSvg = '';
   if (check.passed) {
-    statusBannerSvg = `<text x="190" y="${H - 5}" text-anchor="middle" font-family="'Prompt', sans-serif" font-size="9" font-weight="700" fill="#16a34a">✅ ต่อวงจร Ladder ถูกต้องสมบูรณ์ตามใบงาน</text>`;
+    statusBannerSvg = `<text x="190" y="${H - 5}" text-anchor="middle" font-family="'Prompt', sans-serif" font-size="9" font-weight="700" fill="#16a34a">✅ ต่อวงจร Ladder ถูกต้องสมบูรณ์ตามโจทย์</text>`;
   } else {
     statusBannerSvg = `<text x="190" y="${H - 5}" text-anchor="middle" font-family="'Prompt', sans-serif" font-size="8.5" font-weight="600" fill="#0284c7">🛠️ โหมดฝึกต่อ Ladder: คลิกช่องว่างเพื่อวาง Contact / Coil</text>`;
   }
@@ -8368,6 +9185,14 @@ function getPlcSimulationState() {
     idealM0 = false;
     idealQ0 = pwr && !rawS1;
     idealQ1 = pwr && rawS1;
+  } else if (labId === 'lab_summary_3_5') {
+    const sumCfg = (typeof plcState !== 'undefined' && plcState.summaryConfig) ? plcState.summaryConfig : {};
+    const inA = (sumCfg.s1ContactType === 'NO') ? rawS1 : !rawS1;
+    const inB = sumCfg.useS2 ? ((sumCfg.s2ContactType === 'NO') ? rawS2 : !rawS2) : false;
+    const lRes = evaluateUserLadder(inA, inB, plcState.userMemoryM0, pwr);
+    idealM0 = lRes.M0;
+    idealQ0 = pwr && Boolean(lRes.Q0);
+    idealQ1 = pwr && Boolean(lRes.Q1);
   } else if (lab && lab.customSchematic) {
     if (!pwr) {
       plcState.idealMemoryM0 = false;
@@ -8382,12 +9207,16 @@ function getPlcSimulationState() {
   }
 
   // Electrical inputs reaching the PLC in Sync Mode
+  const isSummary = (labId === 'lab_summary_3_5');
+  const sumInBitA = isSummary ? (plcState.summaryConfig?.s1Bit ?? 2) : 0;
+  const sumInBitB = isSummary ? (plcState.summaryConfig?.s2Bit ?? 4) : 1;
+
   const s1 = (isPlcLab && isSyncMode && state.simResult && state.simResult.plcInputs)
-    ? Boolean(state.simResult.plcInputs[0])
-    : rawS1;
+    ? Boolean(state.simResult.plcInputs[sumInBitA])
+    : (isSummary ? ((plcState.summaryConfig?.s1ContactType === 'NO') ? rawS1 : !rawS1) : rawS1);
   const s2 = (isPlcLab && isSyncMode && state.simResult && state.simResult.plcInputs)
-    ? Boolean(state.simResult.plcInputs[1])
-    : rawS2;
+    ? Boolean(state.simResult.plcInputs[sumInBitB])
+    : (isSummary ? ((plcState.summaryConfig?.s2ContactType === 'NO') ? rawS2 : !rawS2) : rawS2);
 
   // 2. Physical Board State (actual wiring)
   const actualM0 = Boolean(pwr && state.simResult && (state.simResult.K1 || state.simResult.K2));
@@ -8563,23 +9392,25 @@ function updatePlcAddressTable(pState) {
   const q0Val = pState.activeQ0;
   const q1Val = pState.activeQ1;
 
-  const isPlcLab = (pState.labId && (pState.labId.startsWith('lab4') || pState.labId.startsWith('lab5')));
+  const isSummary = (pState.labId === 'lab_summary_3_5');
+  const sumCfg = (typeof plcState !== 'undefined' && plcState.summaryConfig) ? plcState.summaryConfig : {};
+  const isPlcLab = isSummary || (pState.labId && (pState.labId.startsWith('lab4') || pState.labId.startsWith('lab5')));
 
   // S1 is always used
   rows.push({
-    device: isPlcLab ? 'สวิตช์ PB1 (S1)' : 'สวิตช์ S1',
-    address: spec.in0,
-    type: 'Digital Input (24VDC)',
+    device: isSummary ? `สวิตช์ PB1 (${sumCfg.s1ContactType})` : (isPlcLab ? 'สวิตช์ PB1 (S1)' : 'สวิตช์ S1'),
+    address: isSummary ? spec.termIn(sumCfg.s1Bit ?? 2) : spec.in0,
+    type: `Digital Input (${isSummary ? sumCfg.s1ContactType : '24VDC'})`,
     val: s1Val ? '1 (ON / กดติด)' : '0 (OFF / ปล่อย)',
     isOn: s1Val
   });
 
   // S2
-  if (!pState.lab || pState.lab.showS2 || (pState.lab.inputs && pState.lab.inputs.includes('S2'))) {
+  if (isSummary ? sumCfg.useS2 : (!pState.lab || pState.lab.showS2 || (pState.lab.inputs && pState.lab.inputs.includes('S2')))) {
     rows.push({
-      device: isPlcLab ? 'สวิตช์ PB2 (S2)' : 'สวิตช์ S2',
-      address: spec.in1,
-      type: 'Digital Input (24VDC)',
+      device: isSummary ? `สวิตช์ PB2 (${sumCfg.s2ContactType})` : (isPlcLab ? 'สวิตช์ PB2 (S2)' : 'สวิตช์ S2'),
+      address: isSummary ? spec.termIn(sumCfg.s2Bit ?? 4) : spec.in1,
+      type: `Digital Input (${isSummary ? sumCfg.s2ContactType : '24VDC'})`,
       val: s2Val ? '1 (ON / กดติด)' : '0 (OFF / ปล่อย)',
       isOn: s2Val
     });
@@ -8598,18 +9429,18 @@ function updatePlcAddressTable(pState) {
 
   // L1 / PL1
   rows.push({
-    device: isPlcLab ? 'หลอดไฟ PL1 (แดง)' : 'หลอดไฟ L1 (LOAD)',
-    address: spec.out0,
+    device: isSummary ? `หลอดไฟ PL1 (${sumCfg.pl1Color === 'green' ? 'เขียว' : 'แดง'})` : (isPlcLab ? 'หลอดไฟ PL1 (แดง)' : 'หลอดไฟ L1 (LOAD)'),
+    address: isSummary ? spec.termOut(sumCfg.pl1Bit ?? 1) : spec.out0,
     type: 'Relay Output (NO 2A)',
     val: q0Val ? '1 (ON / สว่าง)' : '0 (OFF / ดับ)',
     isOn: q0Val
   });
 
   // L2 / PL2
-  if (pState.lab && (pState.lab.showL2 || (pState.lab.outputs && pState.lab.outputs.includes('L2')) || (pState.lab.customSchematic && JSON.stringify(pState.lab.customSchematic).includes('L2')))) {
+  if (isSummary ? sumCfg.usePL2 : (pState.lab && (pState.lab.showL2 || (pState.lab.outputs && pState.lab.outputs.includes('L2')) || (pState.lab.customSchematic && JSON.stringify(pState.lab.customSchematic).includes('L2'))))) {
     rows.push({
-      device: isPlcLab ? 'หลอดไฟ PL2 (เขียว)' : 'หลอดไฟ L2',
-      address: spec.out1,
+      device: isSummary ? `หลอดไฟ PL2 (${sumCfg.pl2Color === 'red' ? 'แดง' : 'เขียว'})` : (isPlcLab ? 'หลอดไฟ PL2 (เขียว)' : 'หลอดไฟ L2'),
+      address: isSummary ? spec.termOut(sumCfg.pl2Bit ?? 3) : spec.out1,
       type: 'Relay Output (NO 2A)',
       val: q1Val ? '1 (ON / สว่าง)' : '0 (OFF / ดับ)',
       isOn: q1Val
@@ -8647,20 +9478,37 @@ function updateTm221HwStrip(pState) {
 
   const spec = getPlcModelSpec();
   const lab = pState.lab;
-  const hasS2 = !lab || lab.showS2 || (lab.inputs && lab.inputs.includes('S2'));
-  const hasK1 = lab && (lab.requireRelay || lab.showRelays || (lab.customSchematic && JSON.stringify(lab.customSchematic).includes('K1')));
-  const hasL2 = lab && (lab.showL2 || (lab.outputs && lab.outputs.includes('L2')) || (lab.customSchematic && JSON.stringify(lab.customSchematic).includes('L2')));
+  const isSummary = (pState.labId === 'lab_summary_3_5');
+  const sumCfg = (typeof plcState !== 'undefined' && plcState.summaryConfig) ? plcState.summaryConfig : {};
+  const hasS2 = isSummary ? sumCfg.useS2 : (!lab || lab.showS2 || (lab.inputs && lab.inputs.includes('S2')));
+  const hasK1 = !isSummary && lab && (lab.requireRelay || lab.showRelays || (lab.customSchematic && JSON.stringify(lab.customSchematic).includes('K1')));
+  const hasL2 = isSummary ? sumCfg.usePL2 : (lab && (lab.showL2 || (lab.outputs && lab.outputs.includes('L2')) || (lab.customSchematic && JSON.stringify(lab.customSchematic).includes('L2'))));
 
   if (inRow) {
-    let html = `<span class="io-pin-pill clickable ${pState.s1 ? 'active-in' : ''}" data-sw="S1" title="คลิกเพื่อสลับสวิตช์ S1">${spec.in0}(S1)</span>`;
-    if (hasS2) {
-      html += `<span class="io-pin-pill clickable ${pState.s2 ? 'active-in' : ''}" data-sw="S2" title="คลิกเพื่อสลับสวิตช์ S2">${spec.in1}(S2)</span>`;
+    if (isSummary) {
+      const bitA = sumCfg.s1Bit ?? 2;
+      const bitB = sumCfg.s2Bit ?? 4;
+      let html = `<span class="io-pin-pill clickable ${pState.s1 ? 'active-in' : ''}" data-sw="S1" title="คลิกเพื่อสลับสวิตช์ PB1">${spec.termInShort(bitA)}(PB1)</span>`;
+      if (sumCfg.useS2) {
+        html += `<span class="io-pin-pill clickable ${pState.s2 ? 'active-in' : ''}" data-sw="S2" title="คลิกเพื่อสลับสวิตช์ PB2">${spec.termInShort(bitB)}(PB2)</span>`;
+      }
+      for (let k = 0; k <= 5; k++) {
+        if (k !== bitA && (!sumCfg.useS2 || k !== bitB)) {
+          html += `<span class="io-pin-pill" style="opacity:0.35;">${spec.termInShort(k)}</span>`;
+        }
+      }
+      inRow.innerHTML = html;
     } else {
-      html += `<span class="io-pin-pill" style="opacity:0.35;">${spec.in1}</span>`;
+      let html = `<span class="io-pin-pill clickable ${pState.s1 ? 'active-in' : ''}" data-sw="S1" title="คลิกเพื่อสลับสวิตช์ S1">${spec.in0}(S1)</span>`;
+      if (hasS2) {
+        html += `<span class="io-pin-pill clickable ${pState.s2 ? 'active-in' : ''}" data-sw="S2" title="คลิกเพื่อสลับสวิตช์ S2">${spec.in1}(S2)</span>`;
+      } else {
+        html += `<span class="io-pin-pill" style="opacity:0.35;">${spec.in1}</span>`;
+      }
+      html += `<span class="io-pin-pill" style="opacity:0.35;">${spec.in2}</span>`;
+      html += `<span class="io-pin-pill" style="opacity:0.35;">${spec.in3}</span>`;
+      inRow.innerHTML = html;
     }
-    html += `<span class="io-pin-pill" style="opacity:0.35;">${spec.in2}</span>`;
-    html += `<span class="io-pin-pill" style="opacity:0.35;">${spec.in3}</span>`;
-    inRow.innerHTML = html;
   }
 
   if (memRow) {
@@ -8675,15 +9523,30 @@ function updateTm221HwStrip(pState) {
   }
 
   if (outRow) {
-    let html = `<span class="io-pin-pill ${pState.activeQ0 ? 'active-out' : ''}">${spec.out0}(L1)</span>`;
-    if (hasL2) {
-      html += `<span class="io-pin-pill ${pState.activeQ1 ? 'active-out' : ''}">${spec.out1}(L2)</span>`;
+    if (isSummary) {
+      const qBitA = sumCfg.pl1Bit ?? 1;
+      const qBitB = sumCfg.pl2Bit ?? 3;
+      let html = `<span class="io-pin-pill ${pState.activeQ0 ? 'active-out' : ''}">${spec.termOutShort(qBitA)}(PL1)</span>`;
+      if (sumCfg.usePL2) {
+        html += `<span class="io-pin-pill ${pState.activeQ1 ? 'active-out' : ''}">${spec.termOutShort(qBitB)}(PL2)</span>`;
+      }
+      for (let k = 0; k <= 5; k++) {
+        if (k !== qBitA && (!sumCfg.usePL2 || k !== qBitB)) {
+          html += `<span class="io-pin-pill" style="opacity:0.35;">${spec.termOutShort(k)}</span>`;
+        }
+      }
+      outRow.innerHTML = html;
     } else {
-      html += `<span class="io-pin-pill" style="opacity:0.35;">${spec.out1}</span>`;
+      let html = `<span class="io-pin-pill ${pState.activeQ0 ? 'active-out' : ''}">${spec.out0}(L1)</span>`;
+      if (hasL2) {
+        html += `<span class="io-pin-pill ${pState.activeQ1 ? 'active-out' : ''}">${spec.out1}(L2)</span>`;
+      } else {
+        html += `<span class="io-pin-pill" style="opacity:0.35;">${spec.out1}</span>`;
+      }
+      html += `<span class="io-pin-pill" style="opacity:0.35;">${spec.out2}</span>`;
+      html += `<span class="io-pin-pill" style="opacity:0.35;">${spec.out3}</span>`;
+      outRow.innerHTML = html;
     }
-    html += `<span class="io-pin-pill" style="opacity:0.35;">${spec.out2}</span>`;
-    html += `<span class="io-pin-pill" style="opacity:0.35;">${spec.out3}</span>`;
-    outRow.innerHTML = html;
   }
 }
 
@@ -8779,6 +9642,41 @@ ${spec.ilOut}   ${spec.out0}    (* Output 0 (PL1 Red) *)
 (* Rung 1: เมื่อกด (NO) -> PL2 เขียวติด *)
 ${spec.ilLd}   ${spec.in0}    (* PB1 Pressed *)
 ${spec.ilOut}   ${spec.out1}    (* Output 1 (PL2 Green) *)`;
+  } else if (labId === 'lab_summary_3_5') {
+    const sumCfg = (typeof plcState !== 'undefined' && plcState.summaryConfig) ? plcState.summaryConfig : {};
+    const rungs = plcState.userLadderRungs || [];
+    const getAddr = (token) => {
+      if (!token) return '';
+      if (token.startsWith('M0')) return spec.mem0;
+      if (token.startsWith('I1')) return spec.termIn(sumCfg.s2Bit ?? 4);
+      if (token.startsWith('I0')) return spec.termIn(sumCfg.s1Bit ?? 2);
+      return '';
+    };
+    const getCoilAddr = (coil) => {
+      if (coil === 'M0') return spec.mem0;
+      if (coil === 'Q1') return spec.termOut(sumCfg.pl2Bit ?? 3);
+      if (coil === 'Q0') return spec.termOut(sumCfg.pl1Bit ?? 1);
+      return '';
+    };
+    code = `${spec.ilHeader}\n(* แบบฝึกหัดสรุปใบงานที่ 3-5: โปรแกรม Ladder *)`;
+    rungs.forEach((r, idx) => {
+      code += `\n\n(* Rung ${idx} *)`;
+      if (r.slot1) {
+        const isNC = r.slot1.endsWith('_NC');
+        code += `\n${isNC ? spec.ilLdn : spec.ilLd}   ${getAddr(r.slot1)}`;
+      }
+      if (r.parSlot) {
+        const isNC = r.parSlot.endsWith('_NC');
+        code += `\n${isNC ? spec.ilOrn : spec.ilOr}   ${getAddr(r.parSlot)}`;
+      }
+      if (r.slot2 && r.slot2 !== 'WIRE') {
+        const isNC = r.slot2.endsWith('_NC');
+        code += `\n${isNC ? spec.ilAndn : spec.ilAnd}  ${getAddr(r.slot2)}`;
+      }
+      if (r.coil) {
+        code += `\n${spec.ilOut}   ${getCoilAddr(r.coil)}`;
+      }
+    });
   } else if (pState.lab && pState.lab.customSchematic) {
     code = generateCustomPlcIl(pState.lab.customSchematic);
   } else {
@@ -9400,25 +10298,30 @@ function updatePlcModelUI(model = state.plcModel) {
   const hwBadge = document.getElementById('plcHwModelBadge');
   if (hwBadge) hwBadge.textContent = spec.shortName;
 
-  // Update Ladder Builder palette buttons matching PLC model addresses
-  const bindMap = {
-    'in0_no': `${spec.in0} (S1)`,
-    'in0_nc': `${spec.in0} (S1)`,
-    'in1_no': `${spec.in1} (S2)`,
-    'in1_nc': `${spec.in1} (S2)`,
-    'm0_no': `${spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0'} (K1)`,
-    'm0_nc': `${spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0'} (K1)`,
-    'out0_coil': `${spec.out0} (PL1)`,
-    'out1_coil': `${spec.out1} (PL2)`,
-    'm0_coil': `${spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0'} (K1)`
-  };
-  if (typeof document !== 'undefined') {
-    document.querySelectorAll('[data-bind-plc]').forEach((el) => {
-      const key = el.getAttribute('data-bind-plc');
-      if (bindMap[key]) {
-        el.textContent = bindMap[key];
-      }
-    });
+  const isSummary = (typeof state !== 'undefined' && state.currentLabId === 'lab_summary_3_5');
+  if (isSummary && typeof syncSummaryLabConfiguration === 'function') {
+    syncSummaryLabConfiguration();
+  } else {
+    // Update Ladder Builder palette buttons matching PLC model addresses
+    const bindMap = {
+      'in0_no': `${spec.in0} (S1)`,
+      'in0_nc': `${spec.in0} (S1)`,
+      'in1_no': `${spec.in1} (S2)`,
+      'in1_nc': `${spec.in1} (S2)`,
+      'm0_no': `${spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0'} (K1)`,
+      'm0_nc': `${spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0'} (K1)`,
+      'out0_coil': `${spec.out0} (PL1)`,
+      'out1_coil': `${spec.out1} (PL2)`,
+      'm0_coil': `${spec.shortName === 'FX5U-32MR' ? 'M0' : '%M0'} (K1)`
+    };
+    if (typeof document !== 'undefined') {
+      document.querySelectorAll('[data-bind-plc]').forEach((el) => {
+        const key = el.getAttribute('data-bind-plc');
+        if (bindMap[key]) {
+          el.textContent = bindMap[key];
+        }
+      });
+    }
   }
 
   if (typeof updateLadderBuilderUI === 'function') {
@@ -9737,6 +10640,346 @@ function initPlcLadderCoSim() {
   }
 }
 
+// ============================================================================
+// Summary Practice Lab for Worksheets 3-5 (lab_summary_3_5) Controller
+// ============================================================================
+
+function computeSummaryLabTruthTable() {
+  const sumCfg = (typeof plcState !== 'undefined' && plcState.summaryConfig) ? plcState.summaryConfig : {
+    s1Bit: 2,
+    s1ContactType: 'NO',
+    useS2: true,
+    s2Bit: 4,
+    s2ContactType: 'NO',
+    pl1Bit: 1,
+    pl1Color: 'red',
+    usePL2: true,
+    pl2Bit: 3,
+    pl2Color: 'green',
+    rungCount: 2
+  };
+  const s1Type = sumCfg.s1ContactType || 'NO';
+  const useS2 = Boolean(sumCfg.useS2);
+  const s2Type = sumCfg.s2ContactType || 'NO';
+  const usePL2 = Boolean(sumCfg.usePL2);
+
+  const inputs = useS2 ? ['S1', 'S2'] : ['S1'];
+  const outputs = usePL2 ? ['L1', 'L2'] : ['L1'];
+
+  const combos = useS2
+    ? [
+        { S1: 0, S2: 0 },
+        { S1: 0, S2: 1 },
+        { S1: 1, S2: 0 },
+        { S1: 1, S2: 1 }
+      ]
+    : [
+        { S1: 0, S2: 0 },
+        { S1: 1, S2: 0 }
+      ];
+
+  const truthTable = combos.map((tc) => {
+    // When physical switch S1 is in state tc.S1:
+    // If NO: pressing S1 (1) closes contact -> bit is 1; releasing (0) opens -> bit is 0
+    // If NC: pressing S1 (1) opens contact -> bit is 0; releasing (0) closes -> bit is 1
+    const inA = (s1Type === 'NO') ? (tc.S1 === 1) : (tc.S1 === 0);
+    const inB = useS2 ? ((s2Type === 'NO') ? (tc.S2 === 1) : (tc.S2 === 0)) : false;
+
+    const ladderRes = evaluateUserLadder(inA, inB, false, true);
+
+    const expected = {
+      L1: ladderRes.Q0 ? 1 : 0
+    };
+    if (usePL2) {
+      expected.L2 = ladderRes.Q1 ? 1 : 0;
+    }
+
+    return {
+      S1: tc.S1,
+      ...(useS2 ? { S2: tc.S2 } : {}),
+      expected
+    };
+  });
+
+  if (typeof LABS !== 'undefined' && LABS.lab_summary_3_5) {
+    LABS.lab_summary_3_5.inputs = inputs;
+    LABS.lab_summary_3_5.outputs = outputs;
+    LABS.lab_summary_3_5.showS2 = useS2;
+    LABS.lab_summary_3_5.showL2 = usePL2;
+    LABS.lab_summary_3_5.truthTable = truthTable;
+  }
+
+  return truthTable;
+}
+
+function syncSummaryLabConfiguration() {
+  const panel = document.getElementById('summaryLabConfigPanel');
+  if (!panel) return;
+
+  if (state.currentLabId !== 'lab_summary_3_5') {
+    panel.hidden = true;
+    panel.style.display = 'none';
+    return;
+  }
+
+  panel.hidden = false;
+  panel.style.display = '';
+
+  const spec = getPlcModelSpec();
+  const sumCfg = plcState.summaryConfig;
+
+  // 1. Populate/Update Select Options for Bit Inputs (0..8) and Bit Outputs (0..6)
+  const populateBitSelect = (selectId, count, isOut, currentVal) => {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    const currentSelected = (currentVal !== undefined) ? currentVal : parseInt(sel.value, 10);
+    let optionsHtml = '';
+    for (let i = 0; i < count; i++) {
+      const lbl = isOut ? `${spec.termOutShort(i)} (${spec.termOut(i)})` : `${spec.termInShort(i)} (${spec.termIn(i)})`;
+      const isSel = (i === currentSelected);
+      optionsHtml += `<option value="${i}" ${isSel ? 'selected' : ''}>${lbl}</option>`;
+    }
+    sel.innerHTML = optionsHtml;
+    sel.value = currentSelected;
+  };
+
+  populateBitSelect('sumS1Bit', 9, false, sumCfg.s1Bit);
+  populateBitSelect('sumS2Bit', 9, false, sumCfg.s2Bit);
+  populateBitSelect('sumPl1Bit', 7, true, sumCfg.pl1Bit);
+  populateBitSelect('sumPl2Bit', 7, true, sumCfg.pl2Bit);
+
+  // Sync types and states to selects
+  const s1TypeSel = document.getElementById('sumS1Type');
+  if (s1TypeSel) s1TypeSel.value = sumCfg.s1ContactType;
+  const useS2Sel = document.getElementById('sumUseS2');
+  if (useS2Sel) useS2Sel.value = sumCfg.useS2 ? '1' : '0';
+  const s2TypeSel = document.getElementById('sumS2Type');
+  if (s2TypeSel) s2TypeSel.value = sumCfg.s2ContactType;
+  const pl1ColSel = document.getElementById('sumPl1Color');
+  if (pl1ColSel) pl1ColSel.value = sumCfg.pl1Color;
+  const usePl2Sel = document.getElementById('sumUsePl2');
+  if (usePl2Sel) usePl2Sel.value = sumCfg.usePL2 ? '1' : '0';
+  const pl2ColSel = document.getElementById('sumPl2Color');
+  if (pl2ColSel) pl2ColSel.value = sumCfg.pl2Color;
+  const rungCountSel = document.getElementById('sumRungCount');
+  if (rungCountSel) rungCountSel.value = String(sumCfg.rungCount);
+
+  // Disabled/Dimmed states for sub-groups
+  const s2Group = document.getElementById('sumS2ControlsGroup');
+  if (s2Group) s2Group.classList.toggle('disabled', !sumCfg.useS2);
+  const pl2Group = document.getElementById('sumPl2ControlsGroup');
+  if (pl2Group) pl2Group.classList.toggle('disabled', !sumCfg.usePL2);
+
+  // 2. Adjust user ladder rungs count
+  if (!plcState.userLadderRungs) {
+    plcState.userLadderRungs = [];
+  }
+  if (sumCfg.rungCount === 1) {
+    if (plcState.userLadderRungs.length > 1) {
+      plcState.userLadderRungs = [plcState.userLadderRungs[0]];
+    } else if (plcState.userLadderRungs.length === 0) {
+      plcState.userLadderRungs = [{ slot1: null, slot2: 'WIRE', parSlot: null, coil: null }];
+    }
+  } else {
+    // 2 rungs
+    while (plcState.userLadderRungs.length < 2) {
+      plcState.userLadderRungs.push({ slot1: null, slot2: 'WIRE', parSlot: null, coil: null });
+    }
+    if (plcState.userLadderRungs.length > 2) {
+      plcState.userLadderRungs = plcState.userLadderRungs.slice(0, 2);
+    }
+  }
+
+  // 3. Update Pilot Lamp Titles, Colors, and opacities on PLC Terminal Board
+  const l1Title = document.getElementById('plcLamp1Title');
+  if (l1Title) l1Title.textContent = `PL1 (${sumCfg.pl1Color === 'green' ? 'เขียว' : 'แดง'})`;
+  const l2Title = document.getElementById('plcLamp2Title');
+  if (l2Title) l2Title.textContent = `PL2 (${sumCfg.pl2Color === 'red' ? 'แดง' : 'เขียว'})`;
+
+  const l1Icon = document.getElementById('plcLamp1Icon');
+  if (l1Icon) l1Icon.textContent = sumCfg.pl1Color === 'green' ? 'GRN' : 'RED';
+  const l2Icon = document.getElementById('plcLamp2Icon');
+  if (l2Icon) l2Icon.textContent = sumCfg.pl2Color === 'red' ? 'RED' : 'GRN';
+
+  const lamp2Grp = document.getElementById('plcLamp2Group');
+  if (lamp2Grp) lamp2Grp.style.opacity = sumCfg.usePL2 ? '1' : '0.2';
+  const s2Grp = document.getElementById('plcS2Group');
+  if (s2Grp) s2Grp.style.opacity = sumCfg.useS2 ? '1' : '0.2';
+
+  // 4. Update Ladder Palette Tool Labels
+  const bindMap = {
+    'in0_no': `${spec.termIn(sumCfg.s1Bit)} (PB1)`,
+    'in0_nc': `${spec.termIn(sumCfg.s1Bit)} (PB1)`,
+    'in1_no': `${spec.termIn(sumCfg.s2Bit)} (PB2)`,
+    'in1_nc': `${spec.termIn(sumCfg.s2Bit)} (PB2)`,
+    'out0_coil': `${spec.termOut(sumCfg.pl1Bit)} (PL1-${sumCfg.pl1Color === 'green' ? 'เขียว' : 'แดง'})`,
+    'out1_coil': `${spec.termOut(sumCfg.pl2Bit)} (PL2-${sumCfg.pl2Color === 'red' ? 'แดง' : 'เขียว'})`
+  };
+  document.querySelectorAll('[data-bind-plc]').forEach((el) => {
+    const key = el.getAttribute('data-bind-plc');
+    if (bindMap[key]) {
+      el.textContent = bindMap[key];
+    }
+  });
+
+  // 5. Update Live Summary Assignment Banner Text
+  const assignText = document.getElementById('summaryAssignmentText');
+  const pb1Desc = `สวิตช์ <b>PB1 (${sumCfg.s1ContactType} ขั้ว ${sumCfg.s1ContactType === 'NO' ? '3-4' : '1-2'})</b> ➔ <b>${spec.termInShort(sumCfg.s1Bit)}</b>`;
+  const pb2Desc = sumCfg.useS2
+    ? ` | สวิตช์ <b>PB2 (${sumCfg.s2ContactType} ขั้ว ${sumCfg.s2ContactType === 'NO' ? '3-4' : '1-2'})</b> ➔ <b>${spec.termInShort(sumCfg.s2Bit)}</b>`
+    : ' | <i>ไม่ใช้ PB2</i>';
+  const pl1Desc = ` | เอาต์พุต <b>${spec.termOutShort(sumCfg.pl1Bit)}</b> ➔ <b>PL1 (${sumCfg.pl1Color === 'green' ? 'สีเขียว' : 'สีแดง'})</b>`;
+  const pl2Desc = sumCfg.usePL2
+    ? ` | เอาต์พุต <b>${spec.termOutShort(sumCfg.pl2Bit)}</b> ➔ <b>PL2 (${sumCfg.pl2Color === 'red' ? 'สีแดง' : 'สีเขียว'})</b>`
+    : ' | <i>ไม่ใช้ PL2</i>';
+  const ladderDesc = ` | วงจร Ladder <b>${sumCfg.rungCount} Rung${sumCfg.rungCount > 1 ? 's' : ''}</b> (มีสายขนาน OR ได้ทุก Rung)`;
+
+  const fullSummary = `<b>📌 โจทย์ที่กำหนด:</b> ต่อ${pb1Desc}${pb2Desc}${pl1Desc}${pl2Desc}${ladderDesc} — <i>ออกแบบโปรแกรม Ladder และต่อสายไฟให้ถูกต้องสมบูรณ์</i>`;
+  if (assignText) assignText.innerHTML = fullSummary;
+
+  if (LABS.lab_summary_3_5) {
+    LABS.lab_summary_3_5.objective = `ต่อ${pb1Desc.replace(/<[^>]+>/g, '')}${pb2Desc.replace(/<[^>]+>/g, '')}${pl1Desc.replace(/<[^>]+>/g, '')}${pl2Desc.replace(/<[^>]+>/g, '')}${ladderDesc.replace(/<[^>]+>/g, '')}`;
+    const objEl = document.getElementById('labObjective');
+    if (objEl) objEl.textContent = LABS.lab_summary_3_5.objective;
+  }
+
+  // 6. Recompute dynamic truth table & UI
+  computeSummaryLabTruthTable();
+  renderTruthTable();
+  renderPlcLadderDiagram();
+  renderSchematic();
+}
+
+function initSummaryLabEvents() {
+  const sumCfg = plcState.summaryConfig;
+
+  const onS1Type = (e) => {
+    sumCfg.s1ContactType = e.target.value;
+    syncSummaryLabConfiguration();
+  };
+  const onS1Bit = (e) => {
+    const val = parseInt(e.target.value, 10);
+    if (sumCfg.useS2 && val === sumCfg.s2Bit) {
+      sumCfg.s2Bit = (val + 2) % 9;
+    }
+    sumCfg.s1Bit = val;
+    syncSummaryLabConfiguration();
+  };
+  const onUseS2 = (e) => {
+    sumCfg.useS2 = (e.target.value === '1');
+    syncSummaryLabConfiguration();
+  };
+  const onS2Type = (e) => {
+    sumCfg.s2ContactType = e.target.value;
+    syncSummaryLabConfiguration();
+  };
+  const onS2Bit = (e) => {
+    const val = parseInt(e.target.value, 10);
+    if (val === sumCfg.s1Bit) {
+      sumCfg.s1Bit = (val + 2) % 9;
+    }
+    sumCfg.s2Bit = val;
+    syncSummaryLabConfiguration();
+  };
+  const onPl1Color = (e) => {
+    sumCfg.pl1Color = e.target.value;
+    sumCfg.pl2Color = (sumCfg.pl1Color === 'red') ? 'green' : 'red';
+    syncSummaryLabConfiguration();
+  };
+  const onPl1Bit = (e) => {
+    const val = parseInt(e.target.value, 10);
+    if (sumCfg.usePL2 && val === sumCfg.pl2Bit) {
+      sumCfg.pl2Bit = (val + 2) % 7;
+    }
+    sumCfg.pl1Bit = val;
+    syncSummaryLabConfiguration();
+  };
+  const onUsePl2 = (e) => {
+    sumCfg.usePL2 = (e.target.value === '1');
+    syncSummaryLabConfiguration();
+  };
+  const onPl2Color = (e) => {
+    sumCfg.pl2Color = e.target.value;
+    sumCfg.pl1Color = (sumCfg.pl2Color === 'red') ? 'green' : 'red';
+    syncSummaryLabConfiguration();
+  };
+  const onPl2Bit = (e) => {
+    const val = parseInt(e.target.value, 10);
+    if (val === sumCfg.pl1Bit) {
+      sumCfg.pl1Bit = (val + 2) % 7;
+    }
+    sumCfg.pl2Bit = val;
+    syncSummaryLabConfiguration();
+  };
+  const onRungCount = (e) => {
+    sumCfg.rungCount = parseInt(e.target.value, 10);
+    syncSummaryLabConfiguration();
+  };
+
+  const bindChange = (id, fn) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', fn);
+  };
+
+  bindChange('sumS1Type', onS1Type);
+  bindChange('sumS1Bit', onS1Bit);
+  bindChange('sumUseS2', onUseS2);
+  bindChange('sumS2Type', onS2Type);
+  bindChange('sumS2Bit', onS2Bit);
+  bindChange('sumPl1Color', onPl1Color);
+  bindChange('sumPl1Bit', onPl1Bit);
+  bindChange('sumUsePl2', onUsePl2);
+  bindChange('sumPl2Color', onPl2Color);
+  bindChange('sumPl2Bit', onPl2Bit);
+  bindChange('sumRungCount', onRungCount);
+
+  // Randomize button
+  const btnRandom = document.getElementById('btnSummaryRandomize');
+  if (btnRandom) {
+    btnRandom.addEventListener('click', () => {
+      sumCfg.s1ContactType = Math.random() < 0.35 ? 'NC' : 'NO';
+      sumCfg.s1Bit = Math.floor(Math.random() * 6); // 0..5
+      sumCfg.useS2 = true;
+      sumCfg.s2ContactType = Math.random() < 0.35 ? 'NC' : 'NO';
+      let s2 = Math.floor(Math.random() * 6);
+      if (s2 === sumCfg.s1Bit) s2 = (s2 + 2) % 6;
+      sumCfg.s2Bit = s2;
+
+      sumCfg.pl1Color = Math.random() < 0.5 ? 'red' : 'green';
+      sumCfg.pl2Color = (sumCfg.pl1Color === 'red') ? 'green' : 'red';
+      sumCfg.usePL2 = true;
+      sumCfg.pl1Bit = Math.floor(Math.random() * 6); // 0..5
+      let pl2 = Math.floor(Math.random() * 6);
+      if (pl2 === sumCfg.pl1Bit) pl2 = (pl2 + 2) % 6;
+      sumCfg.pl2Bit = pl2;
+
+      sumCfg.rungCount = 2;
+
+      // Clear wires to start fresh
+      state.wires = [];
+      state.undoStack = [];
+      state.redoStack = [];
+
+      // Reset user ladder to empty
+      resetUserLadderForCurrentLab(false);
+
+      syncSummaryLabConfiguration();
+      updateSimulationUI();
+    });
+  }
+
+  // Clear wires button
+  const btnClear = document.getElementById('btnSummaryClearWires');
+  if (btnClear) {
+    btnClear.addEventListener('click', () => {
+      state.wires = [];
+      state.undoStack = [];
+      state.redoStack = [];
+      updateSimulationUI();
+    });
+  }
+}
+
 // Initialize Application
 window.addEventListener('DOMContentLoaded', () => {
   initWorkbenchComponents();
@@ -9744,5 +10987,6 @@ window.addEventListener('DOMContentLoaded', () => {
   initCustomLabManager();
   initTimingDiagram();
   initPlcLadderCoSim();
+  initSummaryLabEvents();
   loadLab('lab1_1');
 });

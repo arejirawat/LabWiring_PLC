@@ -41,6 +41,7 @@
             <option value="lab4_2">ใบงานที่ 4.2 (มอบหมายงาน): เชื่อมต่ออินพุต S1, S2 ควบคุมเอาต์พุต (AND Logic)</option>
             <option value="lab5_1">ใบงานที่ 5.1: การเชื่อมต่ออินพุตและเอาต์พุต PLC (PB1 ควบคุมหลอดไฟ PL1)</option>
             <option value="lab5_2">ใบงานที่ 5.2 (มอบหมายงาน): เชื่อมต่อ PB1 ควบคุมหลอดไฟ PL1 (แดง) และ PL2 (เขียว) สลับกัน</option>
+            <option value="lab_summary_3_5">แบบฝึกหัดสรุปใบงานที่ 3-5: ออกแบบโจทย์ PLC &amp; Ladder และการต่อสายด้วยตนเอง</option>
           </select>
           <button type="button" id="btnOpenLabBuilder" class="btn btn-builder-menu" title="สร้างและจัดการโจทย์ใบงานเพิ่มเติม (สำหรับผู้สอน)">
             🛠️ สร้างโจทย์เพิ่มเติม
@@ -92,6 +93,153 @@
   <main class="workspace-grid">
     <!-- Left Column: Schematic & Truth Table / Lab Info -->
     <section class="left-panel">
+      <!-- Summary Lab Problem Configuration Card (Lab Summary 3-5) -->
+      <div class="panel-card summary-config-panel" id="summaryLabConfigPanel" hidden>
+        <div class="card-header summary-config-header">
+          <div>
+            <span class="badge badge-summary">SUMMARY LAB 3-5</span>
+            <h2>🎯 กำหนดโจทย์แบบฝึกหัดสรุปใบงานที่ 3-5</h2>
+          </div>
+          <div class="summary-header-actions">
+            <button type="button" id="btnSummaryRandomize" class="btn btn-summary-random" title="สุ่มโจทย์ Bit Input/Output, ชนิดหน้าสัมผัส และสีหลอดไฟใหม่">
+              🎲 สุ่มโจทย์ใหม่
+            </button>
+            <button type="button" id="btnSummaryClearWires" class="btn btn-summary-clear" title="ล้างสายไฟบนกระดานเพื่อเริ่มฝึกต่อใหม่">
+              🧹 ล้างสายไฟ
+            </button>
+          </div>
+        </div>
+        <div class="summary-config-body">
+          <div class="summary-config-grid">
+            <!-- PB1 Box -->
+            <div class="summary-config-item">
+              <div class="config-item-title">
+                <span class="dot-sw s1"></span>
+                <strong>สวิตช์ PB1 (S1)</strong>
+              </div>
+              <div class="config-controls">
+                <div class="config-field">
+                  <label for="sumS1Type">หน้าสัมผัส:</label>
+                  <select id="sumS1Type" class="sum-select">
+                    <option value="NO">NO (ขั้ว 3-4)</option>
+                    <option value="NC">NC (ขั้ว 1-2)</option>
+                  </select>
+                </div>
+                <div class="config-field">
+                  <label for="sumS1Bit">Bit Input PLC:</label>
+                  <select id="sumS1Bit" class="sum-select sum-in-bit"></select>
+                </div>
+              </div>
+            </div>
+
+            <!-- PB2 Box -->
+            <div class="summary-config-item">
+              <div class="config-item-title">
+                <span class="dot-sw s2"></span>
+                <strong>สวิตช์ PB2 (S2)</strong>
+              </div>
+              <div class="config-controls">
+                <div class="config-field">
+                  <label for="sumUseS2">การใช้งาน:</label>
+                  <select id="sumUseS2" class="sum-select">
+                    <option value="1">ใช้งาน PB2</option>
+                    <option value="0">ไม่ใช้ (ใช้เฉพาะ PB1)</option>
+                  </select>
+                </div>
+                <div class="config-controls-sub" id="sumS2ControlsGroup">
+                  <div class="config-field">
+                    <label for="sumS2Type">หน้าสัมผัส:</label>
+                    <select id="sumS2Type" class="sum-select">
+                      <option value="NO">NO (ขั้ว 3-4)</option>
+                      <option value="NC">NC (ขั้ว 1-2)</option>
+                    </select>
+                  </div>
+                  <div class="config-field">
+                    <label for="sumS2Bit">Bit Input PLC:</label>
+                    <select id="sumS2Bit" class="sum-select sum-in-bit"></select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- PL1 Box -->
+            <div class="summary-config-item">
+              <div class="config-item-title">
+                <span class="dot-lamp pl1"></span>
+                <strong>หลอดไฟดวงซ้าย (PL1)</strong>
+              </div>
+              <div class="config-controls">
+                <div class="config-field">
+                  <label for="sumPl1Color">สีหลอดไฟ:</label>
+                  <select id="sumPl1Color" class="sum-select">
+                    <option value="red">🔴 สีแดง (Red)</option>
+                    <option value="green">🟢 สีเขียว (Green)</option>
+                  </select>
+                </div>
+                <div class="config-field">
+                  <label for="sumPl1Bit">Bit Output PLC:</label>
+                  <select id="sumPl1Bit" class="sum-select sum-out-bit"></select>
+                </div>
+              </div>
+            </div>
+
+            <!-- PL2 Box -->
+            <div class="summary-config-item">
+              <div class="config-item-title">
+                <span class="dot-lamp pl2"></span>
+                <strong>หลอดไฟดวงขวา (PL2)</strong>
+              </div>
+              <div class="config-controls">
+                <div class="config-field">
+                  <label for="sumUsePl2">การใช้งาน:</label>
+                  <select id="sumUsePl2" class="sum-select">
+                    <option value="1">ใช้งาน PL2</option>
+                    <option value="0">ไม่ใช้ (ใช้เฉพาะ PL1)</option>
+                  </select>
+                </div>
+                <div class="config-controls-sub" id="sumPl2ControlsGroup">
+                  <div class="config-field">
+                    <label for="sumPl2Color">สีหลอดไฟ:</label>
+                    <select id="sumPl2Color" class="sum-select">
+                      <option value="green">🟢 สีเขียว (Green)</option>
+                      <option value="red">🔴 สีแดง (Red)</option>
+                    </select>
+                  </div>
+                  <div class="config-field">
+                    <label for="sumPl2Bit">Bit Output PLC:</label>
+                    <select id="sumPl2Bit" class="sum-select sum-out-bit"></select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Ladder Structure Box -->
+            <div class="summary-config-item summary-config-item-full">
+              <div class="config-item-title">
+                <span class="dot-ladder"></span>
+                <strong>โครงสร้างผัง Ladder Diagram:</strong>
+              </div>
+              <div class="config-controls-inline">
+                <label for="sumRungCount">จำนวน Rung:</label>
+                <select id="sumRungCount" class="sum-select sum-rung-select">
+                  <option value="2">2 Rungs (สูงสุด 2 บรรทัด/Rung มีสายขนาน OR)</option>
+                  <option value="1">1 Rung (สูงสุด 2 บรรทัด/Rung มีสายขนาน OR)</option>
+                </select>
+                <span class="rung-hint">💡 ทุก Rung สามารถต่อขนาน OR ได้สูงสุด 2 บรรทัด</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Assignment Summary Banner -->
+          <div class="summary-assignment-banner" id="summaryAssignmentBanner">
+            <div class="assignment-icon">📌</div>
+            <div class="assignment-text" id="summaryAssignmentText">
+              <!-- Dynamically populated by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="panel-card schematic-card">
         <div class="card-header">
           <div>
@@ -606,7 +754,7 @@
 
               <!-- Footer watermark matching original worksheet -->
               <text x="18" y="556" fill="#64748b" font-size="13" font-weight="600" pointer-events="none">ชุดทดลองการเชื่อมต่อวงจรไฟฟ้าควบคุมด้วย RELAY</text>
-              <text x="692" y="556" text-anchor="end" fill="#475569" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">Designed by Kru-Jirawat TATC | v2.8.2</text>
+              <text x="692" y="556" text-anchor="end" fill="#475569" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">Designed by Kru-Jirawat TATC | v2.9.0</text>
             </g>
 
             <!-- PLC Terminal Block Workbench Group (Lab 4 & Lab 5) -->
@@ -990,9 +1138,9 @@
 
   <footer class="app-version-footer">
     <span>⚡ <strong>Electrical Control &amp; PLC Wiring Simulator</strong> — พัฒนาสื่อการสอนโดย <strong>Kru-Jirawat Saengkhunnatham ELECTRONICS THAI-AUSTRIAN TECHNICAL COLLEGE</strong></span>
-    <span class="version-pill" id="appVersionBadge">Version 2.8.2 (อัปเดตล่าสุด: 09 พ.ย. 2026)</span>
+    <span class="version-pill" id="appVersionBadge">Version 2.9.0 (อัปเดตล่าสุด: 16 พ.ย. 2026)</span>
   </footer>
 
-  <script src="app.js?v=20261109_282"></script>
+  <script src="app.js?v=20261116_290"></script>
 </body>
 </html>
