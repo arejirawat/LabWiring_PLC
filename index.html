@@ -104,6 +104,9 @@
             <button type="button" id="btnSummaryRandomize" class="btn btn-summary-random" title="สุ่มโจทย์ Bit Input/Output, ชนิดหน้าสัมผัส และสีหลอดไฟใหม่">
               🎲 สุ่มโจทย์ใหม่
             </button>
+            <button type="button" id="btnSummaryRandomLadder" class="btn btn-summary-random-ladder" title="สุ่มสร้างวงจร Ladder Diagram อัตโนมัติ (1–2 Rungs พร้อมเงื่อนไขอนุกรม/ขนาน)">
+              🎲 สุ่มวงจร Ladder
+            </button>
             <button type="button" id="btnSummaryClearWires" class="btn btn-summary-clear" title="ล้างสายไฟบนกระดานเพื่อเริ่มฝึกต่อใหม่">
               🧹 ล้างสายไฟ
             </button>
@@ -331,6 +334,9 @@
               </button>
             </div>
             <div class="ladder-builder-actions">
+              <button type="button" id="btnLadderRandomize" class="btn-ladder-action btn-random-ladder" title="สุ่มสร้างวงจร Ladder Diagram ใหม่โดยอัตโนมัติ">
+                🎲 สุ่ม Ladder
+              </button>
               <button type="button" id="btnLadderFillSolution" class="btn-ladder-action btn-fill-sol" title="วางเฉลยวงจร Ladder ของใบงานนี้โดยอัตโนมัติ">
                 💡 เฉลย Ladder
               </button>
@@ -754,7 +760,7 @@
 
               <!-- Footer watermark matching original worksheet -->
               <text x="18" y="556" fill="#64748b" font-size="13" font-weight="600" pointer-events="none">ชุดทดลองการเชื่อมต่อวงจรไฟฟ้าควบคุมด้วย RELAY</text>
-              <text x="692" y="556" text-anchor="end" fill="#475569" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">Designed by Kru-Jirawat TATC | v2.9.0</text>
+              <text x="692" y="556" text-anchor="end" fill="#475569" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">Designed by Kru-Jirawat TATC | v2.9.1</text>
             </g>
 
             <!-- PLC Terminal Block Workbench Group (Lab 4 & Lab 5) -->
@@ -835,6 +841,9 @@
                   </button>
                 </div>
                 <div class="ladder-builder-actions">
+                  <button type="button" id="btnPopupLadderRandomize" class="btn-ladder-action btn-random-ladder" title="สุ่มสร้างวงจร Ladder Diagram ใหม่โดยอัตโนมัติ">
+                    🎲 สุ่ม Ladder
+                  </button>
                   <button type="button" id="btnPopupLadderFillSolution" class="btn-ladder-action btn-fill-sol" title="วางเฉลยวงจร Ladder ของใบงานนี้โดยอัตโนมัติ">
                     💡 เฉลย Ladder
                   </button>
@@ -1138,9 +1147,9 @@
 
   <footer class="app-version-footer">
     <span>⚡ <strong>Electrical Control &amp; PLC Wiring Simulator</strong> — พัฒนาสื่อการสอนโดย <strong>Kru-Jirawat Saengkhunnatham ELECTRONICS THAI-AUSTRIAN TECHNICAL COLLEGE</strong></span>
-    <span class="version-pill" id="appVersionBadge">Version 2.9.0 (อัปเดตล่าสุด: 16 พ.ย. 2026)</span>
+    <span class="version-pill" id="appVersionBadge">Version 2.9.1 (อัปเดตล่าสุด: 16 พ.ย. 2026)</span>
   </footer>
 
-  <script src="app.js?v=20261116_290"></script>
+  <script src="app.js?v=20261116_291"></script>
 </body>
 </html>

@@ -1612,7 +1612,7 @@ function initPlcTerminalBoard() {
 
   html += `
     <text x="26" y="594" fill="#64748b" font-size="12" font-weight="600" pointer-events="none">ชุดทดลองการเชื่อมต่ออินพุต-เอาต์พุต PLC ผ่าน TERMINAL กลาง</text>
-    <text x="894" y="594" text-anchor="end" fill="#475569" font-size="11.5" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">Designed by Kru-Jirawat TATC | v2.9.0</text>
+    <text x="894" y="594" text-anchor="end" fill="#475569" font-size="11.5" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">Designed by Kru-Jirawat TATC | v2.9.1</text>
   `;
 
   container.innerHTML = html;
@@ -8628,6 +8628,97 @@ function resetUserLadderForCurrentLab(fillSolution = false) {
   }
 }
 
+// Randomize User Ladder Diagram (generates realistic, valid, non-trivial topologies)
+function randomizeUserLadder() {
+  plcState.ladderPracticeMode = true;
+  const isSummary = (typeof state !== 'undefined' && state.currentLabId === 'lab_summary_3_5');
+  const lab = (typeof state !== 'undefined' && state.currentLabId) ? LABS[state.currentLabId] : null;
+
+  let useS2 = true;
+  let usePL2 = true;
+  let numRungs = 2;
+
+  if (isSummary) {
+    const sumCfg = plcState.summaryConfig || {};
+    useS2 = Boolean(sumCfg.useS2);
+    usePL2 = Boolean(sumCfg.usePL2);
+    numRungs = sumCfg.rungCount || (usePL2 ? 2 : 1);
+  } else {
+    useS2 = Boolean(!lab || lab.showS2 || (lab.inputs && lab.inputs.includes('S2')));
+    usePL2 = Boolean(lab && (lab.showL2 || (lab.outputs && lab.outputs.includes('L2'))));
+    const target = getTargetLadderForLab(state.currentLabId);
+    numRungs = usePL2 ? 2 : (target.length || 1);
+  }
+
+  const prevStr = JSON.stringify(plcState.userLadderRungs);
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+  let newRungs = [];
+
+  for (let attempt = 0; attempt < 10; attempt++) {
+    newRungs = [];
+    for (let rIdx = 0; rIdx < numRungs; rIdx++) {
+      let coil = 'Q0';
+      if (numRungs === 1) {
+        coil = 'Q0';
+      } else if (numRungs === 2) {
+        coil = (rIdx === 0) ? 'Q0' : (usePL2 ? 'Q1' : 'Q0');
+      } else {
+        coil = (rIdx === 0) ? 'M0' : ((rIdx === 1) ? 'Q0' : 'Q1');
+      }
+
+      // Available patterns:
+      // Pattern 1: Single Contact -> Coil
+      // Pattern 2: Series AND of PB1 & PB2 -> Coil (when useS2)
+      // Pattern 3: Parallel OR of PB1 & PB2 -> Coil (when useS2)
+      // Pattern 4: Parallel OR in series with 2nd contact -> Coil (when useS2)
+      const patternChoice = useS2 ? pick([1, 2, 3, 4]) : 1;
+
+      let slot1 = null;
+      let slot2 = 'WIRE';
+      let parSlot = null;
+
+      if (patternChoice === 1) {
+        slot1 = useS2 ? pick(['I0_NO', 'I0_NC', 'I1_NO', 'I1_NC']) : pick(['I0_NO', 'I0_NC']);
+        slot2 = 'WIRE';
+        parSlot = null;
+      } else if (patternChoice === 2) {
+        slot1 = pick(['I0_NO', 'I0_NC']);
+        slot2 = pick(['I1_NO', 'I1_NC']);
+        parSlot = null;
+      } else if (patternChoice === 3) {
+        slot1 = pick(['I0_NO', 'I0_NC']);
+        slot2 = 'WIRE';
+        parSlot = pick(['I1_NO', 'I1_NC']);
+      } else if (patternChoice === 4) {
+        slot1 = pick(['I0_NO', 'I0_NC']);
+        parSlot = pick(['I1_NO', 'I1_NC']);
+        // Avoid contradiction where (slot1 || parSlot) && slot2 is always dead
+        const safeContacts = ['I0_NO', 'I0_NC', 'I1_NO', 'I1_NC'].filter(
+          (c) => !(c === (slot1 === 'I0_NO' ? 'I0_NC' : 'I0_NO') && c === (parSlot === 'I1_NO' ? 'I1_NC' : 'I1_NO'))
+        );
+        slot2 = pick(safeContacts);
+      }
+
+      newRungs.push({ slot1, slot2, parSlot, coil });
+    }
+
+    if (JSON.stringify(newRungs) !== prevStr) {
+      break;
+    }
+  }
+
+  plcState.userLadderRungs = newRungs;
+  plcState.userMemoryM0 = false;
+
+  if (isSummary && typeof syncSummaryLabConfiguration === 'function') {
+    syncSummaryLabConfiguration();
+  }
+
+  updateLadderBuilderUI();
+  updateSimulationUI();
+}
+
 function evalLadderContact(token, in0, in1, m0) {
   if (!token) return false;
   if (token === 'WIRE') return true;
@@ -10455,6 +10546,15 @@ function initPlcLadderCoSim() {
   const btnPopupModeToggle = document.getElementById('btnPopupLadderModeToggle');
   if (btnPopupModeToggle) btnPopupModeToggle.addEventListener('click', handleLadderModeToggle);
 
+  // Randomize Ladder Buttons
+  const handleLadderRandomize = () => {
+    randomizeUserLadder();
+  };
+  const btnRand = document.getElementById('btnLadderRandomize');
+  if (btnRand) btnRand.addEventListener('click', handleLadderRandomize);
+  const btnPopupRand = document.getElementById('btnPopupLadderRandomize');
+  if (btnPopupRand) btnPopupRand.addEventListener('click', handleLadderRandomize);
+
   // Fill Solution Buttons
   const handleLadderFillSolution = () => {
     resetUserLadderForCurrentLab(true);
@@ -10960,11 +11060,19 @@ function initSummaryLabEvents() {
       state.undoStack = [];
       state.redoStack = [];
 
-      // Reset user ladder to empty
-      resetUserLadderForCurrentLab(false);
+      // Randomize target ladder diagram
+      randomizeUserLadder();
 
       syncSummaryLabConfiguration();
       updateSimulationUI();
+    });
+  }
+
+  // Randomize Ladder button in summary card
+  const btnSumRandLadder = document.getElementById('btnSummaryRandomLadder');
+  if (btnSumRandLadder) {
+    btnSumRandLadder.addEventListener('click', () => {
+      randomizeUserLadder();
     });
   }
 
