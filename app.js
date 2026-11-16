@@ -32,8 +32,35 @@ const state = {
   panMode: false,
   plcModel: 'TM221CE16R', // 'TM221CE16R' (Schneider) or 'FX5U-32MR' (Mitsubishi)
   plcWiringLogic: 'negative', // 'negative' or 'positive'
-  fuseBlown: { F1: false, F2: false, MAIN: false },
+  fuseBlown: { F1: false, F2: false, MAIN: false, IOP_F1: false, IOP_F2: false },
   isPlcBoardActive: false,
+  isIoPanelBoardActive: false,
+  ioPanelSwitches: {
+    PB1: false,   // Green pushbutton NO
+    PB2: false,   // Red pushbutton NO
+    SS0: false,   // Selector MAN/AUTO (false = MAN 0, true = AUTO 1)
+    PB_EM: false  // Emergency Stop Mushroom NC (false = Normal closed 1, true = Pressed open 0)
+  },
+  ioPanelConfig: {
+    pb1Bit: 3,  // Default: %I0.3 (X3)
+    pb2Bit: 4,  // Default: %I0.4 (X4)
+    ss0Bit: 5,  // Default: %I0.5 (X5)
+    emBit: 6,   // Default: %I0.6 (X6)
+    pl1Bit: 2,  // Default: %Q0.2 (Y2)
+    pl2Bit: 3,  // Default: %Q0.3 (Y3)
+    pl3Bit: 4   // Default: %Q0.4 (Y4)
+  },
+  ioPanelPlcState: {
+    M0: false,
+    M1: false,
+    M10: false,
+    M11: false,
+    M20: false,
+    M21: false,
+    assignM10: false,
+    assignM11: false
+  },
+  ioPanelShowInternalSchem: false,
   switches: {
     // Default locked: true so clicking S1 or S2 holds its state (ON/OFF) by default for easy multi-switch testing
     S1: { pressed: false, locked: true },
@@ -273,9 +300,192 @@ function buildSummaryLabHintWires() {
   return wires;
 }
 
+// Helper to build dynamic hint / solution wires for I/O Panel labs (Version 3.0.0)
+function buildIoPanelHintWires() {
+  const ioCfg = (typeof state !== 'undefined' && state.ioPanelConfig) ? state.ioPanelConfig : {
+    pb1Bit: 3, pb2Bit: 4, ss0Bit: 5, emBit: 6, pl1Bit: 2, pl2Bit: 3, pl3Bit: 4
+  };
+  const isPos = (typeof state !== 'undefined' && state.plcWiringLogic === 'positive');
+  const wires = [];
+
+  const yRowIn = (k) => 317 + (8 - k) * 23;
+  const yRowOut = (k) => {
+    const r = (k >= 4) ? (6 - k) : (7 - k);
+    return 30 + r * 23.5;
+  };
+  const tbX = (col) => 35 + (col - 1) * 31 + 15.5;
+
+  if (!isPos) {
+    // Negative Logic: 24V -> F1 -> COM, 0V -> TB 1
+    wires.push({
+      from: 'IOP_IN_24V_L',
+      to: 'IOP_F1_T',
+      color: '#ef4444',
+      waypoints: [{ x: 670, y: 570 }, { x: 670, y: 395 }, { x: 611, y: 395 }]
+    });
+    wires.push({
+      from: 'IOP_F1_B',
+      to: 'IOP_IN_COM_L',
+      color: '#ef4444',
+      waypoints: [{ x: 611, y: 524 }]
+    });
+    wires.push({
+      from: 'IOP_IN_0V_L',
+      to: 'IOP_TB1_B',
+      color: '#3b82f6',
+      waypoints: [{ x: 685, y: 547 }, { x: 450, y: 602 }, { x: tbX(1), y: 602 }]
+    });
+  } else {
+    // Positive Logic: 0V -> COM, 24V -> F1 -> TB 1
+    wires.push({
+      from: 'IOP_IN_0V_L',
+      to: 'IOP_IN_COM_L',
+      color: '#3b82f6',
+      waypoints: [{ x: 685, y: 547 }, { x: 685, y: 524 }]
+    });
+    wires.push({
+      from: 'IOP_IN_24V_L',
+      to: 'IOP_F1_T',
+      color: '#ef4444',
+      waypoints: [{ x: 670, y: 570 }, { x: 670, y: 395 }, { x: 611, y: 395 }]
+    });
+    wires.push({
+      from: 'IOP_F1_B',
+      to: 'IOP_TB1_B',
+      color: '#ef4444',
+      waypoints: [{ x: 611, y: 535 }, { x: 450, y: 602 }, { x: tbX(1), y: 602 }]
+    });
+  }
+
+  // Input signals: TB 2..5 to Input Strip left terminals
+  wires.push({
+    from: 'IOP_TB2_B',
+    to: `IOP_IN_I${ioCfg.pb1Bit}_L`,
+    color: '#ef4444',
+    waypoints: [{ x: tbX(2), y: 585 }, { x: 500, y: 585 }, { x: 660, y: yRowIn(ioCfg.pb1Bit) }]
+  });
+  wires.push({
+    from: 'IOP_TB3_B',
+    to: `IOP_IN_I${ioCfg.pb2Bit}_L`,
+    color: '#ef4444',
+    waypoints: [{ x: tbX(3), y: 568 }, { x: 515, y: 568 }, { x: 665, y: yRowIn(ioCfg.pb2Bit) }]
+  });
+  wires.push({
+    from: 'IOP_TB4_B',
+    to: `IOP_IN_I${ioCfg.ss0Bit}_L`,
+    color: '#ef4444',
+    waypoints: [{ x: tbX(4), y: 550 }, { x: 530, y: 550 }, { x: 670, y: yRowIn(ioCfg.ss0Bit) }]
+  });
+  wires.push({
+    from: 'IOP_TB5_B',
+    to: `IOP_IN_I${ioCfg.emBit}_L`,
+    color: '#ef4444',
+    waypoints: [{ x: tbX(5), y: 535 }, { x: 545, y: 535 }, { x: 675, y: yRowIn(ioCfg.emBit) }]
+  });
+
+  // Output side: check COM0 vs COM1
+  const bitsUsed = [ioCfg.pl1Bit, ioCfg.pl2Bit, ioCfg.pl3Bit];
+  const needCom0 = bitsUsed.some((b) => b <= 3);
+  const needCom1 = bitsUsed.some((b) => b >= 4);
+
+  if (!isPos) {
+    // Negative Logic: 24V -> F2 -> COM0/COM1, 0V -> TB 7
+    wires.push({
+      from: 'IOP_OUT_24V_L',
+      to: 'IOP_F2_T',
+      color: '#ef4444',
+      waypoints: [{ x: 670, y: 265 }, { x: 670, y: 115 }, { x: 611, y: 115 }]
+    });
+
+    if (needCom0) {
+      wires.push({
+        from: 'IOP_F2_B',
+        to: 'IOP_OUT_COM0_L',
+        color: '#ef4444',
+        waypoints: [{ x: 611, y: 218 }]
+      });
+    }
+    if (needCom1 && !needCom0) {
+      wires.push({
+        from: 'IOP_F2_B',
+        to: 'IOP_OUT_COM1_L',
+        color: '#ef4444',
+        waypoints: [{ x: 611, y: 100.5 }]
+      });
+    } else if (needCom0 && needCom1) {
+      wires.push({
+        from: 'IOP_OUT_COM0_L',
+        to: 'IOP_OUT_COM1_L',
+        color: '#ef4444',
+        waypoints: [{ x: 685, y: 218 }, { x: 685, y: 100.5 }]
+      });
+    }
+
+    wires.push({
+      from: 'IOP_OUT_0V_L',
+      to: 'IOP_TB7_B',
+      color: '#3b82f6',
+      waypoints: [{ x: 685, y: 241.5 }, { x: 420, y: 280 }, { x: 420, y: 505 }, { x: tbX(7), y: 505 }]
+    });
+  } else {
+    // Positive Logic: 0V -> COM0/COM1, 24V -> F2 -> TB 7
+    wires.push({
+      from: 'IOP_OUT_0V_L',
+      to: needCom0 ? 'IOP_OUT_COM0_L' : 'IOP_OUT_COM1_L',
+      color: '#3b82f6',
+      waypoints: [{ x: 685, y: 241.5 }, { x: 685, y: needCom0 ? 218 : 100.5 }]
+    });
+    if (needCom0 && needCom1) {
+      wires.push({
+        from: 'IOP_OUT_COM0_L',
+        to: 'IOP_OUT_COM1_L',
+        color: '#3b82f6',
+        waypoints: [{ x: 685, y: 218 }, { x: 685, y: 100.5 }]
+      });
+    }
+    wires.push({
+      from: 'IOP_OUT_24V_L',
+      to: 'IOP_F2_T',
+      color: '#ef4444',
+      waypoints: [{ x: 670, y: 265 }, { x: 670, y: 115 }, { x: 611, y: 115 }]
+    });
+    wires.push({
+      from: 'IOP_F2_B',
+      to: 'IOP_TB7_B',
+      color: '#ef4444',
+      waypoints: [{ x: 611, y: 231 }, { x: 420, y: 280 }, { x: 420, y: 505 }, { x: tbX(7), y: 505 }]
+    });
+  }
+
+  // Output signals: PLC Q to TB 8..10
+  wires.push({
+    from: `IOP_OUT_Q${ioCfg.pl1Bit}_L`,
+    to: 'IOP_TB8_B',
+    color: '#ef4444',
+    waypoints: [{ x: 660, y: yRowOut(ioCfg.pl1Bit) }, { x: 440, y: 250 }, { x: 440, y: 520 }, { x: tbX(8), y: 520 }]
+  });
+  wires.push({
+    from: `IOP_OUT_Q${ioCfg.pl2Bit}_L`,
+    to: 'IOP_TB9_B',
+    color: '#eab308',
+    waypoints: [{ x: 665, y: yRowOut(ioCfg.pl2Bit) }, { x: 455, y: 230 }, { x: 455, y: 535 }, { x: tbX(9), y: 535 }]
+  });
+  wires.push({
+    from: `IOP_OUT_Q${ioCfg.pl3Bit}_L`,
+    to: 'IOP_TB10_B',
+    color: '#22c55e',
+    waypoints: [{ x: 670, y: yRowOut(ioCfg.pl3Bit) }, { x: 470, y: 210 }, { x: 470, y: 550 }, { x: tbX(10), y: 550 }]
+  });
+
+  return wires;
+}
+
 // Helper to return the active hint / solution wires based on current wiring logic (Negative vs Positive)
 function getActiveHintWires(lab) {
   if (!lab) return [];
+  if (lab.isIoPanelLab) {
+    return buildIoPanelHintWires();
+  }
   if (lab.id === 'lab_summary_3_5') {
     return buildSummaryLabHintWires();
   }
@@ -1094,6 +1304,57 @@ const LABS = {
       { S1: 1, S2: 1, expected: { L1: 0, L2: 0 } }
     ],
     logicComparison: 'แบบฝึกหัดสรุป: ฝึกทักษะการออกแบบวงจร Ladder และการต่อสายฮาร์ดแวร์จริงตามโจทย์ที่กำหนดด้วยตนเอง'
+  },
+
+  lab_iopanel_main: {
+    id: 'lab_iopanel_main',
+    title: 'ใบงาน I/O Panel (ตอนที่ 1): การเชื่อมต่อกับ I/O Panel และฝึก Wiring กับ Terminal (ทดสอบ MANUAL / AUTO)',
+    objective: 'เชื่อมต่อสายไฟระหว่างกล่อง INPUT–OUTPUT PANEL (TB 1–10) ผ่านฟิวส์ F1/F2 เข้าสู่พอร์ต Input และ Relay Output ของ PLC ตามตารางกำหนด Address จากนั้นทดสอบการทำงานของโหมด MANUAL (Interlock) และ AUTO (Self-Holding) รวมถึงปุ่มหยุดฉุกเฉิน PB_EM',
+    isPlcTerminalLab: true,
+    isIoPanelLab: true,
+    plcInputOnlyLab: false,
+    inputs: ['PB1', 'PB2', 'SS0', 'PB_EM'],
+    outputs: ['PL1_RED', 'PL2_YELLOW', 'PL3_GREEN'],
+    showL2: true,
+    showS2: true,
+    showRelays: false,
+    truthTable: [
+      { step: 'สแตนด์บาย (MANUAL ปกติ)', PB1: 0, PB2: 0, SS0: 0, PB_EM: 0, expected: { PL1_RED: 0, PL2_YELLOW: 1, PL3_GREEN: 0 } },
+      { step: 'กด PB1 ใน MANUAL', PB1: 1, PB2: 0, SS0: 0, PB_EM: 0, expected: { PL1_RED: 1, PL2_YELLOW: 0, PL3_GREEN: 0 } },
+      { step: 'ปล่อย PB1 ใน MANUAL', PB1: 0, PB2: 0, SS0: 0, PB_EM: 0, expected: { PL1_RED: 0, PL2_YELLOW: 1, PL3_GREEN: 0 } },
+      { step: 'กด PB2 ใน MANUAL', PB1: 0, PB2: 1, SS0: 0, PB_EM: 0, expected: { PL1_RED: 0, PL2_YELLOW: 0, PL3_GREEN: 1 } },
+      { step: 'สลับ SS0 เป็น AUTO (สแตนด์บาย)', PB1: 0, PB2: 0, SS0: 1, PB_EM: 0, expected: { PL1_RED: 0, PL2_YELLOW: 1, PL3_GREEN: 0 } },
+      { step: 'กด PB1 ใน AUTO (ติดค้าง)', PB1: 1, PB2: 0, SS0: 1, PB_EM: 0, expected: { PL1_RED: 1, PL2_YELLOW: 0, PL3_GREEN: 0 } },
+      { step: 'ปล่อย PB1 ใน AUTO (ยังคงติดค้าง)', PB1: 0, PB2: 0, SS0: 1, PB_EM: 0, expected: { PL1_RED: 1, PL2_YELLOW: 0, PL3_GREEN: 0 } },
+      { step: 'กด PB2 ใน AUTO (สลับติดค้าง)', PB1: 0, PB2: 1, SS0: 1, PB_EM: 0, expected: { PL1_RED: 0, PL2_YELLOW: 0, PL3_GREEN: 1 } },
+      { step: 'ปล่อย PB2 ใน AUTO (ยังคงติดค้าง)', PB1: 0, PB2: 0, SS0: 1, PB_EM: 0, expected: { PL1_RED: 0, PL2_YELLOW: 0, PL3_GREEN: 1 } },
+      { step: 'กดปุ่มฉุกเฉิน PB_EM', PB1: 0, PB2: 0, SS0: 1, PB_EM: 1, expected: { PL1_RED: 0, PL2_YELLOW: 0, PL3_GREEN: 0 } }
+    ],
+    logicComparison: 'การทำงานของโหมด MANUAL (Interlock - สลับทำงานขณะกด) และ AUTO (Self-Holding - กดติดค้าง สลับสถานะได้) พร้อมปุ่มหยุดฉุกเฉิน'
+  },
+
+  lab_iopanel_assign: {
+    id: 'lab_iopanel_assign',
+    title: 'ใบงาน I/O Panel (มอบหมายงาน): ออกแบบวงจร MANUAL กด PB1 ติดค้าง PL1 / กด PB2 ติดค้าง PL2 / กด PB_EM หยุดทั้งหมด',
+    objective: 'มอบหมายงานท้ายใบงาน I/O Panel: ต่อสายฮาร์ดแวร์จริงและออกแบบวงจร Ladder ในโหมด MANUAL โดยกำหนดให้: 1. เมื่อกด PB1 ให้ PL1 (แดง) ติดค้างดวงเดียว 2. เมื่อกด PB2 ให้ PL2 (เหลือง) ติดค้างดวงเดียว (PL1 ดับ) 3. เมื่อกดปุ่มฉุกเฉิน PB_EM ให้หยุดการทำงานทั้งหมด',
+    isPlcTerminalLab: true,
+    isIoPanelLab: true,
+    plcInputOnlyLab: false,
+    inputs: ['PB1', 'PB2', 'SS0', 'PB_EM'],
+    outputs: ['PL1_RED', 'PL2_YELLOW', 'PL3_GREEN'],
+    showL2: true,
+    showS2: true,
+    showRelays: false,
+    truthTable: [
+      { step: 'เริ่มต้น (MANUAL สแตนด์บาย)', PB1: 0, PB2: 0, SS0: 0, PB_EM: 0, expected: { PL1_RED: 0, PL2_YELLOW: 0, PL3_GREEN: 0 } },
+      { step: 'กด PB1 ใน MANUAL (PL1 ติดค้าง)', PB1: 1, PB2: 0, SS0: 0, PB_EM: 0, expected: { PL1_RED: 1, PL2_YELLOW: 0, PL3_GREEN: 0 } },
+      { step: 'ปล่อย PB1 ใน MANUAL (PL1 ยังคงติดค้าง)', PB1: 0, PB2: 0, SS0: 0, PB_EM: 0, expected: { PL1_RED: 1, PL2_YELLOW: 0, PL3_GREEN: 0 } },
+      { step: 'กด PB2 ใน MANUAL (PL2 ติดค้างแทน PL1)', PB1: 0, PB2: 1, SS0: 0, PB_EM: 0, expected: { PL1_RED: 0, PL2_YELLOW: 1, PL3_GREEN: 0 } },
+      { step: 'ปล่อย PB2 ใน MANUAL (PL2 ยังคงติดค้าง)', PB1: 0, PB2: 0, SS0: 0, PB_EM: 0, expected: { PL1_RED: 0, PL2_YELLOW: 1, PL3_GREEN: 0 } },
+      { step: 'กดปุ่มฉุกเฉิน PB_EM (ตัดการทำงานทั้งหมด)', PB1: 0, PB2: 0, SS0: 0, PB_EM: 1, expected: { PL1_RED: 0, PL2_YELLOW: 0, PL3_GREEN: 0 } },
+      { step: 'ปลดปุ่มฉุกเฉิน PB_EM (ยังคงหยุดรอการกดใหม่)', PB1: 0, PB2: 0, SS0: 0, PB_EM: 0, expected: { PL1_RED: 0, PL2_YELLOW: 0, PL3_GREEN: 0 } }
+    ],
+    logicComparison: 'การออกแบบวงจรค้างสถานะแบบสลับหน้าสัมผัส (Mutually Exclusive Latch) ควบคุมหลอดไฟ PL1 และ PL2 ในโหมด MANUAL โดยมีปุ่มฉุกเฉิน Master Stop'
   }
 };
 
@@ -1161,6 +1422,9 @@ function initWorkbenchComponents() {
 
   // 3. Build PLC Terminal Block Workbench for Lab 4 & Lab 5
   initPlcTerminalBoard();
+
+  // 4. Build I/O Panel & Terminal Workbench for Version 3.0.0
+  initIoPanelBoard();
 }
 
 // Build PLC Terminal Block Workbench (Lab 4 & Lab 5)
@@ -1618,6 +1882,359 @@ function initPlcTerminalBoard() {
   container.innerHTML = html;
 }
 
+// Build I/O Panel Workbench (lab_iopanel_main & lab_iopanel_assign) - Version 3.0.0
+function initIoPanelBoard() {
+  const container = document.getElementById('ioPanelBoard');
+  if (!container) return;
+
+  const spec = getPlcModelSpec();
+  const yRowIn = (k) => 317 + (8 - k) * 23;
+  const yRowOut = (k) => {
+    const r = (k >= 4) ? (6 - k) : (7 - k);
+    return 30 + r * 23.5;
+  };
+  const tbX = (col) => 35 + (col - 1) * 31 + 15.5;
+
+  let html = `
+    <!-- LEFT PANEL: I/O PANEL ENCLOSURE (x=18, y=18, w=350, h=570) -->
+    <g id="ioPanelEnclosureGroup">
+      <rect x="18" y="18" width="350" height="570" rx="8" fill="#e2e8f0" stroke="#475569" stroke-width="2.5" filter="url(#shadow-card)" />
+      <!-- Enclosure 4 corner mounting screws -->
+      <circle cx="28" cy="28" r="4.5" fill="#94a3b8" stroke="#1e293b" stroke-width="1.2" />
+      <circle cx="358" cy="28" r="4.5" fill="#94a3b8" stroke="#1e293b" stroke-width="1.2" />
+      <circle cx="28" cy="578" r="4.5" fill="#94a3b8" stroke="#1e293b" stroke-width="1.2" />
+      <circle cx="358" cy="578" r="4.5" fill="#94a3b8" stroke="#1e293b" stroke-width="1.2" />
+
+      <!-- Inside face plate -->
+      <rect x="25" y="25" width="336" height="556" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2" />
+
+      <!-- Header Plate -->
+      <rect x="25" y="25" width="336" height="38" rx="6" fill="#0f172a" />
+      <text x="193" y="45" text-anchor="middle" fill="#38bdf8" font-size="13.5" font-weight="900" letter-spacing="1">INPUT – OUTPUT PANEL</text>
+      <text x="193" y="57" text-anchor="middle" fill="#94a3b8" font-size="8.5" font-weight="700">MODULE TRAINER | TATC Kru-Jirawat</text>
+
+      <!-- 3 PILOT LAMPS (Left Column inside Panel: x=115) -->
+      <!-- PL1: Red Pilot Lamp at (115, 120) -->
+      <g id="ioPanelLamp1Group" transform="translate(115, 120)">
+        <text x="0" y="-30" text-anchor="middle" fill="#0f172a" font-size="12" font-weight="800">PL1</text>
+        <circle id="ioPanelLamp1Halo" cx="0" cy="0" r="38" fill="#ef4444" opacity="0" filter="url(#glow-yellow)" />
+        <circle cx="0" cy="0" r="28" fill="#1e293b" stroke="#0f172a" stroke-width="2.5" />
+        <circle id="ioPanelLamp1Body" cx="0" cy="0" r="23" fill="#7f1d1d" stroke="#ef4444" stroke-width="2" />
+        <text x="0" y="4" text-anchor="middle" fill="#fca5a5" font-size="10.5" font-weight="800" pointer-events="none">RED</text>
+        <text x="0" y="38" text-anchor="middle" fill="#dc2626" font-size="9" font-weight="700">(TB 8)</text>
+      </g>
+
+      <!-- PL2: Yellow Pilot Lamp at (115, 205) -->
+      <g id="ioPanelLamp2Group" transform="translate(115, 205)">
+        <text x="0" y="-30" text-anchor="middle" fill="#0f172a" font-size="12" font-weight="800">PL2</text>
+        <circle id="ioPanelLamp2Halo" cx="0" cy="0" r="38" fill="#facc15" opacity="0" filter="url(#glow-yellow)" />
+        <circle cx="0" cy="0" r="28" fill="#1e293b" stroke="#0f172a" stroke-width="2.5" />
+        <circle id="ioPanelLamp2Body" cx="0" cy="0" r="23" fill="#78350f" stroke="#eab308" stroke-width="2" />
+        <text x="0" y="4" text-anchor="middle" fill="#fef08a" font-size="9" font-weight="800" pointer-events="none">YELLOW</text>
+        <text x="0" y="38" text-anchor="middle" fill="#d97706" font-size="9" font-weight="700">(TB 9)</text>
+      </g>
+
+      <!-- PL3: Green Pilot Lamp at (115, 290) -->
+      <g id="ioPanelLamp3Group" transform="translate(115, 290)">
+        <text x="0" y="-30" text-anchor="middle" fill="#0f172a" font-size="12" font-weight="800">PL3</text>
+        <circle id="ioPanelLamp3Halo" cx="0" cy="0" r="38" fill="#22c55e" opacity="0" filter="url(#glow-green)" />
+        <circle cx="0" cy="0" r="28" fill="#1e293b" stroke="#0f172a" stroke-width="2.5" />
+        <circle id="ioPanelLamp3Body" cx="0" cy="0" r="23" fill="#064e3b" stroke="#22c55e" stroke-width="2" />
+        <text x="0" y="4" text-anchor="middle" fill="#86efac" font-size="9.5" font-weight="800" pointer-events="none">GREEN</text>
+        <text x="0" y="38" text-anchor="middle" fill="#16a34a" font-size="9" font-weight="700">(TB 10)</text>
+      </g>
+
+      <!-- 3 INTERACTIVE SWITCHES (Right Column inside Panel: x=250) -->
+      <!-- PB1: Green Pushbutton at (250, 120) -->
+      <g id="ioPanelPB1Group" transform="translate(250, 120)">
+        <text x="0" y="-30" text-anchor="middle" fill="#0f172a" font-size="12" font-weight="800">PB1 (NO)</text>
+        <circle cx="0" cy="0" r="28" fill="#1e293b" stroke="#334155" stroke-width="2" />
+        <g class="switch-actuator" data-iopanel-sw="PB1" style="cursor: pointer;" title="คลิกเพื่อกดสวิตช์ PB1 (NO)">
+          <circle id="ioPanelPB1Cap" cx="0" cy="0" r="22" fill="#22c55e" stroke="#15803d" stroke-width="2.5" filter="url(#shadow-sm)" />
+          <text x="0" y="4" text-anchor="middle" fill="#ffffff" font-size="10.5" font-weight="800" pointer-events="none">PRESS</text>
+        </g>
+        <rect id="ioPanelPB1StatePill" x="-32" y="30" width="64" height="15" rx="7.5" fill="#e2e8f0" />
+        <text id="ioPanelPB1StateText" x="0" y="41" text-anchor="middle" fill="#334155" font-size="9" font-weight="700">ปกติ OFF (0)</text>
+      </g>
+
+      <!-- PB2: Red Pushbutton at (250, 205) -->
+      <g id="ioPanelPB2Group" transform="translate(250, 205)">
+        <text x="0" y="-30" text-anchor="middle" fill="#0f172a" font-size="12" font-weight="800">PB2 (NO)</text>
+        <circle cx="0" cy="0" r="28" fill="#1e293b" stroke="#334155" stroke-width="2" />
+        <g class="switch-actuator" data-iopanel-sw="PB2" style="cursor: pointer;" title="คลิกเพื่อกดสวิตช์ PB2 (NO)">
+          <circle id="ioPanelPB2Cap" cx="0" cy="0" r="22" fill="#ef4444" stroke="#b91c1c" stroke-width="2.5" filter="url(#shadow-sm)" />
+          <text x="0" y="4" text-anchor="middle" fill="#ffffff" font-size="10.5" font-weight="800" pointer-events="none">PRESS</text>
+        </g>
+        <rect id="ioPanelPB2StatePill" x="-32" y="30" width="64" height="15" rx="7.5" fill="#e2e8f0" />
+        <text id="ioPanelPB2StateText" x="0" y="41" text-anchor="middle" fill="#334155" font-size="9" font-weight="700">ปกติ OFF (0)</text>
+      </g>
+
+      <!-- SS0: Rotary Selector Switch at (250, 290) -->
+      <g id="ioPanelSS0Group" transform="translate(250, 290)">
+        <text x="0" y="-30" text-anchor="middle" fill="#0f172a" font-size="12" font-weight="800">SS0: SELECTOR</text>
+        <circle cx="0" cy="0" r="28" fill="#1e293b" stroke="#0f172a" stroke-width="2" />
+        <!-- Dial labels -->
+        <text x="-21" y="-14" text-anchor="middle" fill="#cbd5e1" font-size="8.5" font-weight="800">MAN</text>
+        <text x="21" y="-14" text-anchor="middle" fill="#cbd5e1" font-size="8.5" font-weight="800">AUTO</text>
+        <g class="switch-actuator" data-iopanel-sw="SS0" style="cursor: pointer;" title="คลิกเพื่อหมุนสลับโหมด SS0 (MAN / AUTO)">
+          <circle cx="0" cy="0" r="20" fill="#334155" stroke="#475569" stroke-width="1.5" />
+          <g id="ioPanelSS0Knob" transform="rotate(-35, 0, 0)">
+            <rect x="-4" y="-16" width="8" height="28" rx="3" fill="#f8fafc" stroke="#0f172a" stroke-width="1" />
+            <polygon points="0,-16 -4,-10 4,-10" fill="#0284c7" />
+          </g>
+        </g>
+        <rect id="ioPanelSS0StatePill" x="-36" y="30" width="72" height="15" rx="7.5" fill="#e2e8f0" />
+        <text id="ioPanelSS0StateText" x="0" y="41" text-anchor="middle" fill="#334155" font-size="9" font-weight="700">MANUAL (0)</text>
+      </g>
+
+      <!-- EMERGENCY STOP MUSHROOM BUTTON (Centered at x=193, y=380) -->
+      <g id="ioPanelPBEMGroup" transform="translate(193, 380)">
+        <!-- Yellow collar plate -->
+        <circle cx="0" cy="0" r="42" fill="#fef08a" stroke="#ca8a04" stroke-width="2.5" />
+        <path id="emTextArcTop" d="M -30,-12 A 32 32 0 0 1 30,-12" fill="none" />
+        <text font-size="8.5" font-weight="900" fill="#854d0e" text-anchor="middle">
+          <textPath href="#emTextArcTop" startOffset="50%">EMERGENCY</textPath>
+        </text>
+        <text x="0" y="32" text-anchor="middle" fill="#854d0e" font-size="8.5" font-weight="900">STOP</text>
+        <!-- Mushroom actuator -->
+        <g class="switch-actuator" data-iopanel-sw="PB_EM" style="cursor: pointer;" title="คลิกเพื่อกด/ปลดปุ่มฉุกเฉิน PB_EM (NC: ปกติจ่ายไฟ กดแล้วตัดไฟ)">
+          <circle cx="0" cy="0" r="30" fill="#991b1b" stroke="#7f1d1d" stroke-width="2" />
+          <circle id="ioPanelEMCap" cx="0" cy="0" r="26" fill="#dc2626" stroke="#b91c1c" stroke-width="2.5" filter="url(#shadow-sm)" />
+          <polygon points="0,-10 -9,6 9,6" fill="#ffffff" opacity="0.9" pointer-events="none" />
+          <text x="0" y="5" text-anchor="middle" fill="#ffffff" font-size="7.5" font-weight="900" pointer-events="none">PULL</text>
+        </g>
+        <rect id="ioPanelEMStatePill" x="-46" y="45" width="92" height="15" rx="7.5" fill="#dcfce7" />
+        <text id="ioPanelEMStateText" x="0" y="56" text-anchor="middle" fill="#15803d" font-size="9" font-weight="800">CLOSED (ปกติ NC)</text>
+      </g>
+
+      <!-- TERMINAL BLOCK STRIP TB 1..10 (x=35..345, y=462..568) -->
+      <g id="ioPanelTBStripGroup">
+        <rect x="35" y="462" width="310" height="106" rx="4" fill="#f8fafc" stroke="#334155" stroke-width="2" />
+        <line x1="35" y1="515" x2="345" y2="515" stroke="#0f172a" stroke-width="2.5" />
+  `;
+
+  // 10 columns for TB 1..10
+  const tbDefs = [
+    { num: 1, role: 'COM (IN)', desc: 'Common Input (สวิตช์ร่วม)', bg: '#e0f2fe', fg: '#0369a1' },
+    { num: 2, role: 'PB1', desc: 'สวิตช์ PB1 (NO)', bg: '#dcfce7', fg: '#15803d' },
+    { num: 3, role: 'PB2', desc: 'สวิตช์ PB2 (NO)', bg: '#fee2e2', fg: '#b91c1c' },
+    { num: 4, role: 'SS0', desc: 'สวิตช์เลือกโหมด SS0_Auto (NO)', bg: '#fef08a', fg: '#854d0e' },
+    { num: 5, role: 'PB_EM', desc: 'สวิตช์ฉุกเฉิน PB_EM (NC)', bg: '#fee2e2', fg: '#b91c1c' },
+    { num: 6, role: 'SPARE', desc: 'ว่าง / สำรอง (Spare)', bg: '#f1f5f9', fg: '#64748b' },
+    { num: 7, role: 'COM (OUT)', desc: 'Common Output (หลอดไฟร่วม)', bg: '#e0f2fe', fg: '#0369a1' },
+    { num: 8, role: 'PL1', desc: 'หลอดไฟ PL1_RED (สีแดง)', bg: '#fee2e2', fg: '#dc2626' },
+    { num: 9, role: 'PL2', desc: 'หลอดไฟ PL2_YELLOW (สีเหลือง)', bg: '#fef9c3', fg: '#ca8a04' },
+    { num: 10, role: 'PL3', desc: 'หลอดไฟ PL3_GREEN (สีเขียว)', bg: '#dcfce7', fg: '#16a34a' }
+  ];
+
+  tbDefs.forEach((tb) => {
+    const colX = 35 + (tb.num - 1) * 31;
+    const cx = tbX(tb.num);
+
+    if (tb.num > 1) {
+      html += `<line x1="${colX}" y1="462" x2="${colX}" y2="568" stroke="#cbd5e1" stroke-width="1.2" />`;
+    }
+    // Internal vertical connection between top and bottom screw
+    html += `<line x1="${cx}" y1="486" x2="${cx}" y2="538" stroke="#64748b" stroke-width="1.8" stroke-dasharray="2 1.5" />`;
+
+    // Top terminal screw (IOP_TB{k}_T at y=478)
+    html += `
+      <g class="terminal-node" data-terminal="IOP_TB${tb.num}_T" data-label="TB ${tb.num}: ${tb.desc} (บน)" transform="translate(${cx}, 478)">
+        <circle class="term-hit" r="16" fill="transparent" />
+        <circle class="term-screw" r="10.5" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="1.8" />
+        <path d="M-5,0 H5 M0,-5 V5" stroke="#1e293b" stroke-width="1.8" />
+      </g>
+
+      <!-- Center Number Badge & Role -->
+      <rect x="${colX + 1}" y="498" width="29" height="34" fill="${tb.bg}" stroke="#94a3b8" stroke-width="0.8" />
+      <text x="${cx}" y="513" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="900" fill="${tb.fg}">${tb.num}</text>
+      <text x="${cx}" y="525" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="7" font-weight="800" fill="${tb.fg}">${tb.role}</text>
+
+      <!-- Bottom terminal screw (IOP_TB{k}_B at y=548) -->
+      <g class="terminal-node" data-terminal="IOP_TB${tb.num}_B" data-label="TB ${tb.num}: ${tb.desc} (ล่าง)" transform="translate(${cx}, 548)">
+        <circle class="term-hit" r="16" fill="transparent" />
+        <circle class="term-screw" r="10.5" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="1.8" />
+        <path d="M-5,0 H5 M0,-5 V5" stroke="#1e293b" stroke-width="1.8" />
+      </g>
+    `;
+  });
+
+  html += `</g></g>`; // End #ioPanelTBStripGroup and #ioPanelEnclosureGroup
+
+  // MIDDLE COLUMN: FUSES F1 (Bottom) & F2 (Top) centered at x=611
+  // Fuse F2 (Output Fuse, y=90..235, center x=611)
+  html += `
+    <g id="ioPFuse2Group" transform="translate(611, 90)">
+      <text x="0" y="-10" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="800">FUSE F2 (OUTPUT)</text>
+      <rect id="ioPFuse2Body" x="-24" y="0" width="48" height="142" rx="6" fill="#38bdf8" stroke="#0284c7" stroke-width="2.5" />
+      <rect id="ioPFuse2Win" x="-15" y="44" width="30" height="54" rx="3" fill="#f0f9ff" stroke="#0369a1" stroke-width="1.5" />
+      <line id="ioPFuse2Wire" x1="0" y1="48" x2="0" y2="94" stroke="#ef4444" stroke-width="2" stroke-dasharray="3 2" />
+      <g id="iopFuse2BlownGroup" opacity="0" style="cursor: pointer;" title="ฟิวส์ F2 ขาด! คลิกเพื่อเปลี่ยน/รีเซตฟิวส์">
+        <circle cx="0" cy="71" r="16" fill="#ef4444" opacity="0.35" filter="url(#glow-yellow)" />
+        <text x="0" y="75" text-anchor="middle" font-size="14">💥</text>
+        <rect x="-35" y="146" width="70" height="20" rx="10" fill="#dc2626" stroke="#fca5a5" stroke-width="1.5" />
+        <text x="0" y="160" text-anchor="middle" fill="#ffffff" font-size="9.5" font-weight="800">🔄 รีเซต F2</text>
+      </g>
+      <text id="ioPFuse2Label" x="0" y="75" text-anchor="middle" fill="#0369a1" font-size="16" font-weight="900" pointer-events="none">F2</text>
+      <text id="ioPFuse2Amp" x="0" y="90" text-anchor="middle" fill="#0284c7" font-size="9.5" font-weight="700" pointer-events="none">2A</text>
+
+      <!-- Top Terminal IOP_F2_T (y=25 rel -> global 611, 115) -->
+      <g class="terminal-node" data-terminal="IOP_F2_T" data-label="ฟิวส์ F2 เอาต์พุต (ขาเข้า/บน)" transform="translate(0, 25)">
+        <circle class="term-hit" r="18" fill="transparent" />
+        <circle class="term-screw" r="12" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
+        <path d="M-6,0 H6 M0,-6 V6" stroke="#1e293b" stroke-width="2" />
+      </g>
+      <!-- Bottom Terminal IOP_F2_B (y=120 rel -> global 611, 210) -->
+      <g class="terminal-node" data-terminal="IOP_F2_B" data-label="ฟิวส์ F2 เอาต์พุต (ขาออก/ล่าง)" transform="translate(0, 120)">
+        <circle class="term-hit" r="18" fill="transparent" />
+        <circle class="term-screw" r="12" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
+        <path d="M-6,0 H6 M0,-6 V6" stroke="#1e293b" stroke-width="2" />
+      </g>
+    </g>
+
+    <!-- Fuse F1 (Input Fuse, y=370..515, center x=611) -->
+    <g id="ioPFuse1Group" transform="translate(611, 370)">
+      <text x="0" y="-10" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="800">FUSE F1 (INPUT)</text>
+      <rect id="ioPFuse1Body" x="-24" y="0" width="48" height="142" rx="6" fill="#38bdf8" stroke="#0284c7" stroke-width="2.5" />
+      <rect id="ioPFuse1Win" x="-15" y="44" width="30" height="54" rx="3" fill="#f0f9ff" stroke="#0369a1" stroke-width="1.5" />
+      <line id="ioPFuse1Wire" x1="0" y1="48" x2="0" y2="94" stroke="#ef4444" stroke-width="2" stroke-dasharray="3 2" />
+      <g id="iopFuse1BlownGroup" opacity="0" style="cursor: pointer;" title="ฟิวส์ F1 ขาด! คลิกเพื่อเปลี่ยน/รีเซตฟิวส์">
+        <circle cx="0" cy="71" r="16" fill="#ef4444" opacity="0.35" filter="url(#glow-yellow)" />
+        <text x="0" y="75" text-anchor="middle" font-size="14">💥</text>
+        <rect x="-35" y="146" width="70" height="20" rx="10" fill="#dc2626" stroke="#fca5a5" stroke-width="1.5" />
+        <text x="0" y="160" text-anchor="middle" fill="#ffffff" font-size="9.5" font-weight="800">🔄 รีเซต F1</text>
+      </g>
+      <text id="ioPFuse1Label" x="0" y="75" text-anchor="middle" fill="#0369a1" font-size="16" font-weight="900" pointer-events="none">F1</text>
+      <text id="ioPFuse1Amp" x="0" y="90" text-anchor="middle" fill="#0284c7" font-size="9.5" font-weight="700" pointer-events="none">2A</text>
+
+      <!-- Top Terminal IOP_F1_T (y=25 rel -> global 611, 395) -->
+      <g class="terminal-node" data-terminal="IOP_F1_T" data-label="ฟิวส์ F1 อินพุต (ขาเข้า/บน)" transform="translate(0, 25)">
+        <circle class="term-hit" r="18" fill="transparent" />
+        <circle class="term-screw" r="12" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
+        <path d="M-6,0 H6 M0,-6 V6" stroke="#1e293b" stroke-width="2" />
+      </g>
+      <!-- Bottom Terminal IOP_F1_B (y=120 rel -> global 611, 490) -->
+      <g class="terminal-node" data-terminal="IOP_F1_B" data-label="ฟิวส์ F1 อินพุต (ขาออก/ล่าง)" transform="translate(0, 120)">
+        <circle class="term-hit" r="18" fill="transparent" />
+        <circle class="term-screw" r="12" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="2" />
+        <path d="M-6,0 H6 M0,-6 V6" stroke="#1e293b" stroke-width="2" />
+      </g>
+    </g>
+  `;
+
+  // RIGHT SIDE: TWO VERTICAL PLC TERMINAL STRIPS (Output Top, Input Bottom)
+  // 1. Output Strip (11 rows, x=715..900, y=18..278)
+  html += `
+    <g id="ioPOutStripGroup">
+      <rect x="715" y="18" width="185" height="260" rx="4" fill="#f8fafc" stroke="#334155" stroke-width="2" />
+      <text x="807" y="14" text-anchor="middle" fill="#0f172a" font-size="11.5" font-weight="800">PLC OUTPUT STRIP (11 ROWS)</text>
+  `;
+
+  const outStripRows = [
+    { id: 'Q6', lbl: spec.termOutShort(6), desc: `เอาต์พุต (${spec.termOutShort(6)})`, bit: 6, bg: '#f8fafc', fg: '#1e293b' },
+    { id: 'Q5', lbl: spec.termOutShort(5), desc: `เอาต์พุต (${spec.termOutShort(5)})`, bit: 5, bg: '#f8fafc', fg: '#1e293b' },
+    { id: 'Q4', lbl: spec.termOutShort(4), desc: `เอาต์พุต (${spec.termOutShort(4)})`, bit: 4, bg: '#f8fafc', fg: '#1e293b' },
+    { id: 'COM1', lbl: 'COM1', desc: 'ขั้วร่วมเอาต์พุต COM1', bit: null, bg: '#fef08a', fg: '#854d0e' },
+    { id: 'Q3', lbl: spec.termOutShort(3), desc: `เอาต์พุต (${spec.termOutShort(3)})`, bit: 3, bg: '#f8fafc', fg: '#1e293b' },
+    { id: 'Q2', lbl: spec.termOutShort(2), desc: `เอาต์พุต (${spec.termOutShort(2)})`, bit: 2, bg: '#f8fafc', fg: '#1e293b' },
+    { id: 'Q1', lbl: spec.termOutShort(1), desc: `เอาต์พุต (${spec.termOutShort(1)})`, bit: 1, bg: '#f8fafc', fg: '#1e293b' },
+    { id: 'Q0', lbl: spec.termOutShort(0), desc: `เอาต์พุต (${spec.termOutShort(0)})`, bit: 0, bg: '#f8fafc', fg: '#1e293b' },
+    { id: 'COM0', lbl: 'COM0', desc: 'ขั้วร่วมเอาต์พุต COM0', bit: null, bg: '#fef08a', fg: '#854d0e' },
+    { id: '0V', lbl: '0V', desc: 'กราวด์ 0VDC', bit: null, bg: '#e0f2fe', fg: '#0369a1' },
+    { id: '24V', lbl: '24V', desc: 'ไฟเลี้ยง +24VDC', bit: null, bg: '#fee2e2', fg: '#dc2626' }
+  ];
+
+  outStripRows.forEach((r, idx) => {
+    const y = 30 + idx * 23.5;
+    if (idx > 0) {
+      html += `<line x1="715" y1="${y - 11.75}" x2="900" y2="${y - 11.75}" stroke="#cbd5e1" stroke-width="1" />`;
+    }
+    // internal connection line between Left and Right screws
+    html += `<line x1="741" y1="${y}" x2="763" y2="${y}" stroke="#64748b" stroke-width="1.6" stroke-dasharray="2 1.5" />`;
+
+    html += `
+      <!-- Left screw (global x=730, y=${y}) -->
+      <g class="terminal-node" data-terminal="IOP_OUT_${r.id}_L" data-label="เอาต์พุต ${r.desc} (ซ้าย)" transform="translate(730, ${y})">
+        <circle class="term-hit" r="16" fill="transparent" />
+        <circle class="term-screw" r="10.5" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="1.8" />
+        <path d="M-5,0 H5 M0,-5 V5" stroke="#1e293b" stroke-width="1.8" />
+      </g>
+      <!-- Right screw (global x=774, y=${y}) -->
+      <g class="terminal-node" data-terminal="IOP_OUT_${r.id}_R" data-label="เอาต์พุต ${r.desc} (ขวา)" transform="translate(774, ${y})">
+        <circle class="term-hit" r="16" fill="transparent" />
+        <circle class="term-screw" r="10.5" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="1.8" />
+        <path d="M-5,0 H5 M0,-5 V5" stroke="#1e293b" stroke-width="1.8" />
+      </g>
+    `;
+
+    if (r.bit !== null) {
+      html += `<circle id="iopOutLed_${r.bit}" cx="796" cy="${y}" r="4.5" fill="#334155" stroke="#1e293b" stroke-width="1" />`;
+    }
+    html += `<text id="iopOutLbl_${idx}" class="plc-dyn-label" x="812" y="${y + 4}" font-family="'JetBrains Mono', monospace" font-size="10.5" font-weight="800" fill="${r.fg}">${r.lbl}</text>`;
+  });
+  html += `</g>`; // End #ioPOutStripGroup
+
+  // 2. Input Strip (12 rows, x=715..900, y=304..585)
+  html += `
+    <g id="ioPInStripGroup">
+      <rect x="715" y="304" width="185" height="282" rx="4" fill="#f8fafc" stroke="#334155" stroke-width="2" />
+      <text x="807" y="300" text-anchor="middle" fill="#0f172a" font-size="11.5" font-weight="800">PLC INPUT STRIP (12 ROWS)</text>
+  `;
+
+  const inStripRows = [
+    { id: 'I8', lbl: spec.termInShort(8), desc: `อินพุต (${spec.termInShort(8)})`, bit: 8, bg: '#f8fafc', fg: '#1e293b' },
+    { id: 'I7', lbl: spec.termInShort(7), desc: `อินพุต (${spec.termInShort(7)})`, bit: 7, bg: '#f8fafc', fg: '#1e293b' },
+    { id: 'I6', lbl: spec.termInShort(6), desc: `อินพุต (${spec.termInShort(6)})`, bit: 6, bg: '#f8fafc', fg: '#1e293b' },
+    { id: 'I5', lbl: spec.termInShort(5), desc: `อินพุต (${spec.termInShort(5)})`, bit: 5, bg: '#f8fafc', fg: '#1e293b' },
+    { id: 'I4', lbl: spec.termInShort(4), desc: `อินพุต (${spec.termInShort(4)})`, bit: 4, bg: '#f8fafc', fg: '#1e293b' },
+    { id: 'I3', lbl: spec.termInShort(3), desc: `อินพุต (${spec.termInShort(3)})`, bit: 3, bg: '#f8fafc', fg: '#1e293b' },
+    { id: 'I2', lbl: spec.termInShort(2), desc: `อินพุต (${spec.termInShort(2)})`, bit: 2, bg: '#f8fafc', fg: '#1e293b' },
+    { id: 'I1', lbl: spec.termInShort(1), desc: `อินพุต (${spec.termInShort(1)})`, bit: 1, bg: '#f8fafc', fg: '#1e293b' },
+    { id: 'I0', lbl: spec.termInShort(0), desc: `อินพุต (${spec.termInShort(0)})`, bit: 0, bg: '#f8fafc', fg: '#1e293b' },
+    { id: 'COM', lbl: 'COM', desc: 'ขั้วร่วมอินพุต COM (S/S)', bit: null, bg: '#fef08a', fg: '#854d0e' },
+    { id: '0V', lbl: '0V', desc: 'กราวด์ 0VDC', bit: null, bg: '#e0f2fe', fg: '#0369a1' },
+    { id: '24V', lbl: '24V', desc: 'ไฟเลี้ยง +24VDC', bit: null, bg: '#fee2e2', fg: '#dc2626' }
+  ];
+
+  inStripRows.forEach((r, idx) => {
+    const y = 317 + idx * 23;
+    if (idx > 0) {
+      html += `<line x1="715" y1="${y - 11.5}" x2="900" y2="${y - 11.5}" stroke="#cbd5e1" stroke-width="1" />`;
+    }
+    // internal connection line between Left and Right screws
+    html += `<line x1="741" y1="${y}" x2="763" y2="${y}" stroke="#64748b" stroke-width="1.6" stroke-dasharray="2 1.5" />`;
+
+    html += `
+      <!-- Left screw (global x=730, y=${y}) -->
+      <g class="terminal-node" data-terminal="IOP_IN_${r.id}_L" data-label="อินพุต ${r.desc} (ซ้าย)" transform="translate(730, ${y})">
+        <circle class="term-hit" r="16" fill="transparent" />
+        <circle class="term-screw" r="10.5" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="1.8" />
+        <path d="M-5,0 H5 M0,-5 V5" stroke="#1e293b" stroke-width="1.8" />
+      </g>
+      <!-- Right screw (global x=774, y=${y}) -->
+      <g class="terminal-node" data-terminal="IOP_IN_${r.id}_R" data-label="อินพุต ${r.desc} (ขวา)" transform="translate(774, ${y})">
+        <circle class="term-hit" r="16" fill="transparent" />
+        <circle class="term-screw" r="10.5" fill="url(#screwGrad)" stroke="#1e293b" stroke-width="1.8" />
+        <path d="M-5,0 H5 M0,-5 V5" stroke="#1e293b" stroke-width="1.8" />
+      </g>
+    `;
+
+    if (r.bit !== null) {
+      html += `<circle id="iopInLed_${r.bit}" cx="796" cy="${y}" r="4.5" fill="#334155" stroke="#1e293b" stroke-width="1" />`;
+    }
+    html += `<text id="iopInLbl_${idx}" class="plc-dyn-label" x="812" y="${y + 4}" font-family="'JetBrains Mono', monospace" font-size="10.5" font-weight="800" fill="${r.fg}">${r.lbl}</text>`;
+  });
+  html += `</g>`; // End #ioPInStripGroup
+
+  // Bottom Watermark
+  html += `
+    <text x="26" y="602" fill="#64748b" font-size="12" font-weight="600" pointer-events="none">ชุดทดลองเชื่อมต่อ I/O Panel และ Terminal Wiring กับ PLC</text>
+    <text x="894" y="602" text-anchor="end" fill="#475569" font-size="11.5" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">Designed by Kru-Jirawat TATC | v3.0.0</text>
+  `;
+
+  container.innerHTML = html;
+}
+
 function renderRelaySocket(containerId, prefix) {
   const container = document.getElementById(containerId);
   const pins = [
@@ -1832,13 +2449,331 @@ function computeWirePath(p1, p2, waypoints = [], bendPoint = null) {
   return `M ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} C ${cx1.toFixed(1)} ${cy1.toFixed(1)}, ${cx2.toFixed(1)} ${cy2.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
 }
 
+// Toggle switch on I/O Panel (Version 3.0.0)
+function toggleIoPanelSwitch(sw) {
+  if (!state.ioPanelSwitches) return;
+  if (sw === 'PB1') state.ioPanelSwitches.PB1 = !state.ioPanelSwitches.PB1;
+  else if (sw === 'PB2') state.ioPanelSwitches.PB2 = !state.ioPanelSwitches.PB2;
+  else if (sw === 'SS0') state.ioPanelSwitches.SS0 = !state.ioPanelSwitches.SS0;
+  else if (sw === 'PB_EM') state.ioPanelSwitches.PB_EM = !state.ioPanelSwitches.PB_EM;
+
+  evaluateCircuit();
+  renderWires();
+  updateSimulationUI();
+  highlightActiveTruthRow();
+  renderPlcLadderDiagram();
+  renderSchematic();
+}
+
 // Physics / Graph Solver for Electrical Simulation
 function evaluateCircuit(customInputs = null, prevRelayState = { K1: false, K2: false }) {
   const s1Pressed = customInputs ? Boolean(customInputs.S1) : state.switches.S1.pressed;
   const s2Pressed = customInputs ? Boolean(customInputs.S2) : state.switches.S2.pressed;
   const powerActive = customInputs ? true : state.powerOn;
   const lab = (typeof state !== 'undefined' && state.currentLabId) ? LABS[state.currentLabId] : null;
-  const isPlcLab = Boolean(lab && lab.isPlcTerminalLab);
+  const isIoPanelLab = Boolean(lab && lab.isIoPanelLab);
+  const isPlcLab = Boolean(lab && lab.isPlcTerminalLab && !isIoPanelLab);
+
+  // --- I/O Panel & Terminal Wiring Circuit Physics (Version 3.0.0) ---
+  if (isIoPanelLab) {
+    let f1Blown = (customInputs !== null) ? false : Boolean(state.fuseBlown && state.fuseBlown.IOP_F1);
+    let f2Blown = (customInputs !== null) ? false : Boolean(state.fuseBlown && state.fuseBlown.IOP_F2);
+
+    const pb1Pressed = (customInputs !== null) ? Boolean(customInputs.PB1 !== undefined ? customInputs.PB1 : customInputs.S1) : state.ioPanelSwitches.PB1;
+    const pb2Pressed = (customInputs !== null) ? Boolean(customInputs.PB2 !== undefined ? customInputs.PB2 : customInputs.S2) : state.ioPanelSwitches.PB2;
+    const ss0Auto = (customInputs !== null) ? Boolean(customInputs.SS0) : state.ioPanelSwitches.SS0;
+    const pbEmPressed = (customInputs !== null) ? Boolean(customInputs.PB_EM) : state.ioPanelSwitches.PB_EM;
+
+    const inRows = ['I8', 'I7', 'I6', 'I5', 'I4', 'I3', 'I2', 'I1', 'I0', 'COM', '0V', '24V'];
+    const outRows = ['Q6', 'Q5', 'Q4', 'COM1', 'Q3', 'Q2', 'Q1', 'Q0', 'COM0', '0V', '24V'];
+
+    const buildGraph = (includeF1, includeF2, closedOutputs = {}) => {
+      const adj = new Map();
+      const addEdge = (a, b) => {
+        if (!adj.has(a)) adj.set(a, []);
+        if (!adj.has(b)) adj.set(b, []);
+        adj.get(a).push(b);
+        adj.get(b).push(a);
+      };
+
+      // 1. User wires
+      for (const w of state.wires) {
+        addEdge(w.from, w.to);
+      }
+
+      // 2. Fuses IOP_F1 and IOP_F2
+      if (includeF1) addEdge('IOP_F1_T', 'IOP_F1_B');
+      if (includeF2) addEdge('IOP_F2_T', 'IOP_F2_B');
+
+      // 3. Internal vertical edges of TB 1..10
+      for (let c = 1; c <= 10; c++) {
+        addEdge(`IOP_TB${c}_T`, `IOP_TB${c}_B`);
+      }
+
+      // 4. Internal switches inside I/O Panel box connected to TB 1 (Common Input)
+      if (pb1Pressed) addEdge('IOP_TB1_T', 'IOP_TB2_T'); // PB1 NO
+      if (pb2Pressed) addEdge('IOP_TB1_T', 'IOP_TB3_T'); // PB2 NO
+      if (ss0Auto) addEdge('IOP_TB1_T', 'IOP_TB4_T');    // SS0 NO (MAN=0, AUTO=1)
+      if (!pbEmPressed) addEdge('IOP_TB1_T', 'IOP_TB5_T'); // PB_EM NC (Normally closed, open when pressed!)
+
+      // 5. Internal feedthrough for vertical Input Strip (12 rows)
+      inRows.forEach((r) => addEdge(`IOP_IN_${r}_L`, `IOP_IN_${r}_R`));
+
+      // 6. Internal feedthrough for vertical Output Strip (11 rows)
+      outRows.forEach((r) => addEdge(`IOP_OUT_${r}_L`, `IOP_OUT_${r}_R`));
+
+      // 7. Power supply rails
+      addEdge('PWR_POS', 'IOP_IN_24V_L');
+      addEdge('PWR_POS', 'IOP_OUT_24V_L');
+      addEdge('PWR_NEG', 'IOP_IN_0V_L');
+      addEdge('PWR_NEG', 'IOP_OUT_0V_L');
+
+      // 8. Closed PLC Output Contacts
+      if (closedOutputs.Q0) addEdge('IOP_OUT_COM0_L', 'IOP_OUT_Q0_L');
+      if (closedOutputs.Q1) addEdge('IOP_OUT_COM0_L', 'IOP_OUT_Q1_L');
+      if (closedOutputs.Q2) addEdge('IOP_OUT_COM0_L', 'IOP_OUT_Q2_L');
+      if (closedOutputs.Q3) addEdge('IOP_OUT_COM0_L', 'IOP_OUT_Q3_L');
+      if (closedOutputs.Q4) addEdge('IOP_OUT_COM1_L', 'IOP_OUT_Q4_L');
+      if (closedOutputs.Q5) addEdge('IOP_OUT_COM1_L', 'IOP_OUT_Q5_L');
+      if (closedOutputs.Q6) addEdge('IOP_OUT_COM1_L', 'IOP_OUT_Q6_L');
+
+      return adj;
+    };
+
+    const runBfsOn = (adjMap) => {
+      const pSet = new Set();
+      const nSet = new Set();
+      if (powerActive) {
+        const qPos = ['PWR_POS'];
+        pSet.add('PWR_POS');
+        while (qPos.length > 0) {
+          const curr = qPos.shift();
+          for (const nxt of adjMap.get(curr) || []) {
+            if (!pSet.has(nxt)) {
+              pSet.add(nxt);
+              qPos.push(nxt);
+            }
+          }
+        }
+        const qNeg = ['PWR_NEG'];
+        nSet.add('PWR_NEG');
+        while (qNeg.length > 0) {
+          const curr = qNeg.shift();
+          for (const nxt of adjMap.get(curr) || []) {
+            if (!nSet.has(nxt)) {
+              nSet.add(nxt);
+              qNeg.push(nxt);
+            }
+          }
+        }
+      }
+      return { pSet, nSet };
+    };
+
+    // Step 1: Check initial short circuit (before PLC outputs close)
+    const { pSet: p0, nSet: n0 } = runBfsOn(buildGraph(!f1Blown, !f2Blown));
+    if (powerActive && p0.has('PWR_NEG')) {
+      const gNoF1 = runBfsOn(buildGraph(false, !f2Blown));
+      if ((gNoF1.pSet.has('IOP_F1_T') && gNoF1.nSet.has('IOP_F1_B')) || (gNoF1.pSet.has('IOP_F1_B') && gNoF1.nSet.has('IOP_F1_T'))) {
+        f1Blown = true;
+      }
+      const gNoF2 = runBfsOn(buildGraph(!f1Blown, false));
+      if ((gNoF2.pSet.has('IOP_F2_T') && gNoF2.nSet.has('IOP_F2_B')) || (gNoF2.pSet.has('IOP_F2_B') && gNoF2.nSet.has('IOP_F2_T'))) {
+        f2Blown = true;
+      }
+      if (!f1Blown && !f2Blown) {
+        f1Blown = true;
+      }
+      if (!customInputs && powerActive) {
+        if (f1Blown) state.fuseBlown.IOP_F1 = true;
+        if (f2Blown) state.fuseBlown.IOP_F2 = true;
+      }
+    }
+
+    // Step 2: Re-evaluate with updated fuses for PLC Inputs
+    const { pSet: pos1, nSet: neg1 } = runBfsOn(buildGraph(!f1Blown, !f2Blown));
+    const { pSet: posNoF1, nSet: negNoF1 } = runBfsOn(buildGraph(false, !f2Blown));
+
+    const plcInputs = [];
+    let detectedInputLogic = null;
+    if (pos1.has('IOP_IN_COM_L') && !neg1.has('IOP_IN_COM_L')) {
+      detectedInputLogic = 'negative';
+    } else if (neg1.has('IOP_IN_COM_L') && !pos1.has('IOP_IN_COM_L')) {
+      detectedInputLogic = 'positive';
+    }
+
+    let bypassedF1 = false;
+    for (let k = 0; k <= 8; k++) {
+      const pin = `IOP_IN_I${k}_L`;
+      const rawNeg = pos1.has('IOP_IN_COM_L') && neg1.has(pin);
+      const rawPos = neg1.has('IOP_IN_COM_L') && pos1.has(pin);
+      const noF1Neg = posNoF1.has('IOP_IN_COM_L') && negNoF1.has(pin);
+      const noF1Pos = negNoF1.has('IOP_IN_COM_L') && posNoF1.has(pin);
+
+      const validNeg = rawNeg && !noF1Neg;
+      const validPos = rawPos && !noF1Pos;
+      plcInputs[k] = powerActive && !f1Blown && (validNeg || validPos);
+
+      if (powerActive && ((rawNeg && noF1Neg) || (rawPos && noF1Pos))) {
+        bypassedF1 = true;
+      }
+    }
+
+    const comPowered = powerActive && !f1Blown && (pos1.has('IOP_IN_COM_L') || neg1.has('IOP_IN_COM_L'));
+
+    // Step 3: Run PLC Scan Logic for I/O Panel
+    const ioCfg = (typeof state !== 'undefined' && state.ioPanelConfig) ? state.ioPanelConfig : {
+      pb1Bit: 3, pb2Bit: 4, ss0Bit: 5, emBit: 6, pl1Bit: 2, pl2Bit: 3, pl3Bit: 4
+    };
+
+    const inPB1 = Boolean(plcInputs[ioCfg.pb1Bit]);
+    const inPB2 = Boolean(plcInputs[ioCfg.pb2Bit]);
+    const inSS0 = Boolean(plcInputs[ioCfg.ss0Bit]);
+    const inEM  = Boolean(plcInputs[ioCfg.emBit]);
+
+    const plcOutputs = { Q0: false, Q1: false, Q2: false, Q3: false, Q4: false, Q5: false, Q6: false };
+
+    if (powerActive && comPowered && detectedInputLogic !== null) {
+      if (state.currentLabId === 'lab_iopanel_main') {
+        // --- 4-RUNG WORKSHEET PROGRAM ---
+        // Rung 0: SELECTOR MODE
+        const M0 = inEM && !inSS0; // MANUAL Mode
+        const M1 = inEM && inSS0;  // AUTO Mode
+
+        // Rung 1: MODE MANUAL (Interlock without latch)
+        const M10 = M0 && inPB1 && !state.ioPanelPlcState.M11;
+        const M11 = M0 && inPB2 && !state.ioPanelPlcState.M10;
+
+        // Rung 2: MODE AUTO (Self-Holding + Interlock)
+        let M20 = false;
+        let M21 = false;
+        if (M1) {
+          const prevM20 = (customInputs && customInputs._prevM20 !== undefined) ? Boolean(customInputs._prevM20) : state.ioPanelPlcState.M20;
+          const prevM21 = (customInputs && customInputs._prevM21 !== undefined) ? Boolean(customInputs._prevM21) : state.ioPanelPlcState.M21;
+          M20 = M1 && (inPB1 || prevM20) && !inPB2;
+          M21 = M1 && (inPB2 || prevM21) && !inPB1;
+        }
+
+        // Rung 3: DRIVE OUTPUTS
+        const outPL1 = inEM && (M10 || M20);
+        const outPL3 = inEM && (M11 || M21);
+        const outPL2 = inEM && !outPL1 && !outPL3; // Standby Yellow
+
+        plcOutputs[`Q${ioCfg.pl1Bit}`] = outPL1;
+        plcOutputs[`Q${ioCfg.pl2Bit}`] = outPL2;
+        plcOutputs[`Q${ioCfg.pl3Bit}`] = outPL3;
+
+        state.ioPanelPlcState.M0 = M0;
+        state.ioPanelPlcState.M1 = M1;
+        state.ioPanelPlcState.M10 = M10;
+        state.ioPanelPlcState.M11 = M11;
+        state.ioPanelPlcState.M20 = M20;
+        state.ioPanelPlcState.M21 = M21;
+      } else if (state.currentLabId === 'lab_iopanel_assign') {
+        // --- WORKSHEET ASSIGNMENT PROGRAM ---
+        // ในโหมด MANUAL: 1. กด PB1 ติดค้าง PL1  2. กด PB2 ติดค้าง PL2 (PL1 ดับ)  3. กด PB_EM หยุดทั้งหมด
+        const M0 = inEM && !inSS0;
+        let assignM10 = false;
+        let assignM11 = false;
+
+        if (M0) {
+          const prevM10 = (customInputs && customInputs._prevAssignM10 !== undefined) ? Boolean(customInputs._prevAssignM10) : state.ioPanelPlcState.assignM10;
+          const prevM11 = (customInputs && customInputs._prevAssignM11 !== undefined) ? Boolean(customInputs._prevAssignM11) : state.ioPanelPlcState.assignM11;
+
+          if (inPB1) {
+            assignM10 = true;
+            assignM11 = false;
+          } else if (inPB2) {
+            assignM11 = true;
+            assignM10 = false;
+          } else {
+            assignM10 = prevM10;
+            assignM11 = prevM11;
+          }
+        }
+
+        const outPL1 = inEM && assignM10;
+        const outPL2 = inEM && assignM11;
+        const outPL3 = false;
+
+        plcOutputs[`Q${ioCfg.pl1Bit}`] = outPL1;
+        plcOutputs[`Q${ioCfg.pl2Bit}`] = outPL2;
+        plcOutputs[`Q${ioCfg.pl3Bit}`] = outPL3;
+
+        state.ioPanelPlcState.assignM10 = assignM10;
+        state.ioPanelPlcState.assignM11 = assignM11;
+      }
+    }
+
+    // Step 4: Close PLC Output Contacts & Check Output Short Circuits
+    const { pSet: pos2, nSet: neg2 } = runBfsOn(buildGraph(!f1Blown, !f2Blown, plcOutputs));
+    if (powerActive && pos2.has('PWR_NEG')) {
+      const g2NoF2 = runBfsOn(buildGraph(!f1Blown, false, plcOutputs));
+      if ((g2NoF2.pSet.has('IOP_F2_T') && g2NoF2.nSet.has('IOP_F2_B')) || (g2NoF2.pSet.has('IOP_F2_B') && g2NoF2.nSet.has('IOP_F2_T'))) {
+        f2Blown = true;
+      }
+      const g2NoF1 = runBfsOn(buildGraph(false, !f2Blown, plcOutputs));
+      if ((g2NoF1.pSet.has('IOP_F1_T') && g2NoF1.nSet.has('IOP_F1_B')) || (g2NoF1.pSet.has('IOP_F1_B') && g2NoF1.nSet.has('IOP_F1_T'))) {
+        f1Blown = true;
+      }
+      if (!f1Blown && !f2Blown) {
+        f2Blown = true;
+      }
+      if (!customInputs && powerActive) {
+        if (f1Blown) state.fuseBlown.IOP_F1 = true;
+        if (f2Blown) state.fuseBlown.IOP_F2 = true;
+      }
+    }
+
+    // Step 5: Final BFS with blown fuses open
+    const finalBfs = runBfsOn(buildGraph(!f1Blown, !f2Blown, plcOutputs));
+    const noF2Bfs = runBfsOn(buildGraph(!f1Blown, false, plcOutputs));
+
+    if (f1Blown) {
+      plcInputs.fill(false);
+      Object.keys(plcOutputs).forEach((k) => plcOutputs[k] = false);
+    }
+
+    const isLampLit = (pinA, pinB) => {
+      const onWithF2 = (finalBfs.pSet.has(pinA) && finalBfs.nSet.has(pinB)) || (finalBfs.pSet.has(pinB) && finalBfs.nSet.has(pinA));
+      const onWithoutF2 = (noF2Bfs.pSet.has(pinA) && noF2Bfs.nSet.has(pinB)) || (noF2Bfs.pSet.has(pinB) && noF2Bfs.nSet.has(pinA));
+      return !f2Blown && onWithF2 && !onWithoutF2;
+    };
+
+    const litPL1 = isLampLit('IOP_TB7_T', 'IOP_TB8_T');
+    const litPL2 = isLampLit('IOP_TB7_T', 'IOP_TB9_T');
+    const litPL3 = isLampLit('IOP_TB7_T', 'IOP_TB10_T');
+
+    const bypassedF2 = powerActive && (
+      ((noF2Bfs.pSet.has('IOP_TB7_T') && noF2Bfs.nSet.has('IOP_TB8_T')) || (noF2Bfs.pSet.has('IOP_TB8_T') && noF2Bfs.nSet.has('IOP_TB7_T'))) ||
+      ((noF2Bfs.pSet.has('IOP_TB7_T') && noF2Bfs.nSet.has('IOP_TB9_T')) || (noF2Bfs.pSet.has('IOP_TB9_T') && noF2Bfs.nSet.has('IOP_TB7_T'))) ||
+      ((noF2Bfs.pSet.has('IOP_TB7_T') && noF2Bfs.nSet.has('IOP_TB10_T')) || (noF2Bfs.pSet.has('IOP_TB10_T') && noF2Bfs.nSet.has('IOP_TB7_T')))
+    );
+
+    return {
+      shortCircuit: finalBfs.pSet.has('PWR_NEG') || f1Blown || f2Blown,
+      fuseBlown: { F1: false, F2: false, MAIN: false, IOP_F1: f1Blown, IOP_F2: f2Blown },
+      bypassedF1,
+      bypassedF2,
+      detectedInputLogic,
+      L1: litPL1,
+      L2: litPL2,
+      L3: litPL3,
+      PL1_RED: litPL1,
+      PL2_YELLOW: litPL2,
+      PL3_GREEN: litPL3,
+      litPL1,
+      litPL2,
+      litPL3,
+      K1: false,
+      K2: false,
+      plcInputs,
+      plcOutputs,
+      comPowered,
+      posTerminals: finalBfs.pSet,
+      negTerminals: finalBfs.nSet
+    };
+  }
 
   // --- PLC Terminal Board Circuit Physics (Lab 4 & Lab 5) ---
   if (isPlcLab) {
@@ -2238,7 +3173,7 @@ function evaluateCircuit(customInputs = null, prevRelayState = { K1: false, K2: 
 }
 
 function resetFuses() {
-  state.fuseBlown = { F1: false, F2: false, MAIN: false };
+  state.fuseBlown = { F1: false, F2: false, MAIN: false, IOP_F1: false, IOP_F2: false };
   state.liveTestedRows = {};
   state.lastVerificationResults = null;
   updateSimulationUI();
@@ -4257,6 +5192,150 @@ function renderSchematic() {
         <path d="M295 ${pl1Y + 40} V248 ${usePL2 ? `M335 ${pl2Y + 40} V248` : ''} H40" fill="none" stroke="${(l1GndWired || l2GndWired) && pwrNegActive ? gndStroke : idleStroke}" stroke-width="2.5"/>
       </svg>
     `;
+  } else if (lab && lab.isIoPanelLab) {
+    const ioCfg = state.ioPanelConfig || { pb1Bit: 3, pb2Bit: 4, ss0Bit: 5, emBit: 6, pl1Bit: 2, pl2Bit: 3, pl3Bit: 4 };
+    const spec = getPlcModelSpec();
+    const ioSw = state.ioPanelSwitches || { PB1: false, PB2: false, SS0: false, PB_EM: false };
+    const isInternal = Boolean(state.ioPanelShowInternalSchem);
+
+    const pb1On = Boolean(ioSw.PB1);
+    const pb2On = Boolean(ioSw.PB2);
+    const ss0On = Boolean(ioSw.SS0);
+    const emNormal = !ioSw.PB_EM;
+
+    const litPL1 = Boolean(res.litPL1 || res.PL1_RED);
+    const litPL2 = Boolean(res.litPL2 || res.PL2_YELLOW);
+    const litPL3 = Boolean(res.litPL3 || res.PL3_GREEN);
+
+    if (isInternal) {
+      svgContent = `
+        <svg viewBox="0 0 380 270">
+          <rect x="15" y="15" width="350" height="240" rx="8" fill="#f8fafc" stroke="#334155" stroke-width="2" />
+          <text x="190" y="32" text-anchor="middle" fill="#0284c7" font-size="11" font-weight="800">วงจรการต่ออุปกรณ์ภายในกล่อง I/O PANEL (TB 1–10)</text>
+
+          <!-- INPUT SECTION (Left): TB 1 to TB 2..5 -->
+          <line x1="50" y1="55" x2="50" y2="175" stroke="#0284c7" stroke-width="2.5" />
+          <circle cx="50" cy="55" r="4" fill="#0284c7" />
+          <text x="45" y="50" text-anchor="end" fill="#0284c7" font-size="9.5" font-weight="700">TB 1 (COM IN)</text>
+
+          <!-- Branch 1: PB1 NO -> TB 2 -->
+          <line x1="50" y1="75" x2="80" y2="75" stroke="${pb1On ? '#22c55e' : '#64748b'}" stroke-width="2" />
+          <line x1="80" y1="68" x2="80" y2="82" stroke="#334155" stroke-width="2" />
+          <line x1="96" y1="68" x2="96" y2="82" stroke="#334155" stroke-width="2" />
+          <line x1="${pb1On ? 80 : 84}" y1="75" x2="${pb1On ? 96 : 92}" y2="${pb1On ? 75 : 68}" stroke="${pb1On ? '#22c55e' : '#ef4444'}" stroke-width="2.5" />
+          <line x1="96" y1="75" x2="135" y2="75" stroke="${pb1On ? '#22c55e' : '#64748b'}" stroke-width="2" />
+          <circle cx="135" cy="75" r="3.5" fill="#15803d" />
+          <text x="88" y="62" text-anchor="middle" fill="#15803d" font-size="8.5" font-weight="700">PB1 (NO)</text>
+          <text x="140" y="78" fill="#0f172a" font-size="9" font-weight="700">TB 2</text>
+
+          <!-- Branch 2: PB2 NO -> TB 3 -->
+          <line x1="50" y1="110" x2="80" y2="110" stroke="${pb2On ? '#22c55e' : '#64748b'}" stroke-width="2" />
+          <line x1="80" y1="103" x2="80" y2="117" stroke="#334155" stroke-width="2" />
+          <line x1="96" y1="103" x2="96" y2="117" stroke="#334155" stroke-width="2" />
+          <line x1="${pb2On ? 80 : 84}" y1="110" x2="${pb2On ? 96 : 92}" y2="${pb2On ? 110 : 103}" stroke="${pb2On ? '#22c55e' : '#ef4444'}" stroke-width="2.5" />
+          <line x1="96" y1="110" x2="135" y2="110" stroke="${pb2On ? '#22c55e' : '#64748b'}" stroke-width="2" />
+          <circle cx="135" cy="110" r="3.5" fill="#dc2626" />
+          <text x="88" y="97" text-anchor="middle" fill="#dc2626" font-size="8.5" font-weight="700">PB2 (NO)</text>
+          <text x="140" y="113" fill="#0f172a" font-size="9" font-weight="700">TB 3</text>
+
+          <!-- Branch 3: SS0 NO -> TB 4 -->
+          <line x1="50" y1="145" x2="80" y2="145" stroke="${ss0On ? '#22c55e' : '#64748b'}" stroke-width="2" />
+          <line x1="80" y1="138" x2="80" y2="152" stroke="#334155" stroke-width="2" />
+          <line x1="96" y1="138" x2="96" y2="152" stroke="#334155" stroke-width="2" />
+          <line x1="${ss0On ? 80 : 84}" y1="145" x2="${ss0On ? 96 : 92}" y2="${ss0On ? 145 : 138}" stroke="${ss0On ? '#22c55e' : '#ef4444'}" stroke-width="2.5" />
+          <line x1="96" y1="145" x2="135" y2="145" stroke="${ss0On ? '#22c55e' : '#64748b'}" stroke-width="2" />
+          <circle cx="135" cy="145" r="3.5" fill="#ca8a04" />
+          <text x="88" y="132" text-anchor="middle" fill="#ca8a04" font-size="8.5" font-weight="700">SS0 (AUTO)</text>
+          <text x="140" y="148" fill="#0f172a" font-size="9" font-weight="700">TB 4</text>
+
+          <!-- Branch 4: PB_EM NC -> TB 5 -->
+          <line x1="50" y1="175" x2="80" y2="175" stroke="${emNormal ? '#22c55e' : '#64748b'}" stroke-width="2" />
+          <line x1="80" y1="168" x2="80" y2="182" stroke="#334155" stroke-width="2" />
+          <line x1="96" y1="168" x2="96" y2="182" stroke="#334155" stroke-width="2" />
+          <line x1="80" y1="175" x2="96" y2="175" stroke="${emNormal ? '#22c55e' : '#ef4444'}" stroke-width="2.5" />
+          <line x1="84" y1="184" x2="92" y2="166" stroke="${emNormal ? '#22c55e' : '#ef4444'}" stroke-width="2.5" />
+          <line x1="96" y1="175" x2="135" y2="175" stroke="${emNormal ? '#22c55e' : '#64748b'}" stroke-width="2" />
+          <circle cx="135" cy="175" r="3.5" fill="#dc2626" />
+          <text x="88" y="162" text-anchor="middle" fill="#dc2626" font-size="8.5" font-weight="700">PB_EM (NC)</text>
+          <text x="140" y="178" fill="#0f172a" font-size="9" font-weight="700">TB 5</text>
+
+          <!-- Divider -->
+          <line x1="185" y1="45" x2="185" y2="210" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="4 3" />
+
+          <!-- OUTPUT SECTION (Right): TB 7 to TB 8..10 -->
+          <line x1="230" y1="55" x2="230" y2="175" stroke="#0284c7" stroke-width="2.5" />
+          <circle cx="230" cy="55" r="4" fill="#0284c7" />
+          <text x="225" y="50" text-anchor="end" fill="#0284c7" font-size="9.5" font-weight="700">TB 7 (COM OUT)</text>
+
+          <!-- Branch 1: PL1 -> TB 8 -->
+          <line x1="230" y1="80" x2="270" y2="80" stroke="${litPL1 ? '#ef4444' : '#64748b'}" stroke-width="2" />
+          <circle cx="285" cy="80" r="14" fill="${litPL1 ? '#ef4444' : '#7f1d1d'}" stroke="#334155" stroke-width="2" />
+          <path d="M276 71 L294 89 M294 71 L276 89" stroke="#ffffff" stroke-width="1.8" />
+          <line x1="299" y1="80" x2="330" y2="80" stroke="${litPL1 ? '#ef4444' : '#64748b'}" stroke-width="2" />
+          <circle cx="330" cy="80" r="3.5" fill="#dc2626" />
+          <text x="285" y="62" text-anchor="middle" fill="#dc2626" font-size="8.5" font-weight="700">PL1 (RED)</text>
+          <text x="335" y="83" fill="#0f172a" font-size="9" font-weight="700">TB 8</text>
+
+          <!-- Branch 2: PL2 -> TB 9 -->
+          <line x1="230" y1="125" x2="270" y2="125" stroke="${litPL2 ? '#facc15' : '#64748b'}" stroke-width="2" />
+          <circle cx="285" cy="125" r="14" fill="${litPL2 ? '#facc15' : '#78350f'}" stroke="#334155" stroke-width="2" />
+          <path d="M276 116 L294 134 M294 116 L276 134" stroke="#ffffff" stroke-width="1.8" />
+          <line x1="299" y1="125" x2="330" y2="125" stroke="${litPL2 ? '#facc15' : '#64748b'}" stroke-width="2" />
+          <circle cx="330" cy="125" r="3.5" fill="#d97706" />
+          <text x="285" y="107" text-anchor="middle" fill="#d97706" font-size="8.5" font-weight="700">PL2 (YELLOW)</text>
+          <text x="335" y="128" fill="#0f172a" font-size="9" font-weight="700">TB 9</text>
+
+          <!-- Branch 3: PL3 -> TB 10 -->
+          <line x1="230" y1="170" x2="270" y2="170" stroke="${litPL3 ? '#22c55e' : '#64748b'}" stroke-width="2" />
+          <circle cx="285" cy="170" r="14" fill="${litPL3 ? '#22c55e' : '#064e3b'}" stroke="#334155" stroke-width="2" />
+          <path d="M276 161 L294 179 M294 161 L276 179" stroke="#ffffff" stroke-width="1.8" />
+          <line x1="299" y1="170" x2="330" y2="170" stroke="${litPL3 ? '#22c55e' : '#64748b'}" stroke-width="2" />
+          <circle cx="330" cy="170" r="3.5" fill="#15803d" />
+          <text x="285" y="152" text-anchor="middle" fill="#15803d" font-size="8.5" font-weight="700">PL3 (GREEN)</text>
+          <text x="335" y="173" fill="#0f172a" font-size="9" font-weight="700">TB 10</text>
+
+          <text x="190" y="240" text-anchor="middle" fill="#64748b" font-size="9.5">💡 คลิกปุ่มสลับดูวงจรเชื่อมต่อระบบ (System) เพื่อดูการต่อสายเข้า Terminal PLC</text>
+        </svg>
+      `;
+    } else {
+      svgContent = `
+        <svg viewBox="0 0 380 270">
+          <rect x="10" y="10" width="360" height="250" rx="8" fill="#f8fafc" stroke="#334155" stroke-width="1.5" />
+          <text x="190" y="28" text-anchor="middle" fill="#0f172a" font-size="11" font-weight="800">แผนผังระบบการต่อสาย: I/O Panel ➔ Fuses ➔ PLC Terminals</text>
+
+          <!-- 24VDC Power Source -->
+          <rect x="25" y="42" width="60" height="34" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5" />
+          <text x="55" y="58" text-anchor="middle" fill="#b91c1c" font-size="9.5" font-weight="800">+24VDC</text>
+          <text x="55" y="70" text-anchor="middle" fill="#b91c1c" font-size="8">POWER</text>
+
+          <rect x="25" y="85" width="60" height="34" rx="4" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.5" />
+          <text x="55" y="101" text-anchor="middle" fill="#0369a1" font-size="9.5" font-weight="800">0VDC</text>
+          <text x="55" y="113" text-anchor="middle" fill="#0369a1" font-size="8">GND</text>
+
+          <!-- Middle Fuses -->
+          <rect x="125" y="42" width="45" height="34" rx="4" fill="#38bdf8" stroke="#0284c7" stroke-width="1.5" />
+          <text x="147.5" y="62" text-anchor="middle" fill="#0f172a" font-size="10" font-weight="800">F1 (2A)</text>
+
+          <rect x="125" y="170" width="45" height="34" rx="4" fill="#38bdf8" stroke="#0284c7" stroke-width="1.5" />
+          <text x="147.5" y="190" text-anchor="middle" fill="#0f172a" font-size="10" font-weight="800">F2 (2A)</text>
+
+          <!-- I/O Panel Box -->
+          <rect x="210" y="42" width="150" height="85" rx="5" fill="#f1f5f9" stroke="#475569" stroke-width="1.5" />
+          <text x="285" y="58" text-anchor="middle" fill="#0284c7" font-size="10" font-weight="800">INPUT PANEL (TB 1–5)</text>
+          <text x="285" y="75" text-anchor="middle" fill="#334155" font-size="8.5">TB 1 (COM) | TB 2 (PB1)</text>
+          <text x="285" y="90" text-anchor="middle" fill="#334155" font-size="8.5">TB 3 (PB2) | TB 4 (SS0)</text>
+          <text x="285" y="105" text-anchor="middle" fill="#dc2626" font-size="8.5" font-weight="700">TB 5 (PB_EM NC)</text>
+
+          <rect x="210" y="145" width="150" height="85" rx="5" fill="#f1f5f9" stroke="#475569" stroke-width="1.5" />
+          <text x="285" y="162" text-anchor="middle" fill="#15803d" font-size="10" font-weight="800">OUTPUT PANEL (TB 7–10)</text>
+          <text x="285" y="179" text-anchor="middle" fill="#334155" font-size="8.5">TB 7 (COM OUT)</text>
+          <text x="285" y="194" text-anchor="middle" fill="#dc2626" font-size="8.5">TB 8 (PL1) 🔴 | TB 9 (PL2) 🟡</text>
+          <text x="285" y="209" text-anchor="middle" fill="#16a34a" font-size="8.5">TB 10 (PL3) 🟢</text>
+
+          <text x="190" y="250" text-anchor="middle" fill="#64748b" font-size="9.5">💡 คลิกปุ่ม "🔍 ดูวงจรภายใน I/O Panel" เพื่อดูผังวงจรสวิตช์และหลอดไฟด้านในกล่อง</text>
+        </svg>
+      `;
+    }
   } else if (lab && lab.customSchematic) {
     svgContent = generateCustomSchematicSvg(lab.customSchematic, {
       s1,
@@ -4309,7 +5388,7 @@ function renderTruthTable(verificationResults = null) {
 
   const thead = table.querySelector('thead');
   let headers = '<tr><th>ลำดับ</th>';
-  if (lab.isSequentialLatch) {
+  if (lab.isSequentialLatch || lab.isIoPanelLab) {
     headers += '<th>สภาวะการทดสอบ</th>';
   }
   const isPlc = Boolean(lab.isPlcTerminalLab);
@@ -4317,7 +5396,14 @@ function renderTruthTable(verificationResults = null) {
 
   lab.inputs.forEach((inp) => {
     if (isPlc) {
-      if (lab.id === 'lab_summary_3_5') {
+      if (lab.isIoPanelLab) {
+        const ioCfg = state.ioPanelConfig || { pb1Bit: 3, pb2Bit: 4, ss0Bit: 5, emBit: 6 };
+        if (inp === 'PB1') headers += `<th>PB1 (${spec.termInShort(ioCfg.pb1Bit)})</th>`;
+        else if (inp === 'PB2') headers += `<th>PB2 (${spec.termInShort(ioCfg.pb2Bit)})</th>`;
+        else if (inp === 'SS0') headers += `<th>SS0 (${spec.termInShort(ioCfg.ss0Bit)})</th>`;
+        else if (inp === 'PB_EM') headers += `<th>PB_EM (${spec.termInShort(ioCfg.emBit)})</th>`;
+        else headers += `<th>${inp}</th>`;
+      } else if (lab.id === 'lab_summary_3_5') {
         const sumCfg = (typeof plcState !== 'undefined' && plcState.summaryConfig) ? plcState.summaryConfig : {};
         if (inp === 'S1') headers += `<th>PB1 (${spec.termInShort(sumCfg.s1Bit ?? 2)})</th>`;
         else if (inp === 'S2') headers += `<th>PB2 (${spec.termInShort(sumCfg.s2Bit ?? 4)})</th>`;
@@ -4336,7 +5422,13 @@ function renderTruthTable(verificationResults = null) {
   }
   lab.outputs.forEach((out) => {
     if (isPlc) {
-      if (lab.id === 'lab_summary_3_5') {
+      if (lab.isIoPanelLab) {
+        const ioCfg = state.ioPanelConfig || { pl1Bit: 2, pl2Bit: 3, pl3Bit: 4 };
+        if (out === 'PL1_RED') headers += `<th>PL1 Red (${spec.termOutShort(ioCfg.pl1Bit)}) คาดหวัง</th>`;
+        else if (out === 'PL2_YELLOW') headers += `<th>PL2 Yellow (${spec.termOutShort(ioCfg.pl2Bit)}) คาดหวัง</th>`;
+        else if (out === 'PL3_GREEN') headers += `<th>PL3 Green (${spec.termOutShort(ioCfg.pl3Bit)}) คาดหวัง</th>`;
+        else headers += `<th>${out} (คาดหวัง)</th>`;
+      } else if (lab.id === 'lab_summary_3_5') {
         const sumCfg = (typeof plcState !== 'undefined' && plcState.summaryConfig) ? plcState.summaryConfig : {};
         if (out === 'L1') headers += `<th>PL1 (${spec.termOutShort(sumCfg.pl1Bit ?? 1)}) คาดหวัง</th>`;
         else if (out === 'L2') headers += `<th>PL2 (${spec.termOutShort(sumCfg.pl2Bit ?? 3)}) คาดหวัง</th>`;
@@ -4374,7 +5466,15 @@ function highlightActiveTruthRow() {
 
   // 1. Determine currently active row in lab.truthTable
   let activeRowIdx = -1;
-  if (lab.isSequentialLatch) {
+  if (lab.isIoPanelLab) {
+    const swPB1 = state.ioPanelSwitches.PB1 ? 1 : 0;
+    const swPB2 = state.ioPanelSwitches.PB2 ? 1 : 0;
+    const swSS0 = state.ioPanelSwitches.SS0 ? 1 : 0;
+    const swEM  = state.ioPanelSwitches.PB_EM ? 1 : 0;
+    activeRowIdx = lab.truthTable.findIndex((row) => {
+      return row.PB1 === swPB1 && row.PB2 === swPB2 && row.SS0 === swSS0 && row.PB_EM === swEM;
+    });
+  } else if (lab.isSequentialLatch) {
     if (s2 === 1) {
       activeRowIdx = 3;
     } else if (s1 === 1 && s2 === 0) {
@@ -4435,8 +5535,8 @@ function highlightActiveTruthRow() {
     // Column: ลำดับ
     rowsHtml += `<td>${isActive ? '<span class="live-row-indicator">▶</span> ' : ''}${idx + 1}</td>`;
 
-    // Column: สภาวะการทดสอบ (Sequential Latch only)
-    if (lab.isSequentialLatch) {
+    // Column: สภาวะการทดสอบ (Sequential Latch & I/O Panel)
+    if (lab.isSequentialLatch || lab.isIoPanelLab) {
       rowsHtml += `<td style="text-align:left">${row.step}</td>`;
     }
 
@@ -4512,6 +5612,44 @@ function applyTruthTableRow(rowIdx) {
   if (!lab || !lab.truthTable || !lab.truthTable[rowIdx]) return;
   const row = lab.truthTable[rowIdx];
 
+  if (lab.isIoPanelLab) {
+    if (row.PB1 !== undefined) state.ioPanelSwitches.PB1 = Boolean(row.PB1);
+    if (row.PB2 !== undefined) state.ioPanelSwitches.PB2 = Boolean(row.PB2);
+    if (row.SS0 !== undefined) state.ioPanelSwitches.SS0 = Boolean(row.SS0);
+    if (row.PB_EM !== undefined) state.ioPanelSwitches.PB_EM = Boolean(row.PB_EM);
+
+    if (rowIdx > 0) {
+      let replaySeq = { M20: false, M21: false, assignM10: false, assignM11: false };
+      for (let s = 0; s <= rowIdx; s++) {
+        const stepCase = lab.truthTable[s];
+        evaluateCircuit({
+          PB1: stepCase.PB1,
+          PB2: stepCase.PB2,
+          SS0: stepCase.SS0,
+          PB_EM: stepCase.PB_EM,
+          _prevM20: replaySeq.M20,
+          _prevM21: replaySeq.M21,
+          _prevAssignM10: replaySeq.assignM10,
+          _prevAssignM11: replaySeq.assignM11
+        });
+        replaySeq.M20 = state.ioPanelPlcState.M20;
+        replaySeq.M21 = state.ioPanelPlcState.M21;
+        replaySeq.assignM10 = state.ioPanelPlcState.assignM10;
+        replaySeq.assignM11 = state.ioPanelPlcState.assignM11;
+      }
+    } else {
+      state.ioPanelPlcState = { M0: false, M1: false, M10: false, M11: false, M20: false, M21: false, assignM10: false, assignM11: false };
+    }
+
+    evaluateCircuit();
+    renderWires();
+    updateSimulationUI();
+    highlightActiveTruthRow();
+    renderPlcLadderDiagram();
+    renderSchematic();
+    return;
+  }
+
   if (lab.isSequentialLatch) {
     if (rowIdx === 0) {
       state.switches.S1.pressed = false;
@@ -4539,6 +5677,107 @@ function applyTruthTableRow(rowIdx) {
     if (row.S2 !== undefined) state.switches.S2.pressed = Boolean(row.S2);
   }
   updateSimulationUI();
+}
+
+// Diagnostic Hint Engine for I/O Panel labs (Version 3.0.0)
+function getIoPanelDiagnosticHint() {
+  const ioCfg = state.ioPanelConfig || { pb1Bit: 3, pb2Bit: 4, ss0Bit: 5, emBit: 6, pl1Bit: 2, pl2Bit: 3, pl3Bit: 4 };
+  const spec = getPlcModelSpec();
+  const isPos = (state.plcWiringLogic === 'positive');
+  const wires = state.wires || [];
+
+  const isTermWired = (t) => wires.some((w) => w.from === t || w.to === t);
+
+  // 1. Check Fuses blown
+  if (state.fuseBlown && state.fuseBlown.IOP_F1) {
+    return '💥 ฟิวส์ F1 (อินพุต) ขาด! ตรวจพบการต่อสายลัดวงจรระหว่าง 24V และ 0V ในฝั่งอินพุต กรุณาแก้ไขสายไฟแล้วคลิกที่ตัวฟิวส์เพื่อรีเซต';
+  }
+  if (state.fuseBlown && state.fuseBlown.IOP_F2) {
+    return '💥 ฟิวส์ F2 (เอาต์พุต) ขาด! ตรวจพบการต่อสายลัดวงจรระหว่าง 24V และ 0V ในฝั่งเอาต์พุต กรุณาแก้ไขสายไฟแล้วคลิกที่ตัวฟิวส์เพื่อรีเซต';
+  }
+
+  // 2. Check Input Side Power & F1
+  if (!isPos) {
+    if (!isTermWired('IOP_F1_T')) {
+      return '💡 ยังไม่ได้ต่อไฟเลี้ยงเข้าฟิวส์ F1: ใน Negative Logic ให้ต่อสายไฟจาก <b>IOP_IN_24V_L</b> เข้า <b>IOP_F1_T</b> (ขาเข้าฟิวส์ F1)';
+    }
+    if (!isTermWired('IOP_IN_COM_L')) {
+      return '💡 ยังไม่ได้ต่อคอมมอนอินพุต COM: ใน Negative Logic ให้ต่อสายไฟจาก <b>IOP_F1_B</b> (ขาออกฟิวส์ F1) เข้า <b>IOP_IN_COM_L</b>';
+    }
+    if (!isTermWired('IOP_TB1_B')) {
+      return '💡 ยังไม่ได้ต่อกราวด์เข้า TB No.1 (Common Input): ใน Negative Logic ให้ต่อสายกราวด์จาก <b>IOP_IN_0V_L</b> เข้า <b>IOP_TB1_B</b>';
+    }
+  } else {
+    if (!isTermWired('IOP_IN_COM_L')) {
+      return '💡 ยังไม่ได้ต่อคอมมอนอินพุต COM: ใน Positive Logic ให้ต่อสายกราวด์จาก <b>IOP_IN_0V_L</b> เข้า <b>IOP_IN_COM_L</b>';
+    }
+    if (!isTermWired('IOP_F1_T')) {
+      return '💡 ยังไม่ได้ต่อไฟเลี้ยงเข้าฟิวส์ F1: ใน Positive Logic ให้ต่อสายไฟจาก <b>IOP_IN_24V_L</b> เข้า <b>IOP_F1_T</b> (ขาเข้าฟิวส์ F1)';
+    }
+    if (!isTermWired('IOP_TB1_B')) {
+      return '💡 ยังไม่ได้ต่อไฟเลี้ยงเข้า TB No.1 (Common Input): ใน Positive Logic ให้ต่อสายไฟจาก <b>IOP_F1_B</b> เข้า <b>IOP_TB1_B</b>';
+    }
+  }
+
+  // 3. Check Input Signal Wires
+  if (!isTermWired(`IOP_IN_I${ioCfg.pb1Bit}_L`)) {
+    return `💡 ยังไม่ได้ต่อสายสัญญาณ PB1: ต่อสายไฟจาก <b>IOP_TB2_B</b> เข้า <b>IOP_IN_I${ioCfg.pb1Bit}_L</b> (${spec.termInShort(ioCfg.pb1Bit)})`;
+  }
+  if (!isTermWired(`IOP_IN_I${ioCfg.pb2Bit}_L`)) {
+    return `💡 ยังไม่ได้ต่อสายสัญญาณ PB2: ต่อสายไฟจาก <b>IOP_TB3_B</b> เข้า <b>IOP_IN_I${ioCfg.pb2Bit}_L</b> (${spec.termInShort(ioCfg.pb2Bit)})`;
+  }
+  if (!isTermWired(`IOP_IN_I${ioCfg.ss0Bit}_L`)) {
+    return `💡 ยังไม่ได้ต่อสายสัญญาณ SS0_Auto: ต่อสายไฟจาก <b>IOP_TB4_B</b> เข้า <b>IOP_IN_I${ioCfg.ss0Bit}_L</b> (${spec.termInShort(ioCfg.ss0Bit)})`;
+  }
+  if (!isTermWired(`IOP_IN_I${ioCfg.emBit}_L`)) {
+    return `💡 ยังไม่ได้ต่อสายสัญญาณ PB_EM: ต่อสายไฟจาก <b>IOP_TB5_B</b> เข้า <b>IOP_IN_I${ioCfg.emBit}_L</b> (${spec.termInShort(ioCfg.emBit)})`;
+  }
+
+  // 4. Check Output Side Power & F2
+  const bitsUsed = [ioCfg.pl1Bit, ioCfg.pl2Bit, ioCfg.pl3Bit];
+  const needCom0 = bitsUsed.some((b) => b <= 3);
+  const needCom1 = bitsUsed.some((b) => b >= 4);
+
+  if (!isPos) {
+    if (!isTermWired('IOP_F2_T')) {
+      return '💡 ยังไม่ได้ต่อไฟเลี้ยงเข้าฟิวส์ F2: ใน Negative Logic ให้ต่อสายไฟจาก <b>IOP_OUT_24V_L</b> เข้า <b>IOP_F2_T</b> (ขาเข้าฟิวส์ F2)';
+    }
+    if (needCom0 && !isTermWired('IOP_OUT_COM0_L')) {
+      return '💡 ยังไม่ได้ต่อไฟเข้า COM0: หลอดไฟใช้เอาต์พุต Q0..Q3 ให้ต่อสายไฟจากขาออกฟิวส์ F2 เข้า <b>IOP_OUT_COM0_L</b>';
+    }
+    if (needCom1 && !isTermWired('IOP_OUT_COM1_L')) {
+      return '💡 ยังไม่ได้ต่อไฟเข้า COM1: หลอดไฟใช้เอาต์พุต Q4..Q6 ให้ต่อสายจั๊มเปอร์ไฟเข้า <b>IOP_OUT_COM1_L</b>';
+    }
+    if (!isTermWired('IOP_TB7_B')) {
+      return '💡 ยังไม่ได้ต่อกราวด์เข้า TB No.7 (Common Output): ใน Negative Logic ให้ต่อสายกราวด์จาก <b>IOP_OUT_0V_L</b> เข้า <b>IOP_TB7_B</b>';
+    }
+  } else {
+    if (needCom0 && !isTermWired('IOP_OUT_COM0_L')) {
+      return '💡 ยังไม่ได้ต่อกราวด์เข้า COM0: ใน Positive Logic ให้ต่อสายกราวด์จาก <b>IOP_OUT_0V_L</b> เข้า <b>IOP_OUT_COM0_L</b>';
+    }
+    if (needCom1 && !isTermWired('IOP_OUT_COM1_L')) {
+      return '💡 ยังไม่ได้ต่อกราวด์เข้า COM1: ใน Positive Logic ให้ต่อสายจั๊มเปอร์กราวด์เข้า <b>IOP_OUT_COM1_L</b>';
+    }
+    if (!isTermWired('IOP_F2_T')) {
+      return '💡 ยังไม่ได้ต่อไฟเลี้ยงเข้าฟิวส์ F2: ใน Positive Logic ให้ต่อสายไฟจาก <b>IOP_OUT_24V_L</b> เข้า <b>IOP_F2_T</b>';
+    }
+    if (!isTermWired('IOP_TB7_B')) {
+      return '💡 ยังไม่ได้ต่อไฟเลี้ยงเข้า TB No.7 (Common Output): ใน Positive Logic ให้ต่อสายไฟจาก <b>IOP_F2_B</b> เข้า <b>IOP_TB7_B</b>';
+    }
+  }
+
+  // 5. Check Output Signal Wires
+  if (!isTermWired(`IOP_OUT_Q${ioCfg.pl1Bit}_L`)) {
+    return `💡 ยังไม่ได้ต่อสายสัญญาณหลอดไฟ PL1_RED: ต่อสายไฟจาก <b>IOP_OUT_Q${ioCfg.pl1Bit}_L</b> (${spec.termOutShort(ioCfg.pl1Bit)}) เข้า <b>IOP_TB8_B</b>`;
+  }
+  if (!isTermWired(`IOP_OUT_Q${ioCfg.pl2Bit}_L`)) {
+    return `💡 ยังไม่ได้ต่อสายสัญญาณหลอดไฟ PL2_YELLOW: ต่อสายไฟจาก <b>IOP_OUT_Q${ioCfg.pl2Bit}_L</b> (${spec.termOutShort(ioCfg.pl2Bit)}) เข้า <b>IOP_TB9_B</b>`;
+  }
+  if (!isTermWired(`IOP_OUT_Q${ioCfg.pl3Bit}_L`)) {
+    return `💡 ยังไม่ได้ต่อสายสัญญาณหลอดไฟ PL3_GREEN: ต่อสายไฟจาก <b>IOP_OUT_Q${ioCfg.pl3Bit}_L</b> (${spec.termOutShort(ioCfg.pl3Bit)}) เข้า <b>IOP_TB10_B</b>`;
+  }
+
+  return '💡 ตรวจสอบตำแหน่ง Bit Position ของสวิตช์และหลอดไฟให้ตรงกับตารางกำหนด Address';
 }
 
 // Diagnostic Hint Engine for lab_summary_3_5: pinpoints exact miswired bit or contact
@@ -4727,10 +5966,30 @@ function runAutomatedVerification() {
   let hasBypassedF2 = false;
   let detectedLogic = null;
   let relayState = { K1: false, K2: false };
+  let ioMem = { M10: false, M11: false, M20: false, M21: false, assignM10: false, assignM11: false };
 
   lab.truthTable.forEach((testCase) => {
-    const sim = evaluateCircuit({ S1: testCase.S1, S2: testCase.S2 }, relayState);
-    relayState = { K1: sim.K1, K2: sim.K2 };
+    let sim;
+    if (lab.isIoPanelLab) {
+      sim = evaluateCircuit({
+        PB1: testCase.PB1,
+        PB2: testCase.PB2,
+        SS0: testCase.SS0,
+        PB_EM: testCase.PB_EM,
+        _prevM20: ioMem.M20,
+        _prevM21: ioMem.M21,
+        _prevAssignM10: ioMem.assignM10,
+        _prevAssignM11: ioMem.assignM11
+      });
+      if (sim.ioPlcState) {
+        ioMem = { ...sim.ioPlcState };
+      } else if (state.ioPanelPlcState) {
+        ioMem = { ...state.ioPanelPlcState };
+      }
+    } else {
+      sim = evaluateCircuit({ S1: testCase.S1, S2: testCase.S2 }, relayState);
+      relayState = { K1: sim.K1, K2: sim.K2 };
+    }
 
     if (sim.shortCircuit) {
       hasShortCircuit = true;
@@ -4743,6 +6002,14 @@ function runAutomatedVerification() {
       if (sim.fuseBlown.F2) {
         f2BlownDetected = true;
         if (state.fuseBlown) state.fuseBlown.F2 = true;
+      }
+      if (sim.fuseBlown.IOP_F1) {
+        f1BlownDetected = true;
+        if (state.fuseBlown) state.fuseBlown.IOP_F1 = true;
+      }
+      if (sim.fuseBlown.IOP_F2) {
+        f2BlownDetected = true;
+        if (state.fuseBlown) state.fuseBlown.IOP_F2 = true;
       }
       if (sim.fuseBlown.MAIN) {
         if (state.fuseBlown) state.fuseBlown.MAIN = true;
@@ -4768,13 +6035,20 @@ function runAutomatedVerification() {
 
     if (!rowPass) allPassed = false;
 
+    const rowActual = {
+      L1: sim.L1,
+      L2: sim.L2,
+      RELAY: actualRelay
+    };
+    if (lab.isIoPanelLab) {
+      rowActual.PL1_RED = sim.PL1_RED;
+      rowActual.PL2_YELLOW = sim.PL2_YELLOW;
+      rowActual.PL3_GREEN = sim.PL3_GREEN;
+    }
+
     rowResults.push({
       passed: rowPass,
-      actual: {
-        L1: sim.L1,
-        L2: sim.L2,
-        RELAY: actualRelay
-      }
+      actual: rowActual
     });
   });
 
@@ -4791,7 +6065,13 @@ function runAutomatedVerification() {
   if (hasShortCircuit) {
     banner.className = 'verification-banner error';
     let blownMsg = 'ตรวจพบการลัดวงจร (Short Circuit)!';
-    if (isPlcLab) {
+    if (lab && lab.isIoPanelLab) {
+      const blownNames = [];
+      if (f1BlownDetected) blownNames.push('F1 (อินพุต)');
+      if (f2BlownDetected) blownNames.push('F2 (เอาต์พุต)');
+      if (blownNames.length === 0) blownNames.push('F1 / F2');
+      blownMsg = `💥 ฟิวส์ ${blownNames.join(' และ ')} ขาดเนื่องจากลัดวงจร! ตรวจพบสายไฟต่อตรงระหว่าง <b>+24V</b> และ <b>0V</b><br><span style="font-size:0.88rem;color:#fca5a5;">${getIoPanelDiagnosticHint()}</span>`;
+    } else if (isPlcLab) {
       const blownNames = [];
       if (f1BlownDetected) blownNames.push('F1 (ฝั่งอินพุต)');
       if (f2BlownDetected) blownNames.push('F2 (ฝั่งเอาต์พุต)');
@@ -4860,7 +6140,9 @@ function runAutomatedVerification() {
     scoreBadge.textContent = `ผ่าน (${score}/10 คะแนน)`;
   } else {
     let diagHint = 'ตรวจสอบการเลือกขั้ว NO / NC ของสวิตช์ และการต่อครบวงจรกลับไปยังขั้ว 0V (-)';
-    if (state.currentLabId === 'lab_summary_3_5') {
+    if (lab.isIoPanelLab) {
+      diagHint = getIoPanelDiagnosticHint();
+    } else if (state.currentLabId === 'lab_summary_3_5') {
       diagHint = getSummaryLabDiagnosticHint();
     } else if (hasBypassedF1 || hasBypassedF2) {
       diagHint = '⚠️ ตรวจพบการต่อสายข้ามฟิวส์ (FUSE): กรุณาต่อสายไฟเลี้ยงผ่านฟิวส์ F ตามวงจรสัญลักษณ์เพื่อความปลอดภัย';
@@ -6132,24 +7414,46 @@ function loadLab(labId) {
   if (switch2Group) switch2Group.style.opacity = lab.showS2 ? '1' : '0.35';
   if (relaysGroup) relaysGroup.style.opacity = lab.showRelays ? '1' : '0.35';
 
-  // Toggle between Relay Workbench Board and PLC Terminal Block Board
+  // Toggle between Relay Workbench Board, PLC Terminal Board, and I/O Panel Board
+  const isIoPanelLab = Boolean(lab && lab.isIoPanelLab);
   const isPlcLab = Boolean(lab && lab.isPlcTerminalLab);
-  state.isPlcBoardActive = isPlcLab;
+  state.isIoPanelBoardActive = isIoPanelLab;
+  state.isPlcBoardActive = isPlcLab && !isIoPanelLab;
 
   const mainBoard = document.getElementById('mainBoard');
   const powerModule = document.getElementById('powerModule');
   const plcTerminalBoard = document.getElementById('plcTerminalBoard');
+  const ioPanelBoard = document.getElementById('ioPanelBoard');
+  const ioPanelConfigCard = document.getElementById('ioPanelConfigCard');
+  const summaryConfigPanel = document.getElementById('summaryLabConfigPanel');
   const wbBoardBadge = document.getElementById('workbenchBoardBadge');
   const pwrSupplyLabel = document.getElementById('powerSupplyLabel');
   const wbPlcModelSelect = document.getElementById('wbPlcModelSelect');
+  const ioPopSw = document.getElementById('ioPanelPopupSwGroup');
 
-  if (isPlcLab) {
+  if (isIoPanelLab) {
+    if (mainBoard) mainBoard.style.display = 'none';
+    if (powerModule) powerModule.style.display = 'none';
+    if (plcTerminalBoard) plcTerminalBoard.style.display = 'none';
+    if (ioPanelBoard) ioPanelBoard.style.display = '';
+    if (ioPanelConfigCard) ioPanelConfigCard.hidden = false;
+    if (summaryConfigPanel) summaryConfigPanel.hidden = true;
+    if (wbBoardBadge) wbBoardBadge.textContent = 'ชุดทดลองเชื่อมต่อ I/O Panel และ Terminal Wiring กับ PLC';
+    if (pwrSupplyLabel) pwrSupplyLabel.textContent = 'แหล่งจ่ายไฟ 24VDC:';
+    if (wbPlcModelSelect) wbPlcModelSelect.style.display = '';
+    if (ioPopSw) ioPopSw.style.display = 'flex';
+    syncIoPanelConfigUI();
+  } else if (isPlcLab) {
     if (mainBoard) mainBoard.style.display = 'none';
     if (powerModule) powerModule.style.display = 'none';
     if (plcTerminalBoard) plcTerminalBoard.style.display = '';
+    if (ioPanelBoard) ioPanelBoard.style.display = 'none';
+    if (ioPanelConfigCard) ioPanelConfigCard.hidden = true;
+    if (summaryConfigPanel) summaryConfigPanel.hidden = (labId !== 'lab_summary_3_5');
     if (wbBoardBadge) wbBoardBadge.textContent = 'ชุดทดลองการเชื่อมต่ออินพุต-เอาต์พุต PLC ผ่าน TERMINAL กลาง';
     if (pwrSupplyLabel) pwrSupplyLabel.textContent = 'แหล่งจ่ายไฟ 24VDC:';
     if (wbPlcModelSelect) wbPlcModelSelect.style.display = '';
+    if (ioPopSw) ioPopSw.style.display = 'none';
 
     const outSection = document.getElementById('plcOutputSectionGroup');
     if (outSection) {
@@ -6174,9 +7478,13 @@ function loadLab(labId) {
     if (mainBoard) mainBoard.style.display = '';
     if (powerModule) powerModule.style.display = '';
     if (plcTerminalBoard) plcTerminalBoard.style.display = 'none';
+    if (ioPanelBoard) ioPanelBoard.style.display = 'none';
+    if (ioPanelConfigCard) ioPanelConfigCard.hidden = true;
+    if (summaryConfigPanel) summaryConfigPanel.hidden = true;
     if (wbBoardBadge) wbBoardBadge.textContent = 'ชุดทดลองการเชื่อมต่อวงจรไฟฟ้าควบคุมด้วย RELAY';
     if (pwrSupplyLabel) pwrSupplyLabel.textContent = 'แหล่งจ่ายไฟ 12VDC:';
     if (wbPlcModelSelect) wbPlcModelSelect.style.display = 'none';
+    if (ioPopSw) ioPopSw.style.display = 'none';
   }
 
   const wbPlcLogicSelect = document.getElementById('wbPlcLogicSelect');
@@ -6216,7 +7524,7 @@ function loadLab(labId) {
   if (typeof plcState !== 'undefined') {
     plcState.idealMemoryM0 = false;
     plcState.userMemoryM0 = false;
-    plcState.ladderPracticeMode = Boolean(isPlcLab);
+    plcState.ladderPracticeMode = Boolean(isPlcLab && !isIoPanelLab);
     if (typeof resetUserLadderForCurrentLab === 'function') {
       resetUserLadderForCurrentLab(!plcState.ladderPracticeMode);
     }
@@ -8781,6 +10089,9 @@ function isUserLadderComplete() {
 function verifyUserLadderAgainstLab(labId = state.currentLabId) {
   const lab = (typeof LABS !== 'undefined') ? LABS[labId] : null;
   if (!lab) return { passed: true, missingLadder: false, reason: '' };
+  if (lab.isIoPanelLab && !plcState.ladderPracticeMode) {
+    return { passed: true, missingLadder: false, reason: '' };
+  }
 
   const rungs = plcState.userLadderRungs || [];
   const target = getTargetLadderForLab(labId);
@@ -9795,6 +11106,250 @@ function updatePlcFooterStatus(pState) {
   }
 }
 
+
+// Render Live 4-Rung Ladder Diagram for I/O Panel Labs (Version 3.0.0)
+function renderIoPanelLadderSVG(pState, spec) {
+  const ioCfg = (typeof state !== 'undefined' && state.ioPanelConfig) ? state.ioPanelConfig : {
+    pb1Bit: 3, pb2Bit: 4, ss0Bit: 5, emBit: 6, pl1Bit: 2, pl2Bit: 3, pl3Bit: 4
+  };
+  const isAssign = (state.currentLabId === 'lab_iopanel_assign');
+  const pwr = Boolean(pState.pwr);
+  const ioSw = state.ioPanelSwitches || { PB1: false, PB2: false, SS0: false, PB_EM: false };
+
+  const inEM  = !ioSw.PB_EM; // NC contact: closed 1 when normal, open 0 when pressed
+  const inSS0 = Boolean(ioSw.SS0);
+  const inPB1 = Boolean(ioSw.PB1);
+  const inPB2 = Boolean(ioSw.PB2);
+
+  const plcSt = state.ioPanelPlcState || {};
+  const M0 = Boolean(plcSt.M0);
+  const M1 = Boolean(plcSt.M1);
+  const M10 = Boolean(isAssign ? plcSt.assignM10 : plcSt.M10);
+  const M11 = Boolean(isAssign ? plcSt.assignM11 : plcSt.M11);
+  const M20 = Boolean(plcSt.M20);
+  const M21 = Boolean(plcSt.M21);
+
+  const H = 430;
+  const W = 400;
+
+  const rL = 22;
+  const rR = 378;
+
+  const addrPB1 = spec.termInShort(ioCfg.pb1Bit);
+  const addrPB2 = spec.termInShort(ioCfg.pb2Bit);
+  const addrSS0 = spec.termInShort(ioCfg.ss0Bit);
+  const addrEM  = spec.termInShort(ioCfg.emBit);
+
+  const addrPL1 = spec.termOutShort(ioCfg.pl1Bit);
+  const addrPL2 = spec.termOutShort(ioCfg.pl2Bit);
+  const addrPL3 = spec.termOutShort(ioCfg.pl3Bit);
+
+  // R0: SELECTOR MODE
+  const r0EmOut = pwr && inEM;
+  const r0ManOut = r0EmOut && !inSS0;
+  const r0AutoOut = r0EmOut && inSS0;
+
+  // R1: MODE MANUAL
+  const r1M0In = pwr && M0;
+  let r1TopOut, r1BotOut;
+  if (!isAssign) {
+    const pb1Out = r1M0In && inPB1;
+    r1TopOut = pb1Out && !M11;
+    const pb2Out = r1M0In && inPB2;
+    r1BotOut = pb2Out && !M10;
+  } else {
+    const pb1Branch = r1M0In && (inPB1 || M10);
+    r1TopOut = pb1Branch && !M11;
+    const pb2Branch = r1M0In && (inPB2 || M11);
+    r1BotOut = pb2Branch && !M10;
+  }
+
+  // R2: MODE AUTO
+  const r2M1In = pwr && M1;
+  const r2TopBranch = r2M1In && (inPB1 || M20);
+  const r2TopOut = r2TopBranch && !inPB2;
+  const r2BotBranch = r2M1In && (inPB2 || M21);
+  const r2BotOut = r2BotBranch && !inPB1;
+
+  // R3: DRIVE OUTPUTS
+  const r3EmIn = pwr && inEM;
+  const r3Pl1Out = r3EmIn && (M10 || M20);
+  const r3Pl3Out = r3EmIn && (M11 || M21);
+  const r3Pl2Out = r3EmIn && !r3Pl1Out && !r3Pl3Out;
+
+  return `
+    <svg viewBox="0 0 ${W} ${H}" class="plc-ladder-svg" style="min-height:${H}px;">
+      <!-- Rails -->
+      <line x1="${rL}" y1="12" x2="${rL}" y2="${H - 12}" stroke="#38bdf8" stroke-width="2.5" />
+      <text x="${rL}" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#38bdf8" text-anchor="middle">+24V</text>
+      <line x1="${rR}" y1="12" x2="${rR}" y2="${H - 12}" stroke="#64748b" stroke-width="2.5" />
+      <text x="${rR}" y="10" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" fill="#94a3b8" text-anchor="middle">0V</text>
+
+      <!-- ==================== RUNG 0: SELECTOR MODE ==================== -->
+      <text x="4" y="32" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="800" fill="#64748b">R0</text>
+      <text x="42" y="22" font-family="'Prompt', sans-serif" font-size="7.5" font-weight="700" fill="#38bdf8">RUNG 0: SELECTOR MODE (MAN / AUTO)</text>
+
+      ${drawLadderWire(rL, 36, 68 - 16, 36, pwr)}
+      ${drawLadderContactNO(68, 36, addrEM, 'PB_EM', inEM, pwr, 'PB_EM')}
+      ${drawLadderWire(68 + 16, 36, 120, 36, r0EmOut)}
+
+      <!-- MAN Branch (Top: y=36) -->
+      ${drawLadderWire(120, 36, 165 - 16, 36, r0EmOut)}
+      ${drawLadderContactNC(165, 36, addrSS0, 'SS0_MAN', !inSS0, r0EmOut, 'SS0')}
+      ${drawLadderWire(165 + 16, 36, 310 - 18, 36, r0ManOut)}
+      ${drawLadderCoil(310, 36, '%M0', 'MODE_MAN', r0ManOut, 'int', r0ManOut)}
+      ${drawLadderWire(310 + 18, 36, rR, 36, false)}
+
+      <!-- AUTO Branch (Bottom: y=68) -->
+      <circle cx="120" cy="36" r="2.5" fill="${r0EmOut ? '#22c55e' : '#475569'}" />
+      ${drawLadderWire(120, 36, 120, 68, r0EmOut)}
+      <circle cx="120" cy="68" r="2.5" fill="${r0EmOut ? '#22c55e' : '#475569'}" />
+      ${drawLadderWire(120, 68, 165 - 16, 68, r0EmOut)}
+      ${drawLadderContactNO(165, 68, addrSS0, 'SS0_AUTO', inSS0, r0EmOut, 'SS0')}
+      ${drawLadderWire(165 + 16, 68, 310 - 18, 68, r0AutoOut)}
+      ${drawLadderCoil(310, 68, '%M1', 'MODE_AUTO', r0AutoOut, 'int', r0AutoOut)}
+      ${drawLadderWire(310 + 18, 68, rR, 68, false)}
+
+      <!-- ==================== RUNG 1: MODE MANUAL ==================== -->
+      <line x1="${rL + 10}" y1="94" x2="${rR - 10}" y2="94" stroke="#334155" stroke-width="0.8" stroke-dasharray="3 3" />
+      <text x="4" y="122" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="800" fill="#64748b">R1</text>
+      <text x="42" y="106" font-family="'Prompt', sans-serif" font-size="7.5" font-weight="700" fill="${isAssign ? '#f59e0b' : '#38bdf8'}">
+        RUNG 1: ${isAssign ? 'MODE MANUAL (SELF-HOLDING LATCH - มอบหมายงาน)' : 'MODE MANUAL (INTERLOCK - ใบงาน)'}
+      </text>
+
+      ${drawLadderWire(rL, 120, 58 - 16, 120, pwr)}
+      ${drawLadderContactNO(58, 120, '%M0', 'MAN_ON', M0, pwr, null)}
+      ${drawLadderWire(58 + 16, 120, 105, 120, r1M0In)}
+
+      <!-- Rung 1 Top: PB1 -> M10 -->
+      ${drawLadderWire(105, 120, 150 - 16, 120, r1M0In)}
+      ${drawLadderContactNO(150, 120, addrPB1, 'PB1', inPB1, r1M0In, 'PB1')}
+      ${drawLadderWire(150 + 16, 120, 235 - 16, 120, r1M0In && inPB1)}
+      ${drawLadderContactNC(235, 120, '%M11', 'IL_PB2', !M11, r1M0In && inPB1, null)}
+      ${drawLadderWire(235 + 16, 120, 310 - 18, 120, r1TopOut)}
+      ${drawLadderCoil(310, 120, '%M10', 'MAN_PB1', r1TopOut, 'int', r1TopOut)}
+      ${drawLadderWire(310 + 18, 120, rR, 120, false)}
+
+      <!-- Rung 1 Bottom: PB2 -> M11 -->
+      <circle cx="105" cy="120" r="2.5" fill="${r1M0In ? '#22c55e' : '#475569'}" />
+      ${drawLadderWire(105, 120, 105, 160, r1M0In)}
+      <circle cx="105" cy="160" r="2.5" fill="${r1M0In ? '#22c55e' : '#475569'}" />
+      ${drawLadderWire(105, 160, 150 - 16, 160, r1M0In)}
+      ${drawLadderContactNO(150, 160, addrPB2, 'PB2', inPB2, r1M0In, 'PB2')}
+      ${drawLadderWire(150 + 16, 160, 235 - 16, 160, r1M0In && inPB2)}
+      ${drawLadderContactNC(235, 160, '%M10', 'IL_PB1', !M10, r1M0In && inPB2, null)}
+      ${drawLadderWire(235 + 16, 160, 310 - 18, 160, r1BotOut)}
+      ${drawLadderCoil(310, 160, '%M11', 'MAN_PB2', r1BotOut, 'int', r1BotOut)}
+      ${drawLadderWire(310 + 18, 160, rR, 160, false)}
+
+      <!-- ==================== RUNG 2: MODE AUTO ==================== -->
+      <line x1="${rL + 10}" y1="188" x2="${rR - 10}" y2="188" stroke="#334155" stroke-width="0.8" stroke-dasharray="3 3" />
+      <text x="4" y="218" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="800" fill="#64748b">R2</text>
+      <text x="42" y="200" font-family="'Prompt', sans-serif" font-size="7.5" font-weight="700" fill="#38bdf8">RUNG 2: MODE AUTO (SELF-HOLDING + INTERLOCK)</text>
+
+      ${drawLadderWire(rL, 215, 58 - 16, 215, pwr)}
+      ${drawLadderContactNO(58, 215, '%M1', 'AUTO_ON', M1, pwr, null)}
+      ${drawLadderWire(58 + 16, 215, 100, 215, r2M1In)}
+
+      <!-- Rung 2 Top: (PB1 || M20) & /PB2 -> M20 -->
+      <circle cx="100" cy="215" r="2.5" fill="${r2M1In ? '#22c55e' : '#475569'}" />
+      ${drawLadderWire(100, 215, 135 - 16, 215, r2M1In)}
+      ${drawLadderContactNO(135, 215, addrPB1, 'PB1', inPB1, r2M1In, 'PB1')}
+      ${drawLadderWire(135 + 16, 215, 185, 215, r2TopBranch)}
+
+      <!-- Parallel M20 contact under PB1 (y=235) -->
+      ${drawLadderWire(100, 215, 100, 235, r2M1In)}
+      ${drawLadderWire(100, 235, 135 - 16, 235, r2M1In)}
+      ${drawLadderContactNO(135, 235, '%M20', 'HOLD', M20, r2M1In, null)}
+      ${drawLadderWire(135 + 16, 235, 185, 235, r2M1In && M20)}
+      ${drawLadderWire(185, 235, 185, 215, r2M1In && M20)}
+      <circle cx="185" cy="215" r="2.5" fill="${r2TopBranch ? '#22c55e' : '#475569'}" />
+
+      ${drawLadderWire(185, 215, 235 - 16, 215, r2TopBranch)}
+      ${drawLadderContactNC(235, 215, addrPB2, 'PB2_STP', !inPB2, r2TopBranch, 'PB2')}
+      ${drawLadderWire(235 + 16, 215, 310 - 18, 215, r2TopOut)}
+      ${drawLadderCoil(310, 215, '%M20', 'AUTO_PL1', r2TopOut, 'int', r2TopOut)}
+      ${drawLadderWire(310 + 18, 215, rR, 215, false)}
+
+      <!-- Rung 2 Bottom: (PB2 || M21) & /PB1 -> M21 -->
+      ${drawLadderWire(100, 215, 100, 260, r2M1In)}
+      <circle cx="100" cy="260" r="2.5" fill="${r2M1In ? '#22c55e' : '#475569'}" />
+      ${drawLadderWire(100, 260, 135 - 16, 260, r2M1In)}
+      ${drawLadderContactNO(135, 260, addrPB2, 'PB2', inPB2, r2M1In, 'PB2')}
+      ${drawLadderWire(135 + 16, 260, 185, 260, r2BotBranch)}
+
+      <!-- Parallel M21 contact under PB2 (y=280) -->
+      ${drawLadderWire(100, 260, 100, 280, r2M1In)}
+      ${drawLadderWire(100, 280, 135 - 16, 280, r2M1In)}
+      ${drawLadderContactNO(135, 280, '%M21', 'HOLD', M21, r2M1In, null)}
+      ${drawLadderWire(135 + 16, 280, 185, 280, r2M1In && M21)}
+      ${drawLadderWire(185, 280, 185, 260, r2M1In && M21)}
+      <circle cx="185" cy="260" r="2.5" fill="${r2BotBranch ? '#22c55e' : '#475569'}" />
+
+      ${drawLadderWire(185, 260, 235 - 16, 260, r2BotBranch)}
+      ${drawLadderContactNC(235, 260, addrPB1, 'PB1_STP', !inPB1, r2BotBranch, 'PB1')}
+      ${drawLadderWire(235 + 16, 260, 310 - 18, 260, r2BotOut)}
+      ${drawLadderCoil(310, 260, '%M21', 'AUTO_PL3', r2BotOut, 'int', r2BotOut)}
+      ${drawLadderWire(310 + 18, 260, rR, 260, false)}
+
+      <!-- ==================== RUNG 3: DRIVE OUTPUTS ==================== -->
+      <line x1="${rL + 10}" y1="298" x2="${rR - 10}" y2="298" stroke="#334155" stroke-width="0.8" stroke-dasharray="3 3" />
+      <text x="4" y="316" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="800" fill="#64748b">R3</text>
+      <text x="42" y="306" font-family="'Prompt', sans-serif" font-size="7.5" font-weight="700" fill="#22c55e">RUNG 3: DRIVE OUTPUTS (PL1_RED, PL2_YELLOW, PL3_GREEN)</text>
+
+      ${drawLadderWire(rL, 312, 58 - 16, 312, pwr)}
+      ${drawLadderContactNO(58, 312, addrEM, 'PB_EM', inEM, pwr, 'PB_EM')}
+      ${drawLadderWire(58 + 16, 312, 95, 312, r3EmIn)}
+
+      <!-- Branch 1: (M10 || M20) -> PL1_RED -->
+      <circle cx="95" cy="312" r="2.5" fill="${r3EmIn ? '#22c55e' : '#475569'}" />
+      ${drawLadderWire(95, 312, 135 - 16, 312, r3EmIn)}
+      ${drawLadderContactNO(135, 312, '%M10', 'MAN', M10, r3EmIn, null)}
+      ${drawLadderWire(135 + 16, 312, 210, 312, r3EmIn && M10)}
+
+      ${drawLadderWire(95, 312, 95, 328, r3EmIn)}
+      ${drawLadderWire(95, 328, 135 - 16, 328, r3EmIn)}
+      ${drawLadderContactNO(135, 328, '%M20', 'AUTO', M20, r3EmIn, null)}
+      ${drawLadderWire(135 + 16, 328, 210, 328, r3EmIn && M20)}
+      ${drawLadderWire(210, 328, 210, 312, r3EmIn && M20)}
+      <circle cx="210" cy="312" r="2.5" fill="${r3Pl1Out ? '#22c55e' : '#475569'}" />
+
+      ${drawLadderWire(210, 312, 310 - 18, 312, r3Pl1Out)}
+      ${drawLadderCoil(310, 312, addrPL1, 'PL1_RED', r3Pl1Out, 'out', r3Pl1Out)}
+      ${drawLadderWire(310 + 18, 312, rR, 312, false)}
+
+      <!-- Branch 2: (M11 || M21) -> PL3_GREEN -->
+      ${drawLadderWire(95, 312, 95, 352, r3EmIn)}
+      <circle cx="95" cy="352" r="2.5" fill="${r3EmIn ? '#22c55e' : '#475569'}" />
+      ${drawLadderWire(95, 352, 135 - 16, 352, r3EmIn)}
+      ${drawLadderContactNO(135, 352, '%M11', 'MAN', M11, r3EmIn, null)}
+      ${drawLadderWire(135 + 16, 352, 210, 352, r3EmIn && M11)}
+
+      ${drawLadderWire(95, 352, 95, 368, r3EmIn)}
+      ${drawLadderWire(95, 368, 135 - 16, 368, r3EmIn)}
+      ${drawLadderContactNO(135, 368, '%M21', 'AUTO', M21, r3EmIn, null)}
+      ${drawLadderWire(135 + 16, 368, 210, 368, r3EmIn && M21)}
+      ${drawLadderWire(210, 368, 210, 352, r3EmIn && M21)}
+      <circle cx="210" cy="352" r="2.5" fill="${r3Pl3Out ? '#22c55e' : '#475569'}" />
+
+      ${drawLadderWire(210, 352, 310 - 18, 352, r3Pl3Out)}
+      ${drawLadderCoil(310, 352, addrPL3, 'PL3_GRN', r3Pl3Out, 'out', r3Pl3Out)}
+      ${drawLadderWire(310 + 18, 352, rR, 352, false)}
+
+      <!-- Branch 3: /PL1 & /PL3 -> PL2_YELLOW (Standby) -->
+      ${drawLadderWire(95, 352, 95, 396, r3EmIn)}
+      <circle cx="95" cy="396" r="2.5" fill="${r3EmIn ? '#22c55e' : '#475569'}" />
+      ${drawLadderWire(95, 396, 145 - 16, 396, r3EmIn)}
+      ${drawLadderContactNC(145, 396, addrPL1, '/PL1', !r3Pl1Out, r3EmIn, null)}
+      ${drawLadderWire(145 + 16, 396, 225 - 16, 396, r3EmIn && !r3Pl1Out)}
+      ${drawLadderContactNC(225, 396, addrPL3, '/PL3', !r3Pl3Out, r3EmIn && !r3Pl1Out, null)}
+      ${drawLadderWire(225 + 16, 396, 310 - 18, 396, r3Pl2Out)}
+      ${drawLadderCoil(310, 396, addrPL2, 'PL2_YEL', r3Pl2Out, 'out', r3Pl2Out)}
+      ${drawLadderWire(310 + 18, 396, rR, 396, false)}
+    </svg>
+  `;
+}
+
 function renderPlcLadderDiagram() {
   const container = document.getElementById('ladderViewport');
   if (!container) return;
@@ -9804,7 +11359,9 @@ function renderPlcLadderDiagram() {
   const labId = pState.labId;
   let svgContent = '';
 
-  if (plcState.ladderPracticeMode) {
+  if (pState.lab && pState.lab.isIoPanelLab) {
+    svgContent = renderIoPanelLadderSVG(pState, spec);
+  } else if (plcState.ladderPracticeMode) {
     svgContent = renderPracticeLadderSVG(pState, spec);
   } else if (labId === 'lab1_1') {
     // 1 Rung: S1 NO series with S2 NO -> Q0.0 / Y0 (L1)
@@ -10500,6 +12057,10 @@ function initPlcLadderCoSim() {
     const hit = e.target.closest('[data-sw]');
     if (!hit) return;
     const sw = hit.getAttribute('data-sw');
+    if (['PB1', 'PB2', 'SS0', 'PB_EM'].includes(sw)) {
+      toggleIoPanelSwitch(sw);
+      return;
+    }
     if (sw && state.switches && state.switches[sw]) {
       state.switches[sw].pressed = !state.switches[sw].pressed;
       updateSimulationUI();
@@ -10950,6 +12511,186 @@ function syncSummaryLabConfiguration() {
   renderSchematic();
 }
 
+// Sync I/O Panel Config UI with state.ioPanelConfig (Version 3.0.0)
+function syncIoPanelConfigUI() {
+  const ioCfg = (typeof state !== 'undefined' && state.ioPanelConfig) ? state.ioPanelConfig : {
+    pb1Bit: 3, pb2Bit: 4, ss0Bit: 5, emBit: 6, pl1Bit: 2, pl2Bit: 3, pl3Bit: 4
+  };
+  const spec = getPlcModelSpec();
+
+  const populateInSelect = (elId, curVal) => {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    let html = '';
+    for (let k = 0; k <= 8; k++) {
+      html += `<option value="${k}" ${k === curVal ? 'selected' : ''}>Bit ${k} (${spec.termInShort(k)})</option>`;
+    }
+    el.innerHTML = html;
+  };
+
+  const populateOutSelect = (elId, curVal) => {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    let html = '';
+    for (let k = 0; k <= 6; k++) {
+      html += `<option value="${k}" ${k === curVal ? 'selected' : ''}>Bit ${k} (${spec.termOutShort(k)})</option>`;
+    }
+    el.innerHTML = html;
+  };
+
+  populateInSelect('ioBitPB1', ioCfg.pb1Bit);
+  populateInSelect('ioBitPB2', ioCfg.pb2Bit);
+  populateInSelect('ioBitSS0', ioCfg.ss0Bit);
+  populateInSelect('ioBitEM', ioCfg.emBit);
+
+  populateOutSelect('ioBitPL1', ioCfg.pl1Bit);
+  populateOutSelect('ioBitPL2', ioCfg.pl2Bit);
+  populateOutSelect('ioBitPL3', ioCfg.pl3Bit);
+
+  const bannerText = document.getElementById('ioPanelAssignmentText');
+  if (bannerText) {
+    const isAssign = (state.currentLabId === 'lab_iopanel_assign');
+    const modeDesc = isAssign
+      ? '<b>โจทย์มอบหมายงาน:</b> ต่อสายฮาร์ดแวร์ I/O Panel เข้ากับ PLC และทดสอบโหมด MANUAL: กด PB1 ติดค้าง PL1 / กด PB2 ติดค้าง PL2 / กด PB_EM หยุดทั้งหมด'
+      : '<b>ใบงาน I/O Panel ตอนที่ 1:</b> ต่อสายฮาร์ดแวร์ I/O Panel เข้ากับ PLC และทดสอบการทำงานของโหมด MANUAL (Interlock) และ AUTO (Self-Holding)';
+
+    bannerText.innerHTML = `
+      ${modeDesc}<br>
+      <span style="font-size:0.82rem;color:#94a3b8">
+        อินพุต: <b>PB1</b>=<code>${spec.termInShort(ioCfg.pb1Bit)}</code>, <b>PB2</b>=<code>${spec.termInShort(ioCfg.pb2Bit)}</code>, <b>SS0</b>=<code>${spec.termInShort(ioCfg.ss0Bit)}</code>, <b>PB_EM</b>=<code>${spec.termInShort(ioCfg.emBit)}</code> |
+        เอาต์พุต: <b>PL1</b>=<code>${spec.termOutShort(ioCfg.pl1Bit)}</code>, <b>PL2</b>=<code>${spec.termOutShort(ioCfg.pl2Bit)}</code>, <b>PL3</b>=<code>${spec.termOutShort(ioCfg.pl3Bit)}</code>
+      </span>
+    `;
+  }
+}
+
+// Initialize I/O Panel Event Listeners (Version 3.0.0)
+function initIoPanelEvents() {
+  const attachBitChange = (id, prop) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('change', (e) => {
+      const val = parseInt(e.target.value, 10);
+      state.ioPanelConfig[prop] = val;
+      state.wires = []; // Clear user wires on address change
+      syncIoPanelConfigUI();
+      renderWires();
+      updateSimulationUI();
+      renderTruthTable();
+      renderPlcLadderDiagram();
+      renderSchematic();
+    });
+  };
+
+  attachBitChange('ioBitPB1', 'pb1Bit');
+  attachBitChange('ioBitPB2', 'pb2Bit');
+  attachBitChange('ioBitSS0', 'ss0Bit');
+  attachBitChange('ioBitEM', 'emBit');
+  attachBitChange('ioBitPL1', 'pl1Bit');
+  attachBitChange('ioBitPL2', 'pl2Bit');
+  attachBitChange('ioBitPL3', 'pl3Bit');
+
+  // Randomize Bits button
+  const btnRand = document.getElementById('btnIoPanelRandomBits');
+  if (btnRand) {
+    btnRand.addEventListener('click', () => {
+      const inPool = [0, 1, 2, 3, 4, 5, 6, 7, 8].sort(() => Math.random() - 0.5);
+      state.ioPanelConfig.pb1Bit = inPool[0];
+      state.ioPanelConfig.pb2Bit = inPool[1];
+      state.ioPanelConfig.ss0Bit = inPool[2];
+      state.ioPanelConfig.emBit  = inPool[3];
+
+      const outPool = [0, 1, 2, 3, 4, 5, 6].sort(() => Math.random() - 0.5);
+      state.ioPanelConfig.pl1Bit = outPool[0];
+      state.ioPanelConfig.pl2Bit = outPool[1];
+      state.ioPanelConfig.pl3Bit = outPool[2];
+
+      state.wires = [];
+      syncIoPanelConfigUI();
+      renderWires();
+      updateSimulationUI();
+      renderTruthTable();
+      renderPlcLadderDiagram();
+      renderSchematic();
+    });
+  }
+
+  // Reset to default worksheet bits button
+  const btnReset = document.getElementById('btnIoPanelResetDefaultBits');
+  if (btnReset) {
+    btnReset.addEventListener('click', () => {
+      state.ioPanelConfig = { pb1Bit: 3, pb2Bit: 4, ss0Bit: 5, emBit: 6, pl1Bit: 2, pl2Bit: 3, pl3Bit: 4 };
+      state.wires = [];
+      syncIoPanelConfigUI();
+      renderWires();
+      updateSimulationUI();
+      renderTruthTable();
+      renderPlcLadderDiagram();
+      renderSchematic();
+    });
+  }
+
+  // Toggle Internal Schematic button
+  const btnToggleSchem = document.getElementById('btnToggleIoPanelInternalSchem');
+  if (btnToggleSchem) {
+    btnToggleSchem.addEventListener('click', () => {
+      state.ioPanelShowInternalSchem = !state.ioPanelShowInternalSchem;
+      btnToggleSchem.textContent = state.ioPanelShowInternalSchem
+        ? '📐 ดูวงจรเชื่อมต่อระบบ (System)'
+        : '🔍 ดูวงจรภายใน I/O Panel (TB 1–10)';
+      renderSchematic();
+    });
+  }
+
+  // Check Theory Answers button
+  const btnTheory = document.getElementById('btnCheckTheoryAnswers');
+  if (btnTheory) {
+    btnTheory.addEventListener('click', () => {
+      const q3 = document.querySelector('input[name="wsQ3"]:checked');
+      const q4 = document.querySelector('input[name="wsQ4"]:checked');
+      const banner = document.getElementById('theoryFeedbackBanner');
+      if (!banner) return;
+
+      if (!q3 || !q4) {
+        banner.className = 'theory-feedback-banner error';
+        banner.style.display = 'block';
+        banner.innerHTML = '⚠️ <b>กรุณาตอบคำถามให้ครบทั้งข้อ 3 และข้อ 4:</b> เลือกคำตอบในโหมด MANUAL และ AUTO ก่อนกดบันทึกผล';
+        return;
+      }
+
+      const q3Correct = (q3.value === 'INTERLOCK');
+      const q4Correct = (q4.value === 'SELF_HOLDING');
+
+      if (q3Correct && q4Correct) {
+        banner.className = 'theory-feedback-banner success';
+        banner.style.display = 'block';
+        banner.innerHTML = '🎉 <b>คำตอบถูกต้อง 100%!</b><br>• ข้อ 3: ในโหมด <b>MANUAL</b> การทำงานตรงกับแบบ <b>INTERLOCK</b> (สลับทำงานขณะกด ไม่ค้างสถานะ)<br>• ข้อ 4: ในโหมด <b>AUTO</b> การทำงานตรงกับแบบ <b>SELF-HOLDING</b> (กดติดค้างและสลับสถานะได้)';
+      } else {
+        banner.className = 'theory-feedback-banner error';
+        banner.style.display = 'block';
+        let msg = '❌ <b>ยังมีคำตอบที่ไม่ถูกต้อง:</b><br>';
+        if (!q3Correct) msg += '• ข้อ 3: โหมด MANUAL ในใบงานไม่มีการ Self-Holding (ไม่มีหน้าสัมผัสขนานต่อล็อกค้าง) ดังนั้นการกดสลับหลอดไฟจึงเป็นแบบ <b>INTERLOCK</b><br>';
+        if (!q4Correct) msg += '• ข้อ 4: โหมด AUTO มีหน้าสัมผัสช่วยขนานล็อกสถานะ (Self-Holding) ทำให้กดแล้วติดค้างได้<br>';
+        msg += '💡 กรุณาลองเลือกคำตอบใหม่อีกครั้ง';
+        banner.innerHTML = msg;
+      }
+    });
+  }
+
+  // Ladder popup quick switch buttons
+  const popPB1 = document.getElementById('btnPopupIoPanelPB1');
+  if (popPB1) popPB1.addEventListener('click', () => toggleIoPanelSwitch('PB1'));
+
+  const popPB2 = document.getElementById('btnPopupIoPanelPB2');
+  if (popPB2) popPB2.addEventListener('click', () => toggleIoPanelSwitch('PB2'));
+
+  const popSS0 = document.getElementById('btnPopupIoPanelSS0');
+  if (popSS0) popSS0.addEventListener('click', () => toggleIoPanelSwitch('SS0'));
+
+  const popEM = document.getElementById('btnPopupIoPanelEM');
+  if (popEM) popEM.addEventListener('click', () => toggleIoPanelSwitch('PB_EM'));
+}
+
 function initSummaryLabEvents() {
   const sumCfg = plcState.summaryConfig;
 
@@ -11096,5 +12837,6 @@ window.addEventListener('DOMContentLoaded', () => {
   initTimingDiagram();
   initPlcLadderCoSim();
   initSummaryLabEvents();
+  initIoPanelEvents();
   loadLab('lab1_1');
 });

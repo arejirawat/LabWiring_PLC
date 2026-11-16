@@ -42,6 +42,8 @@
             <option value="lab5_1">ใบงานที่ 5.1: การเชื่อมต่ออินพุตและเอาต์พุต PLC (PB1 ควบคุมหลอดไฟ PL1)</option>
             <option value="lab5_2">ใบงานที่ 5.2 (มอบหมายงาน): เชื่อมต่อ PB1 ควบคุมหลอดไฟ PL1 (แดง) และ PL2 (เขียว) สลับกัน</option>
             <option value="lab_summary_3_5">แบบฝึกหัดสรุปใบงานที่ 3-5: ออกแบบโจทย์ PLC &amp; Ladder และการต่อสายด้วยตนเอง</option>
+            <option value="lab_iopanel_main">ใบงาน I/O Panel (ตอนที่ 1): การเชื่อมต่อกับ I/O Panel และฝึก Wiring กับ Terminal (ทดสอบ MANUAL / AUTO)</option>
+            <option value="lab_iopanel_assign">ใบงาน I/O Panel (มอบหมายงาน): ออกแบบวงจร MANUAL กด PB1 ติดค้าง PL1 / กด PB2 ติดค้าง PL2 / กด PB_EM หยุดทั้งหมด</option>
           </select>
           <button type="button" id="btnOpenLabBuilder" class="btn btn-builder-menu" title="สร้างและจัดการโจทย์ใบงานเพิ่มเติม (สำหรับผู้สอน)">
             🛠️ สร้างโจทย์เพิ่มเติม
@@ -238,6 +240,179 @@
             <div class="assignment-icon">📌</div>
             <div class="assignment-text" id="summaryAssignmentText">
               <!-- Dynamically populated by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- I/O Panel & Terminal Wiring Configuration & Worksheet Card (Version 3.0.0) -->
+      <div class="panel-card iopanel-config-card" id="ioPanelConfigCard" hidden>
+        <div class="card-header iopanel-card-header">
+          <div>
+            <span class="badge badge-iopanel">I/O PANEL &amp; TERMINAL LAB</span>
+            <h2 id="ioPanelCardTitle">📦 การกำหนด Bit Position &amp; ตาราง Address (I/O Panel)</h2>
+          </div>
+          <div class="iopanel-header-actions">
+            <button type="button" id="btnIoPanelRandomBits" class="btn btn-iopanel-random" title="สุ่ม Bit Position อินพุตและเอาต์พุตใหม่โดยอัตโนมัติ">
+              🎲 สุ่ม Bit โจทย์ใหม่
+            </button>
+            <button type="button" id="btnIoPanelResetDefaultBits" class="btn btn-iopanel-reset" title="คืนค่า Bit Position ตามตารางในใบงาน (Input: 3, 4, 5, 6 / Output: 2, 3, 4)">
+              📐 ค่าเริ่มต้นตามใบงาน (3,4,5,6 / 2,3,4)
+            </button>
+            <button type="button" id="btnToggleIoPanelInternalSchem" class="btn btn-iopanel-internal" title="แสดง/ซ่อน แผนผังวงจรการต่อภายในกล่อง I/O Panel (TB 1–10)">
+              🔍 ดูวงจรภายใน I/O Panel
+            </button>
+          </div>
+        </div>
+
+        <div class="iopanel-card-body">
+          <div class="iopanel-tables-grid">
+            <!-- INPUT Table (Matching Worksheet) -->
+            <div class="iopanel-table-wrapper input-table-wrap">
+              <div class="iopanel-table-title">
+                <span class="badge badge-input">INPUT</span>
+                <strong>ตารางเชื่อมต่อสัญญาณอินพุต (สวิตช์ ➔ PLC)</strong>
+              </div>
+              <table class="iopanel-table">
+                <thead>
+                  <tr>
+                    <th>Bit Position</th>
+                    <th>TB No.</th>
+                    <th>Input Signal</th>
+                    <th>ชนิดหน้าสัมผัส</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <select id="ioBitPB1" class="sum-select io-bit-select" title="เลือก Bit Input ของ PB1"></select>
+                    </td>
+                    <td><code>TB 2</code></td>
+                    <td><b>PB1</b> (ปุ่มเขียว)</td>
+                    <td><span class="contact-pill no">Fixed NO (3-4)</span></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <select id="ioBitPB2" class="sum-select io-bit-select" title="เลือก Bit Input ของ PB2"></select>
+                    </td>
+                    <td><code>TB 3</code></td>
+                    <td><b>PB2</b> (ปุ่มแดง)</td>
+                    <td><span class="contact-pill no">Fixed NO (3-4)</span></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <select id="ioBitSS0" class="sum-select io-bit-select" title="เลือก Bit Input ของ SS0_Auto"></select>
+                    </td>
+                    <td><code>TB 4</code></td>
+                    <td><b>SS0_Auto</b> (MAN/AUTO)</td>
+                    <td><span class="contact-pill no">Fixed NO (MAN=0, AUTO=1)</span></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <select id="ioBitEM" class="sum-select io-bit-select" title="เลือก Bit Input ของ PB_EM"></select>
+                    </td>
+                    <td><code>TB 5</code></td>
+                    <td><b>PB_EM</b> (ปุ่มฉุกเฉิน)</td>
+                    <td><span class="contact-pill nc">Fixed NC (ปกติ=1, กด=0)</span></td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="iopanel-tb-note">💡 <b>* TB No.1</b> เป็น <b>Common Input</b> (ต่อเข้าไฟเลี้ยงสวิตช์ร่วม)</div>
+            </div>
+
+            <!-- OUTPUT Table (Matching Worksheet) -->
+            <div class="iopanel-table-wrapper output-table-wrap">
+              <div class="iopanel-table-title">
+                <span class="badge badge-output">OUTPUT</span>
+                <strong>ตารางเชื่อมต่อสัญญาณเอาต์พุต (PLC ➔ หลอดไฟ)</strong>
+              </div>
+              <table class="iopanel-table">
+                <thead>
+                  <tr>
+                    <th>Bit Position</th>
+                    <th>TB No.</th>
+                    <th>Output Signal</th>
+                    <th>สีหลอดไฟ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <select id="ioBitPL1" class="sum-select io-bit-select" title="เลือก Bit Output ของ PL1_RED"></select>
+                    </td>
+                    <td><code>TB 8</code></td>
+                    <td><b>PL1_RED</b></td>
+                    <td><span class="lamp-color-badge red">🔴 สีแดง (Red)</span></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <select id="ioBitPL2" class="sum-select io-bit-select" title="เลือก Bit Output ของ PL2_YELLOW"></select>
+                    </td>
+                    <td><code>TB 9</code></td>
+                    <td><b>PL2_YELLOW</b></td>
+                    <td><span class="lamp-color-badge yellow">🟡 สีเหลือง (Yellow)</span></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <select id="ioBitPL3" class="sum-select io-bit-select" title="เลือก Bit Output ของ PL3_GREEN"></select>
+                    </td>
+                    <td><code>TB 10</code></td>
+                    <td><b>PL3_GREEN</b></td>
+                    <td><span class="lamp-color-badge green">🟢 สีเขียว (Green)</span></td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="iopanel-tb-note">💡 <b>* TB No.7</b> เป็น <b>Common Output</b> (ต่อเข้าขั้วร่วมหลอดไฟ)</div>
+            </div>
+          </div>
+
+          <!-- Assignment & Wiring Summary Banner -->
+          <div class="iopanel-summary-banner" id="ioPanelAssignmentBanner">
+            <div class="banner-icon">📌</div>
+            <div class="banner-text" id="ioPanelAssignmentText">
+              <!-- Dynamically populated by JS -->
+            </div>
+          </div>
+
+          <!-- Interactive Worksheet Questions Section (ข้อ 3, 4, 5) -->
+          <div class="iopanel-worksheet-section" id="ioPanelWorksheetSection">
+            <div class="worksheet-section-header">
+              <span class="badge badge-theory">WORKSHEET LOG &amp; EVALUATION</span>
+              <h4>📝 บันทึกผลการทดลองตามใบงาน (MANUAL vs AUTO)</h4>
+            </div>
+            <div class="worksheet-questions-grid">
+              <div class="worksheet-q-card" id="qCardMan">
+                <div class="q-title"><b>ข้อ 3:</b> ในโหมด <b>MANUAL (SS0 = 0)</b> การทำงานตรงกับแบบใด?</div>
+                <div class="q-options">
+                  <label class="q-option-label">
+                    <input type="radio" name="wsQ3" value="INTERLOCK" id="q3Interlock"> <span>🔒 INTERLOCK (สลับทำงานขณะกดค้าง)</span>
+                  </label>
+                  <label class="q-option-label">
+                    <input type="radio" name="wsQ3" value="SELF_HOLDING" id="q3SelfHolding"> <span>🔄 SELF-HOLDING (กดติดค้างตลอด)</span>
+                  </label>
+                </div>
+                <div class="q-feedback" id="q3Feedback"></div>
+              </div>
+
+              <div class="worksheet-q-card" id="qCardAuto">
+                <div class="q-title"><b>ข้อ 4:</b> ในโหมด <b>AUTO (SS0 = 1)</b> การทำงานตรงกับแบบใด?</div>
+                <div class="q-options">
+                  <label class="q-option-label">
+                    <input type="radio" name="wsQ4" value="INTERLOCK" id="q4Interlock"> <span>🔒 INTERLOCK (สลับทำงานขณะกดค้าง)</span>
+                  </label>
+                  <label class="q-option-label">
+                    <input type="radio" name="wsQ4" value="SELF_HOLDING" id="q4SelfHolding"> <span>🔄 SELF-HOLDING (กดติดค้างตลอด)</span>
+                  </label>
+                </div>
+                <div class="q-feedback" id="q4Feedback"></div>
+              </div>
+            </div>
+
+            <div class="worksheet-actions-row">
+              <button type="button" id="btnCheckIoPanelTheory" class="btn btn-check-theory">
+                📝 ตรวจคำตอบบันทึกผลใบงาน
+              </button>
+              <div id="theoryFeedbackBanner" class="theory-feedback-banner" hidden></div>
             </div>
           </div>
         </div>
@@ -760,11 +935,14 @@
 
               <!-- Footer watermark matching original worksheet -->
               <text x="18" y="556" fill="#64748b" font-size="13" font-weight="600" pointer-events="none">ชุดทดลองการเชื่อมต่อวงจรไฟฟ้าควบคุมด้วย RELAY</text>
-              <text x="692" y="556" text-anchor="end" fill="#475569" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">Designed by Kru-Jirawat TATC | v2.9.1</text>
+              <text x="692" y="556" text-anchor="end" fill="#475569" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">Designed by Kru-Jirawat TATC | v3.0.0</text>
             </g>
 
             <!-- PLC Terminal Block Workbench Group (Lab 4 & Lab 5) -->
             <g id="plcTerminalBoard" style="display: none;"></g>
+
+            <!-- I/O Panel & Terminal Wiring Workbench Group (Version 3.0.0) -->
+            <g id="ioPanelBoard" style="display: none;"></g>
 
             <!-- Wires Layer -->
             <g id="wiresLayer"></g>
@@ -828,6 +1006,12 @@
               <span class="testbar-label">กดสวิตช์ทดสอบ:</span>
               <button type="button" id="btnPopupSwS1" class="btn-popup-sw" data-sw="S1">🔘 PB1 (S1): OFF (0)</button>
               <button type="button" id="btnPopupSwS2" class="btn-popup-sw" data-sw="S2">🔘 PB2 (S2): OFF (0)</button>
+              <div id="ioPanelPopupSwGroup" class="iopanel-popup-sw-group" style="display: none;">
+                <button type="button" id="btnPopupIoPB1" class="btn-popup-sw" data-iopanel-sw="PB1">🔘 PB1: OFF (0)</button>
+                <button type="button" id="btnPopupIoPB2" class="btn-popup-sw" data-iopanel-sw="PB2">🔘 PB2: OFF (0)</button>
+                <button type="button" id="btnPopupIoSS0" class="btn-popup-sw" data-iopanel-sw="SS0">🔄 SS0: MAN (0)</button>
+                <button type="button" id="btnPopupIoEM" class="btn-popup-sw btn-popup-em" data-iopanel-sw="PB_EM">🛑 PB_EM: ปกติ (1)</button>
+              </div>
               <span id="ladderPopupIoSummary" class="ladder-popup-io-summary"></span>
             </div>
 
@@ -1147,9 +1331,9 @@
 
   <footer class="app-version-footer">
     <span>⚡ <strong>Electrical Control &amp; PLC Wiring Simulator</strong> — พัฒนาสื่อการสอนโดย <strong>Kru-Jirawat Saengkhunnatham ELECTRONICS THAI-AUSTRIAN TECHNICAL COLLEGE</strong></span>
-    <span class="version-pill" id="appVersionBadge">Version 2.9.1 (อัปเดตล่าสุด: 16 พ.ย. 2026)</span>
+    <span class="version-pill" id="appVersionBadge">Version 3.0.0 (อัปเดตล่าสุด: 16 พ.ย. 2026)</span>
   </footer>
 
-  <script src="app.js?v=20261116_291"></script>
+  <script src="app.js?v=20261116_300"></script>
 </body>
 </html>
