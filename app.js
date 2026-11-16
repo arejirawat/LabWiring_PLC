@@ -1944,29 +1944,31 @@ function initIoPanelBoard() {
         <text x="0" y="38" text-anchor="middle" fill="#16a34a" font-size="9" font-weight="700">(TB 10)</text>
       </g>
 
-      <!-- 3 INTERACTIVE SWITCHES (Right Column inside Panel: x=250) -->
+      <!-- 3 INTERACTIVE SWITCHES (Right Column inside Panel: x=250) - Version 3.0.1 -->
       <!-- PB1: Green Pushbutton at (250, 120) -->
       <g id="ioPanelPB1Group" transform="translate(250, 120)">
         <text x="0" y="-30" text-anchor="middle" fill="#0f172a" font-size="12" font-weight="800">PB1 (NO)</text>
         <circle cx="0" cy="0" r="28" fill="#1e293b" stroke="#334155" stroke-width="2" />
+        <circle id="ioPanelPB1Glow" cx="0" cy="0" r="26" fill="transparent" opacity="0" filter="url(#glow-green)" />
         <g class="switch-actuator" data-iopanel-sw="PB1" style="cursor: pointer;" title="คลิกเพื่อกดสวิตช์ PB1 (NO)">
-          <circle id="ioPanelPB1Cap" cx="0" cy="0" r="22" fill="#22c55e" stroke="#15803d" stroke-width="2.5" filter="url(#shadow-sm)" />
-          <text x="0" y="4" text-anchor="middle" fill="#ffffff" font-size="10.5" font-weight="800" pointer-events="none">PRESS</text>
+          <circle id="ioPanelPB1Cap" cx="0" cy="0" r="22" fill="#22c55e" stroke="#15803d" stroke-width="2.5" filter="url(#shadow-sm)" style="transition: all 0.14s ease;" />
+          <text id="ioPanelPB1Text" x="0" y="4" text-anchor="middle" fill="#ffffff" font-size="10.5" font-weight="800" pointer-events="none" style="transition: all 0.14s ease;">PRESS</text>
         </g>
-        <rect id="ioPanelPB1StatePill" x="-32" y="30" width="64" height="15" rx="7.5" fill="#e2e8f0" />
-        <text id="ioPanelPB1StateText" x="0" y="41" text-anchor="middle" fill="#334155" font-size="9" font-weight="700">ปกติ OFF (0)</text>
+        <rect id="ioPanelPB1StatePill" x="-45" y="30" width="90" height="16" rx="8" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="1" />
+        <text id="ioPanelPB1StateText" x="0" y="41.5" text-anchor="middle" fill="#334155" font-size="8.5" font-weight="700">OFF: Open (0)</text>
       </g>
 
       <!-- PB2: Red Pushbutton at (250, 205) -->
       <g id="ioPanelPB2Group" transform="translate(250, 205)">
         <text x="0" y="-30" text-anchor="middle" fill="#0f172a" font-size="12" font-weight="800">PB2 (NO)</text>
         <circle cx="0" cy="0" r="28" fill="#1e293b" stroke="#334155" stroke-width="2" />
+        <circle id="ioPanelPB2Glow" cx="0" cy="0" r="26" fill="transparent" opacity="0" filter="url(#glow-yellow)" />
         <g class="switch-actuator" data-iopanel-sw="PB2" style="cursor: pointer;" title="คลิกเพื่อกดสวิตช์ PB2 (NO)">
-          <circle id="ioPanelPB2Cap" cx="0" cy="0" r="22" fill="#ef4444" stroke="#b91c1c" stroke-width="2.5" filter="url(#shadow-sm)" />
-          <text x="0" y="4" text-anchor="middle" fill="#ffffff" font-size="10.5" font-weight="800" pointer-events="none">PRESS</text>
+          <circle id="ioPanelPB2Cap" cx="0" cy="0" r="22" fill="#ef4444" stroke="#b91c1c" stroke-width="2.5" filter="url(#shadow-sm)" style="transition: all 0.14s ease;" />
+          <text id="ioPanelPB2Text" x="0" y="4" text-anchor="middle" fill="#ffffff" font-size="10.5" font-weight="800" pointer-events="none" style="transition: all 0.14s ease;">PRESS</text>
         </g>
-        <rect id="ioPanelPB2StatePill" x="-32" y="30" width="64" height="15" rx="7.5" fill="#e2e8f0" />
-        <text id="ioPanelPB2StateText" x="0" y="41" text-anchor="middle" fill="#334155" font-size="9" font-weight="700">ปกติ OFF (0)</text>
+        <rect id="ioPanelPB2StatePill" x="-45" y="30" width="90" height="16" rx="8" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="1" />
+        <text id="ioPanelPB2StateText" x="0" y="41.5" text-anchor="middle" fill="#334155" font-size="8.5" font-weight="700">OFF: Open (0)</text>
       </g>
 
       <!-- SS0: Rotary Selector Switch at (250, 290) -->
@@ -1974,37 +1976,38 @@ function initIoPanelBoard() {
         <text x="0" y="-30" text-anchor="middle" fill="#0f172a" font-size="12" font-weight="800">SS0: SELECTOR</text>
         <circle cx="0" cy="0" r="28" fill="#1e293b" stroke="#0f172a" stroke-width="2" />
         <!-- Dial labels -->
-        <text x="-21" y="-14" text-anchor="middle" fill="#cbd5e1" font-size="8.5" font-weight="800">MAN</text>
-        <text x="21" y="-14" text-anchor="middle" fill="#cbd5e1" font-size="8.5" font-weight="800">AUTO</text>
-        <g class="switch-actuator" data-iopanel-sw="SS0" style="cursor: pointer;" title="คลิกเพื่อหมุนสลับโหมด SS0 (MAN / AUTO)">
+        <text id="ioPanelSS0LblMan" x="-23" y="-12" text-anchor="middle" fill="#38bdf8" font-size="8" font-weight="800">MAN<tspan x="-23" y="-3" font-size="7">(OFF)</tspan></text>
+        <text id="ioPanelSS0LblAuto" x="23" y="-12" text-anchor="middle" fill="#64748b" font-size="8" font-weight="800">AUTO<tspan x="23" y="-3" font-size="7">(ON)</tspan></text>
+        <g class="switch-actuator" data-iopanel-sw="SS0" style="cursor: pointer;" title="คลิกเพื่อหมุนสลับโหมด SS0: MAN(OFF - Open Circuit) / AUTO(ON - Close Circuit)">
           <circle cx="0" cy="0" r="20" fill="#334155" stroke="#475569" stroke-width="1.5" />
-          <g id="ioPanelSS0Knob" transform="rotate(-35, 0, 0)">
+          <g id="ioPanelSS0Knob" transform="rotate(-38, 0, 0)" style="transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1); transform-origin: 0px 0px;">
             <rect x="-4" y="-16" width="8" height="28" rx="3" fill="#f8fafc" stroke="#0f172a" stroke-width="1" />
-            <polygon points="0,-16 -4,-10 4,-10" fill="#0284c7" />
+            <polygon id="ioPanelSS0Tip" points="0,-16 -4,-10 4,-10" fill="#94a3b8" />
           </g>
         </g>
-        <rect id="ioPanelSS0StatePill" x="-36" y="30" width="72" height="15" rx="7.5" fill="#e2e8f0" />
-        <text id="ioPanelSS0StateText" x="0" y="41" text-anchor="middle" fill="#334155" font-size="9" font-weight="700">MANUAL (0)</text>
+        <rect id="ioPanelSS0StatePill" x="-54" y="30" width="108" height="16" rx="8" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1" />
+        <text id="ioPanelSS0StateText" x="0" y="41.5" text-anchor="middle" fill="#334155" font-size="8" font-weight="700">SS0 OFF: Open (MAN)</text>
       </g>
 
       <!-- EMERGENCY STOP MUSHROOM BUTTON (Centered at x=193, y=380) -->
       <g id="ioPanelPBEMGroup" transform="translate(193, 380)">
         <!-- Yellow collar plate -->
         <circle cx="0" cy="0" r="42" fill="#fef08a" stroke="#ca8a04" stroke-width="2.5" />
+        <circle id="ioPanelEMAlertRing" cx="0" cy="0" r="38" fill="none" stroke="#ef4444" stroke-width="3" stroke-dasharray="6 3" opacity="0" filter="url(#glow-yellow)" style="transition: opacity 0.2s ease;" />
         <path id="emTextArcTop" d="M -30,-12 A 32 32 0 0 1 30,-12" fill="none" />
         <text font-size="8.5" font-weight="900" fill="#854d0e" text-anchor="middle">
           <textPath href="#emTextArcTop" startOffset="50%">EMERGENCY</textPath>
         </text>
         <text x="0" y="32" text-anchor="middle" fill="#854d0e" font-size="8.5" font-weight="900">STOP</text>
         <!-- Mushroom actuator -->
-        <g class="switch-actuator" data-iopanel-sw="PB_EM" style="cursor: pointer;" title="คลิกเพื่อกด/ปลดปุ่มฉุกเฉิน PB_EM (NC: ปกติจ่ายไฟ กดแล้วตัดไฟ)">
-          <circle cx="0" cy="0" r="30" fill="#991b1b" stroke="#7f1d1d" stroke-width="2" />
-          <circle id="ioPanelEMCap" cx="0" cy="0" r="26" fill="#dc2626" stroke="#b91c1c" stroke-width="2.5" filter="url(#shadow-sm)" />
+        <g class="switch-actuator" data-iopanel-sw="PB_EM" style="cursor: pointer;" title="คลิกเพื่อกดหยุดฉุกเฉิน (Open Circuit) หรือบิดปลดล็อก (Close Circuit)">
+          <circle cx="0" cy="0" r="30" fill="#7f1d1d" stroke="#450a0a" stroke-width="2" />
+          <circle id="ioPanelEMCap" cx="0" cy="0" r="26" fill="#dc2626" stroke="#b91c1c" stroke-width="2.5" filter="url(#shadow-sm)" style="transition: all 0.14s ease;" />
           <polygon points="0,-10 -9,6 9,6" fill="#ffffff" opacity="0.9" pointer-events="none" />
-          <text x="0" y="5" text-anchor="middle" fill="#ffffff" font-size="7.5" font-weight="900" pointer-events="none">PULL</text>
+          <text id="ioPanelEMActionText" x="0" y="4" text-anchor="middle" fill="#ffffff" font-size="7.5" font-weight="900" pointer-events="none" style="transition: all 0.14s ease;">PUSH STOP</text>
         </g>
-        <rect id="ioPanelEMStatePill" x="-46" y="45" width="92" height="15" rx="7.5" fill="#dcfce7" />
-        <text id="ioPanelEMStateText" x="0" y="56" text-anchor="middle" fill="#15803d" font-size="9" font-weight="800">CLOSED (ปกติ NC)</text>
+        <rect id="ioPanelEMStatePill" x="-54" y="45" width="108" height="16" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="1" />
+        <text id="ioPanelEMStateText" x="0" y="56.5" text-anchor="middle" fill="#15803d" font-size="8.5" font-weight="800">ปกติ: Close (NC=1)</text>
       </g>
 
       <!-- TERMINAL BLOCK STRIP TB 1..10 (x=35..345, y=462..568) -->
@@ -2229,7 +2232,7 @@ function initIoPanelBoard() {
   // Bottom Watermark
   html += `
     <text x="26" y="602" fill="#64748b" font-size="12" font-weight="600" pointer-events="none">ชุดทดลองเชื่อมต่อ I/O Panel และ Terminal Wiring กับ PLC</text>
-    <text x="894" y="602" text-anchor="end" fill="#475569" font-size="11.5" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">Designed by Kru-Jirawat TATC | v3.0.0</text>
+    <text x="894" y="602" text-anchor="end" fill="#475569" font-size="11.5" font-weight="700" font-family="'JetBrains Mono', monospace" pointer-events="none">Designed by Kru-Jirawat TATC | v3.0.1</text>
   `;
 
   container.innerHTML = html;
@@ -2449,13 +2452,20 @@ function computeWirePath(p1, p2, waypoints = [], bendPoint = null) {
   return `M ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} C ${cx1.toFixed(1)} ${cy1.toFixed(1)}, ${cx2.toFixed(1)} ${cy2.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
 }
 
-// Toggle switch on I/O Panel (Version 3.0.0)
+// Toggle switch on I/O Panel (Version 3.0.1)
 function toggleIoPanelSwitch(sw) {
   if (!state.ioPanelSwitches) return;
-  if (sw === 'PB1') state.ioPanelSwitches.PB1 = !state.ioPanelSwitches.PB1;
-  else if (sw === 'PB2') state.ioPanelSwitches.PB2 = !state.ioPanelSwitches.PB2;
-  else if (sw === 'SS0') state.ioPanelSwitches.SS0 = !state.ioPanelSwitches.SS0;
-  else if (sw === 'PB_EM') state.ioPanelSwitches.PB_EM = !state.ioPanelSwitches.PB_EM;
+  if (sw === 'PB1') {
+    state.ioPanelSwitches.PB1 = !state.ioPanelSwitches.PB1;
+    if (state.switches && state.switches.S1) state.switches.S1.pressed = state.ioPanelSwitches.PB1;
+  } else if (sw === 'PB2') {
+    state.ioPanelSwitches.PB2 = !state.ioPanelSwitches.PB2;
+    if (state.switches && state.switches.S2) state.switches.S2.pressed = state.ioPanelSwitches.PB2;
+  } else if (sw === 'SS0') {
+    state.ioPanelSwitches.SS0 = !state.ioPanelSwitches.SS0;
+  } else if (sw === 'PB_EM') {
+    state.ioPanelSwitches.PB_EM = !state.ioPanelSwitches.PB_EM;
+  }
 
   evaluateCircuit();
   renderWires();
@@ -3465,6 +3475,253 @@ function updateSimulationUI() {
       statePill.setAttribute('fill', pressed ? '#dcfce7' : '#e2e8f0');
     }
   });
+
+  // ==================== I/O PANEL VISUAL UPDATES (Version 3.0.1) ====================
+  const iopF1Blown = Boolean(state.fuseBlown && state.fuseBlown.IOP_F1);
+  const iopF2Blown = Boolean(state.fuseBlown && state.fuseBlown.IOP_F2);
+
+  const ioF1Body = document.getElementById('ioPFuse1Body');
+  const ioF1Win = document.getElementById('ioPFuse1Win');
+  const ioF1Wire = document.getElementById('ioPFuse1Wire');
+  const iopF1BlownGroup = document.getElementById('iopFuse1BlownGroup');
+  const ioF1Label = document.getElementById('ioPFuse1Label');
+  const ioF1Amp = document.getElementById('ioPFuse1Amp');
+
+  if (ioF1Body) {
+    ioF1Body.setAttribute('fill', iopF1Blown ? '#450a0a' : '#38bdf8');
+    ioF1Body.setAttribute('stroke', iopF1Blown ? '#ef4444' : '#0284c7');
+  }
+  if (ioF1Win) {
+    ioF1Win.setAttribute('fill', iopF1Blown ? '#1e293b' : '#f0f9ff');
+    ioF1Win.setAttribute('stroke', iopF1Blown ? '#ef4444' : '#0369a1');
+  }
+  if (ioF1Wire) ioF1Wire.setAttribute('opacity', iopF1Blown ? '0' : '1');
+  if (iopF1BlownGroup) {
+    iopF1BlownGroup.setAttribute('opacity', iopF1Blown ? '1' : '0');
+    iopF1BlownGroup.style.pointerEvents = iopF1Blown ? 'auto' : 'none';
+  }
+  if (ioF1Label) ioF1Label.setAttribute('opacity', iopF1Blown ? '0' : '1');
+  if (ioF1Amp) {
+    ioF1Amp.textContent = iopF1Blown ? 'BLOWN' : '2A';
+    ioF1Amp.setAttribute('fill', iopF1Blown ? '#fca5a5' : '#0284c7');
+  }
+
+  const ioF2Body = document.getElementById('ioPFuse2Body');
+  const ioF2Win = document.getElementById('ioPFuse2Win');
+  const ioF2Wire = document.getElementById('ioPFuse2Wire');
+  const iopF2BlownGroup = document.getElementById('iopFuse2BlownGroup');
+  const ioF2Label = document.getElementById('ioPFuse2Label');
+  const ioF2Amp = document.getElementById('ioPFuse2Amp');
+
+  if (ioF2Body) {
+    ioF2Body.setAttribute('fill', iopF2Blown ? '#450a0a' : '#38bdf8');
+    ioF2Body.setAttribute('stroke', iopF2Blown ? '#ef4444' : '#0284c7');
+  }
+  if (ioF2Win) {
+    ioF2Win.setAttribute('fill', iopF2Blown ? '#1e293b' : '#f0f9ff');
+    ioF2Win.setAttribute('stroke', iopF2Blown ? '#ef4444' : '#0369a1');
+  }
+  if (ioF2Wire) ioF2Wire.setAttribute('opacity', iopF2Blown ? '0' : '1');
+  if (iopF2BlownGroup) {
+    iopF2BlownGroup.setAttribute('opacity', iopF2Blown ? '1' : '0');
+    iopF2BlownGroup.style.pointerEvents = iopF2Blown ? 'auto' : 'none';
+  }
+  if (ioF2Label) ioF2Label.setAttribute('opacity', iopF2Blown ? '0' : '1');
+  if (ioF2Amp) {
+    ioF2Amp.textContent = iopF2Blown ? 'BLOWN' : '2A';
+    ioF2Amp.setAttribute('fill', iopF2Blown ? '#fca5a5' : '#0284c7');
+  }
+
+  if (btnResetFuse) {
+    btnResetFuse.style.display = (f1Blown || f2Blown || mainBlown || iopF1Blown || iopF2Blown) ? 'inline-flex' : 'none';
+  }
+
+  // Update I/O Panel Pilot Lamps (PL1 Red, PL2 Yellow, PL3 Green)
+  const isIoPL1 = Boolean(res.litPL1 || res.PL1_RED);
+  const isIoPL2 = Boolean(res.litPL2 || res.PL2_YELLOW);
+  const isIoPL3 = Boolean(res.litPL3 || res.PL3_GREEN);
+
+  const ioLamp1Body = document.getElementById('ioPanelLamp1Body');
+  const ioLamp1Halo = document.getElementById('ioPanelLamp1Halo');
+  if (ioLamp1Body) ioLamp1Body.setAttribute('fill', isIoPL1 ? '#ef4444' : '#7f1d1d');
+  if (ioLamp1Halo) ioLamp1Halo.setAttribute('opacity', isIoPL1 ? '0.95' : '0');
+
+  const ioLamp2Body = document.getElementById('ioPanelLamp2Body');
+  const ioLamp2Halo = document.getElementById('ioPanelLamp2Halo');
+  if (ioLamp2Body) ioLamp2Body.setAttribute('fill', isIoPL2 ? '#facc15' : '#78350f');
+  if (ioLamp2Halo) ioLamp2Halo.setAttribute('opacity', isIoPL2 ? '0.95' : '0');
+
+  const ioLamp3Body = document.getElementById('ioPanelLamp3Body');
+  const ioLamp3Halo = document.getElementById('ioPanelLamp3Halo');
+  if (ioLamp3Body) ioLamp3Body.setAttribute('fill', isIoPL3 ? '#22c55e' : '#064e3b');
+  if (ioLamp3Halo) ioLamp3Halo.setAttribute('opacity', isIoPL3 ? '0.95' : '0');
+
+  // Update I/O Panel Pushbuttons & Switches (with rich press, rotate & latch visual effects)
+  const ioSw = state.ioPanelSwitches || { PB1: false, PB2: false, SS0: false, PB_EM: false };
+
+  // PB1 (Green NO)
+  const pb1Cap = document.getElementById('ioPanelPB1Cap');
+  const pb1Glow = document.getElementById('ioPanelPB1Glow');
+  const pb1Text = document.getElementById('ioPanelPB1Text');
+  const pb1StateText = document.getElementById('ioPanelPB1StateText');
+  const pb1Pill = document.getElementById('ioPanelPB1StatePill');
+  if (pb1Cap) {
+    if (ioSw.PB1) {
+      pb1Cap.setAttribute('r', '19.5');
+      pb1Cap.setAttribute('cy', '2.5');
+      pb1Cap.setAttribute('fill', '#16a34a');
+      pb1Cap.setAttribute('stroke', '#4ade80');
+      pb1Cap.setAttribute('stroke-width', '3.5');
+    } else {
+      pb1Cap.setAttribute('r', '22');
+      pb1Cap.setAttribute('cy', '0');
+      pb1Cap.setAttribute('fill', '#22c55e');
+      pb1Cap.setAttribute('stroke', '#15803d');
+      pb1Cap.setAttribute('stroke-width', '2.5');
+    }
+  }
+  if (pb1Glow) pb1Glow.setAttribute('opacity', ioSw.PB1 ? '0.7' : '0');
+  if (pb1Text) {
+    pb1Text.setAttribute('y', ioSw.PB1 ? '6.5' : '4');
+    pb1Text.textContent = ioSw.PB1 ? 'PRESSED' : 'PRESS';
+  }
+  if (pb1StateText) {
+    pb1StateText.textContent = ioSw.PB1 ? 'ON: Close (1)' : 'OFF: Open (0)';
+    pb1StateText.setAttribute('fill', ioSw.PB1 ? '#15803d' : '#334155');
+  }
+  if (pb1Pill) {
+    pb1Pill.setAttribute('fill', ioSw.PB1 ? '#dcfce7' : '#e2e8f0');
+    pb1Pill.setAttribute('stroke', ioSw.PB1 ? '#16a34a' : '#cbd5e1');
+  }
+
+  // PB2 (Red NO)
+  const pb2Cap = document.getElementById('ioPanelPB2Cap');
+  const pb2Glow = document.getElementById('ioPanelPB2Glow');
+  const pb2Text = document.getElementById('ioPanelPB2Text');
+  const pb2StateText = document.getElementById('ioPanelPB2StateText');
+  const pb2Pill = document.getElementById('ioPanelPB2StatePill');
+  if (pb2Cap) {
+    if (ioSw.PB2) {
+      pb2Cap.setAttribute('r', '19.5');
+      pb2Cap.setAttribute('cy', '2.5');
+      pb2Cap.setAttribute('fill', '#dc2626');
+      pb2Cap.setAttribute('stroke', '#fca5a5');
+      pb2Cap.setAttribute('stroke-width', '3.5');
+    } else {
+      pb2Cap.setAttribute('r', '22');
+      pb2Cap.setAttribute('cy', '0');
+      pb2Cap.setAttribute('fill', '#ef4444');
+      pb2Cap.setAttribute('stroke', '#b91c1c');
+      pb2Cap.setAttribute('stroke-width', '2.5');
+    }
+  }
+  if (pb2Glow) pb2Glow.setAttribute('opacity', ioSw.PB2 ? '0.7' : '0');
+  if (pb2Text) {
+    pb2Text.setAttribute('y', ioSw.PB2 ? '6.5' : '4');
+    pb2Text.textContent = ioSw.PB2 ? 'PRESSED' : 'PRESS';
+  }
+  if (pb2StateText) {
+    pb2StateText.textContent = ioSw.PB2 ? 'ON: Close (1)' : 'OFF: Open (0)';
+    pb2StateText.setAttribute('fill', ioSw.PB2 ? '#b91c1c' : '#334155');
+  }
+  if (pb2Pill) {
+    pb2Pill.setAttribute('fill', ioSw.PB2 ? '#fee2e2' : '#e2e8f0');
+    pb2Pill.setAttribute('stroke', ioSw.PB2 ? '#b91c1c' : '#cbd5e1');
+  }
+
+  // SS0 (Rotary Selector: MAN = OFF / Open Circuit, AUTO = ON / Close Circuit)
+  const ss0Knob = document.getElementById('ioPanelSS0Knob');
+  const ss0Tip = document.getElementById('ioPanelSS0Tip');
+  const ss0LblMan = document.getElementById('ioPanelSS0LblMan');
+  const ss0LblAuto = document.getElementById('ioPanelSS0LblAuto');
+  const ss0StateText = document.getElementById('ioPanelSS0StateText');
+  const ss0Pill = document.getElementById('ioPanelSS0StatePill');
+
+  if (ss0Knob) {
+    ss0Knob.setAttribute('transform', ioSw.SS0 ? 'rotate(38, 0, 0)' : 'rotate(-38, 0, 0)');
+  }
+  if (ss0Tip) ss0Tip.setAttribute('fill', ioSw.SS0 ? '#22c55e' : '#94a3b8');
+  if (ss0LblMan) ss0LblMan.setAttribute('fill', ioSw.SS0 ? '#64748b' : '#38bdf8');
+  if (ss0LblAuto) ss0LblAuto.setAttribute('fill', ioSw.SS0 ? '#22c55e' : '#64748b');
+  if (ss0StateText) {
+    ss0StateText.textContent = ioSw.SS0 ? 'SS0 ON: Close (AUTO)' : 'SS0 OFF: Open (MAN)';
+    ss0StateText.setAttribute('fill', ioSw.SS0 ? '#15803d' : '#334155');
+  }
+  if (ss0Pill) {
+    ss0Pill.setAttribute('fill', ioSw.SS0 ? '#dcfce7' : '#f1f5f9');
+    ss0Pill.setAttribute('stroke', ioSw.SS0 ? '#16a34a' : '#94a3b8');
+  }
+
+  // PB_EM (Mushroom Emergency Stop: Normal = Close NC=1, Pressed = Open NC=0)
+  const emCap = document.getElementById('ioPanelEMCap');
+  const emAlertRing = document.getElementById('ioPanelEMAlertRing');
+  const emActionText = document.getElementById('ioPanelEMActionText');
+  const emStateText = document.getElementById('ioPanelEMStateText');
+  const emPill = document.getElementById('ioPanelEMStatePill');
+
+  if (emCap) {
+    if (ioSw.PB_EM) {
+      emCap.setAttribute('r', '22');
+      emCap.setAttribute('cy', '3.5');
+      emCap.setAttribute('fill', '#991b1b');
+      emCap.setAttribute('stroke', '#fca5a5');
+      emCap.setAttribute('stroke-width', '3');
+    } else {
+      emCap.setAttribute('r', '26');
+      emCap.setAttribute('cy', '0');
+      emCap.setAttribute('fill', '#dc2626');
+      emCap.setAttribute('stroke', '#b91c1c');
+      emCap.setAttribute('stroke-width', '2.5');
+    }
+  }
+  if (emAlertRing) emAlertRing.setAttribute('opacity', ioSw.PB_EM ? '1' : '0');
+  if (emActionText) {
+    emActionText.setAttribute('y', ioSw.PB_EM ? '6.5' : '4');
+    emActionText.textContent = ioSw.PB_EM ? '🔄 บิดปลดล็อก' : 'PUSH STOP';
+  }
+  if (emStateText) {
+    emStateText.textContent = ioSw.PB_EM ? 'กดล็อก: Open (NC=0)' : 'ปกติ: Close (NC=1)';
+    emStateText.setAttribute('fill', ioSw.PB_EM ? '#b91c1c' : '#15803d');
+  }
+  if (emPill) {
+    emPill.setAttribute('fill', ioSw.PB_EM ? '#fee2e2' : '#dcfce7');
+    emPill.setAttribute('stroke', ioSw.PB_EM ? '#b91c1c' : '#16a34a');
+  }
+
+  // Update I/O Panel Vertical Strip LEDs
+  for (let k = 0; k <= 8; k++) {
+    const inActive = Boolean(res.plcInputs && res.plcInputs[k]);
+    const inLed = document.getElementById(`iopInLed_${k}`);
+    if (inLed) inLed.setAttribute('fill', inActive ? '#22c55e' : '#334155');
+  }
+  for (let k = 0; k <= 6; k++) {
+    const outActive = Boolean(res.plcOutputs && res.plcOutputs[`Q${k}`]);
+    const outLed = document.getElementById(`iopOutLed_${k}`);
+    if (outLed) outLed.setAttribute('fill', outActive ? '#22c55e' : '#334155');
+  }
+
+  // Update Popup Switch Buttons (#ioPanelPopupSwGroup)
+  const popPB1 = document.getElementById('btnPopupIoPanelPB1');
+  const popPB2 = document.getElementById('btnPopupIoPanelPB2');
+  const popSS0 = document.getElementById('btnPopupIoPanelSS0');
+  const popEM  = document.getElementById('btnPopupIoPanelEM');
+
+  if (popPB1) {
+    popPB1.classList.toggle('active', Boolean(ioSw.PB1));
+    popPB1.innerHTML = `🔘 PB1: <b>${ioSw.PB1 ? 'ON (1: Close)' : 'OFF (0: Open)'}</b>`;
+  }
+  if (popPB2) {
+    popPB2.classList.toggle('active', Boolean(ioSw.PB2));
+    popPB2.innerHTML = `🔘 PB2: <b>${ioSw.PB2 ? 'ON (1: Close)' : 'OFF (0: Open)'}</b>`;
+  }
+  if (popSS0) {
+    popSS0.classList.toggle('active', Boolean(ioSw.SS0));
+    popSS0.innerHTML = `🔄 SS0: <b>${ioSw.SS0 ? 'AUTO (ON: Close)' : 'MAN (OFF: Open)'}</b>`;
+  }
+  if (popEM) {
+    popEM.classList.toggle('active', Boolean(ioSw.PB_EM));
+    popEM.innerHTML = `🛑 PB_EM: <b>${ioSw.PB_EM ? 'กดหยุด (Open=0)' : 'ปกติ (Close=1)'}</b>`;
+  }
 
   // Update toolbar switch mode button
   const modeBtn = document.getElementById('btnSwitchModeToggle');
@@ -7642,10 +7899,40 @@ function initInteractions() {
     if (e.button !== 0) return;
 
     // Click on blown fuse overlay or short circuit alert -> reset fuses
-    if (e.target.closest('#plcFuse1BlownGroup, #plcFuse2BlownGroup, #shortCircuitAlert')) {
+    if (e.target.closest('#plcFuse1BlownGroup, #plcFuse2BlownGroup, #iopFuse1BlownGroup, #iopFuse2BlownGroup, #shortCircuitAlert')) {
       e.preventDefault();
       e.stopPropagation();
       resetFuses();
+      return;
+    }
+
+    // Direct click/touch on switch/button on I/O Panel (Version 3.0.1)
+    const ioSwHit = e.target.closest('[data-iopanel-sw]');
+    if (ioSwHit) {
+      e.preventDefault();
+      e.stopPropagation();
+      const sw = ioSwHit.getAttribute('data-iopanel-sw');
+      if (sw) {
+        if (sw === 'SS0' || sw === 'PB_EM') {
+          toggleIoPanelSwitch(sw);
+        } else if (sw === 'PB1' || sw === 'PB2') {
+          const isLocked = Boolean(state.switches.S1.locked);
+          if (isLocked) {
+            state.ioPanelSwitches[sw] = !state.ioPanelSwitches[sw];
+          } else {
+            state.ioPanelSwitches[sw] = true;
+          }
+          if (sw === 'PB1' && state.switches && state.switches.S1) state.switches.S1.pressed = state.ioPanelSwitches.PB1;
+          if (sw === 'PB2' && state.switches && state.switches.S2) state.switches.S2.pressed = state.ioPanelSwitches.PB2;
+
+          evaluateCircuit();
+          renderWires();
+          updateSimulationUI();
+          highlightActiveTruthRow();
+          renderPlcLadderDiagram();
+          renderSchematic();
+        }
+      }
       return;
     }
 
@@ -8165,9 +8452,30 @@ function initInteractions() {
     });
 
     window.addEventListener('pointerup', () => {
+      let changed = false;
       if (!state.switches[sw].locked && state.switches[sw].pressed) {
         state.switches[sw].pressed = false;
+        changed = true;
+      }
+      if (state.ioPanelSwitches && !state.switches.S1.locked) {
+        if (state.ioPanelSwitches.PB1) {
+          state.ioPanelSwitches.PB1 = false;
+          if (state.switches && state.switches.S1) state.switches.S1.pressed = false;
+          changed = true;
+        }
+        if (state.ioPanelSwitches.PB2) {
+          state.ioPanelSwitches.PB2 = false;
+          if (state.switches && state.switches.S2) state.switches.S2.pressed = false;
+          changed = true;
+        }
+      }
+      if (changed) {
+        evaluateCircuit();
+        renderWires();
         updateSimulationUI();
+        highlightActiveTruthRow();
+        renderPlcLadderDiagram();
+        renderSchematic();
       }
     });
   });
